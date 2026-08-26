@@ -634,7 +634,14 @@ describe("§8 — o card 'Registrar avaliação' NÃO EXISTE na tela do lojista"
       "avaliação confirmada para",
       "quilometragem lida",
       "estado geral observado",
-      "observações",
+      // "observações da avaliação", e não o termo solto.
+      //
+      // A 4.11A trouxe um cartão legítimo chamado "Observações declaradas pelo
+      // proprietário" — o texto que quem publica escreveu. Ele não tem relação
+      // com o formulário aposentado, e a varredura pelo termo cru passou a
+      // acusá-lo. O nome COMPLETO do campo removido continua provando o que este
+      // teste existe para provar, sem colidir com a ficha declarada.
+      "observações da avaliação",
       "registrar proposta final",
       "proposta final",
       "motivo da alteração",

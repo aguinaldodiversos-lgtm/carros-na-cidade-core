@@ -126,8 +126,10 @@ describe("cabeçalho e ficha", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
 
     expect(await screen.findByText("Avaliação de veículo para compra")).toBeTruthy();
+    // 4.11A — "pelo vendedor" entrou no subtítulo. A frase continua descrevendo
+    // LEITURA e OFERTA, e continua sem prometer contato: é o portal que conduz.
     expect(
-      screen.getByText("Analise as informações declaradas e envie sua oferta.")
+      screen.getByText("Analise as informações declaradas pelo vendedor e envie sua oferta.")
     ).toBeTruthy();
   });
 
@@ -138,9 +140,12 @@ describe("cabeçalho e ficha", () => {
     // O resumo virou um cartão próprio e a ficha virou UM cartão com seções.
     // Os títulos mudaram junto; o que a asserção protege é que TODO grupo de
     // dados continua na tela, não como cada um se chama por dentro.
+    // 4.11A — "Resumo do veículo" saiu: os cinco dados dele viraram
+    // "Informações do veículo", e o piso subiu para o cartão de negociação. A
+    // ficha declarada ganhou título próprio na tela do lojista.
     for (const title of [
-      "Resumo do veículo",
-      "Situação declarada pelo proprietário",
+      "Informações do veículo",
+      "Condição declarada pelo vendedor",
       "Conservação",
       "Financeiro e documentação",
       "Histórico",
@@ -199,9 +204,14 @@ describe("cabeçalho e ficha", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-sale-opportunity-detail");
 
-    expect(screen.getByText("Referência FIPE")).toBeTruthy();
+    // 4.11A — a referência virou um cartão próprio: o rótulo (com a época) e o
+    // valor agora são elementos distintos, em vez de uma string só.
+    //
     // Mês em UTC: o snapshot de 01/08 não pode aparecer como julho.
-    expect(screen.getByText(/R\$\s?92\.000,00 \(ago de 2026\)/)).toBeTruthy();
+    expect(screen.getByText("Referência FIPE (ago de 2026)")).toBeTruthy();
+    expect(screen.getByTestId("dealer-detail-fipe-value").textContent).toMatch(
+      /92\.000,00/
+    );
   });
 
   it("FIPE não resolvida mostra 'Não informado', nunca um número inventado", async () => {
@@ -211,8 +221,12 @@ describe("cabeçalho e ficha", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-sale-opportunity-detail");
 
-    const rows = screen.getByText("Referência FIPE").closest("div");
-    expect(rows?.textContent).toContain("Não informado");
+    expect(screen.getByTestId("dealer-detail-fipe-missing").textContent).toContain(
+      "Não informado"
+    );
+    // E nenhum número aparece no lugar — nem o piso, que está logo ao lado e
+    // seria o candidato natural a ser confundido com a tabela.
+    expect(screen.queryByTestId("dealer-detail-fipe-value")).toBeNull();
   });
 });
 
@@ -244,12 +258,24 @@ describe("galeria", () => {
 
 // ============================================================================
 describe("painel de proposta", () => {
-  it("sem proposta nenhuma mostra travessão, e não R$ 0,00", async () => {
+  /**
+   * 4.11A (§22) — a ausência virou FRASE.
+   *
+   * O travessão dizia a verdade, mas obrigava o leitor a interpretá-lo: "—" em
+   * "Sua proposta" tanto podia ser "você não ofertou" quanto "não conseguimos
+   * carregar". As frases dizem qual dos dois é.
+   *
+   * O que a asserção protege é o mesmo de antes, e é o que importa: ausência
+   * NUNCA vira R$ 0,00, porque zero seria uma proposta de nada.
+   */
+  it("sem proposta nenhuma diz o que falta em palavras, e nunca R$ 0,00", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const panel = await screen.findByTestId("dealer-offer-panel");
 
-    expect(within(panel).getAllByText("—").length).toBeGreaterThanOrEqual(2);
+    expect(panel.textContent).toContain("Nenhuma oferta recebida ainda.");
+    expect(panel.textContent).toContain("Você ainda não fez uma oferta.");
     expect(within(panel).queryByText("R$ 0,00")).toBeNull();
+    expect(panel.textContent).not.toMatch(/R\$\s?0,00/);
     expect(within(panel).getByTestId("dealer-offer-count").textContent).toContain(
       "Nenhuma proposta recebida"
     );
@@ -490,7 +516,10 @@ describe("painel de proposta", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const distance = await screen.findByTestId("dealer-offer-fipe-distance");
 
-    expect(distance.textContent).toContain("Distância para a referência FIPE");
+    // "da sua oferta" desambigua (4.11A): o cartão de referência de mercado
+    // mostra a diferença entre FIPE e PISO na mesma tela, e as duas distâncias
+    // sem dono seriam lidas como a mesma conta.
+    expect(distance.textContent).toContain("Distância da sua oferta para a FIPE");
     expect(distance.textContent).toContain("22.000,00");
     expect(distance.textContent).toContain("abaixo");
   });

@@ -213,7 +213,34 @@ function beforeCursor(row, createdAt, id) {
  * do FAKE e não do código sob teste — provaria o oposto do que se quer provar.
  * A ausência de `owner_user_id` nesta lista é o que dá sentido à asserção.
  */
-function projectDealer(row) {
+/**
+ * O piso que a projeção do lojista devolve — LENDO O SQL, como o resto do fake.
+ *
+ * Fase 4.11A. O repository passou a resolver o piso pela RODADA CORRENTE
+ * (COALESCE(rnd.minimum_accepted_price, sr.minimum_accepted_price), com um
+ * LEFT JOIN em sale_request_rounds). Se este fake continuasse devolvendo
+ * `row.minimum_accepted_price` incondicionalmente, o teste da rodada 2 passaria
+ * com o repository CORRIGIDO e continuaria passando se alguém removesse o JOIN
+ * — ou seja, não provaria nada.
+ *
+ * Por isso a decisão é tomada a partir do TEXTO da query: sem o join, o fake
+ * devolve o piso da solicitação (o comportamento antigo, que é o que aquele SQL
+ * de fato pediria). Apagar o JOIN do repository faz o teste falhar.
+ */
+function dealerMinimumOf(row, text) {
+  const joinsCurrentRound =
+    /LEFT JOIN sale_request_rounds rnd/i.test(text ?? "") &&
+    /COALESCE\(rnd\.minimum_accepted_price, sr\.minimum_accepted_price\)/i.test(text ?? "");
+
+  if (!joinsCurrentRound) return row.minimum_accepted_price ?? null;
+
+  // COALESCE: a rodada primeiro, a solicitação como último recurso. O LEFT JOIN
+  // sem par devolve NULL em `rnd.*`, e é exatamente isso que `?? null` reproduz.
+  const round = currentRoundOf(row.id);
+  return round?.minimum_accepted_price ?? row.minimum_accepted_price ?? null;
+}
+
+function projectDealer(row, { text = "" } = {}) {
   const city = cityOf(row.city_id);
   return {
     id: row.id,
@@ -231,7 +258,7 @@ function projectDealer(row) {
     fuel_type: row.fuel_type,
     declared_condition: row.declared_condition,
     known_issues: row.known_issues ?? null,
-    minimum_accepted_price: row.minimum_accepted_price ?? null,
+    minimum_accepted_price: dealerMinimumOf(row, text),
     tire_condition: row.tire_condition ?? null,
     financing_status: row.financing_status ?? null,
     financing_balance: row.financing_balance ?? null,
@@ -2016,7 +2043,7 @@ function handle(text, params, now) {
     return {
       rows: [
         {
-          ...projectDealer(row),
+          ...projectDealer(row, { text }),
           selected_offer_at: row.selected_offer_at ?? null,
           selected_offer_amount: selectedOffer?.amount ?? null,
         },
@@ -2051,7 +2078,9 @@ function handle(text, params, now) {
     rows.sort((a, b) => compareByOrder(a, b, order));
 
     return {
-      rows: rows.slice(0, limit).map(projectDealer),
+      // `.map((row) => ...)` e não `.map(projectDealer)`: o segundo argumento do
+      // map é o ÍNDICE, e ele cairia no parâmetro de opções da projeção.
+      rows: rows.slice(0, limit).map((row) => projectDealer(row, { text })),
       rowCount: rows.length,
     };
   }

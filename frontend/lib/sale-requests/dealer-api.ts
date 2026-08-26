@@ -525,22 +525,35 @@ export function formatFipeReference(
 ): string | null {
   const money = formatMoneyValue(value);
   if (!money) return null;
-  if (!at) return money;
+
+  const month = formatFipeReferenceMonth(at);
+  return month ? `${money} (${month})` : money;
+}
+
+/**
+ * Só a ÉPOCA do snapshot: "ago/2026". `null` quando não há data utilizável.
+ *
+ * Existe separada porque o cartão de referência de mercado (4.11A) mostra o
+ * valor e a época em linhas diferentes — o valor grande, a época como rótulo
+ * acima dele. Extrair daqui, em vez de recortar a string de
+ * `formatFipeReference`, é o que impede que uma mudança de formato ali (uma
+ * vírgula, um traço) quebre silenciosamente o rótulo de lá.
+ *
+ * `timeZone: "UTC"` NÃO é detalhe. O snapshot é gravado como TIMESTAMPTZ e a
+ * referência costuma cair na virada do mês (`2026-08-01T00:00:00Z`). Formatado
+ * no fuso de Brasília (UTC-3), esse instante é 31/07 às 21h — e a tela mostraria
+ * "jul/2026" para uma referência de AGOSTO, envelhecendo a âncora de mercado em
+ * um mês inteiro aos olhos de quem vai propor.
+ */
+export function formatFipeReferenceMonth(at: string | null): string | null {
+  if (!at) return null;
 
   const date = new Date(at);
-  if (Number.isNaN(date.getTime())) return money;
+  if (Number.isNaN(date.getTime())) return null;
 
-  // `timeZone: "UTC"` NÃO é detalhe. O snapshot é gravado como TIMESTAMPTZ e a
-  // referência costuma cair na virada do mês (`2026-08-01T00:00:00Z`).
-  // Formatado no fuso de Brasília (UTC-3), esse instante é 31/07 às 21h — e a
-  // tela mostraria "jul/2026" para uma referência de AGOSTO, envelhecendo a
-  // âncora de mercado em um mês inteiro aos olhos de quem vai propor.
-  const month = date.toLocaleDateString("pt-BR", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-  return `${money} (${month.replace(".", "")})`;
+  return date
+    .toLocaleDateString("pt-BR", { month: "short", year: "numeric", timeZone: "UTC" })
+    .replace(".", "");
 }
 
 /**
@@ -674,14 +687,73 @@ export function fipeDistance(
   fipeValue: string | null,
   offerValue: string | null
 ): { amount: string; belowFipe: boolean } | null {
-  if (!fipeValue || !offerValue) return null;
+  const comparison = fipeComparison(fipeValue, offerValue);
+  if (!comparison) return null;
+  return { amount: comparison.amount, belowFipe: comparison.belowFipe };
+}
 
-  const fipe = Number(fipeValue);
-  const offer = Number(offerValue);
-  if (!Number.isFinite(fipe) || !Number.isFinite(offer)) return null;
+/** Decimal do backend ("74200.00") → CENTAVOS inteiros. `null` se malformado. */
+function moneyToCents(raw: string | null): number | null {
+  if (raw == null || raw === "") return null;
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(String(raw).trim());
+  if (!match) return null;
+  return Number(match[1]) * 100 + Number(String(match[2] ?? "").padEnd(2, "0"));
+}
 
-  const diff = fipe - offer;
-  return { amount: Math.abs(diff).toFixed(2), belowFipe: diff >= 0 };
+/**
+ * A comparação com a FIPE — valor absoluto E percentual (Fase 4.11A, §32/§33).
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * UM CÁLCULO SÓ, DOIS CONSUMIDORES
+ * ────────────────────────────────────────────────────────────────────────────
+ * `fipeDistance` (a distância entre a FIPE e a PROPOSTA, no painel) delega para
+ * cá. O cartão de referência de mercado compara a FIPE com o PISO. São perguntas
+ * diferentes sobre a mesma conta — e é justamente por isso que a conta não pode
+ * ser escrita duas vezes: no dia em que uma delas passasse a arredondar
+ * diferente, as duas linhas da mesma tela discordariam.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * CENTAVOS INTEIROS, NÃO PONTO FLUTUANTE
+ * ────────────────────────────────────────────────────────────────────────────
+ * A mesma disciplina do backend e do painel de proposta: `74200.10 - 62500.05`
+ * em binário não dá o que o olho espera. O percentual é uma divisão e sai em
+ * float de qualquer forma — mas a divisão parte de dois inteiros exatos.
+ *
+ * ────────────────────────────────────────────────────────────────────────────
+ * NUNCA "MARGEM" (§34)
+ * ────────────────────────────────────────────────────────────────────────────
+ * O nome da função é `fipeComparison`, e o campo é `belowFipe`. Preparação,
+ * impostos, garantia, tempo de pátio e preço real de revenda não estão
+ * calculados em lugar nenhum deste sistema — chamar esta diferença de margem
+ * entregaria ao lojista uma rentabilidade que ninguém computou.
+ *
+ * @returns `null` quando falta qualquer um dos dois lados, ou quando a FIPE é
+ * zero (a divisão do percentual não teria sentido). `null` NÃO é "sem
+ * diferença": é "não dá para dizer", e a tela precisa distinguir os dois.
+ */
+export function fipeComparison(
+  fipeValue: string | null,
+  referenceValue: string | null
+): { amount: string; percent: number; belowFipe: boolean } | null {
+  const fipeCents = moneyToCents(fipeValue);
+  const referenceCents = moneyToCents(referenceValue);
+
+  if (fipeCents == null || referenceCents == null) return null;
+  // FIPE zero: a diferença até existiria, mas o percentual seria uma divisão por
+  // zero. Meio resultado numa linha que promete os dois é pior que nenhum.
+  if (fipeCents === 0) return null;
+
+  const diffCents = fipeCents - referenceCents;
+
+  return {
+    amount: (Math.abs(diffCents) / 100).toFixed(2),
+    // Uma casa decimal: 11700/74200 = 15,768...% e a tela mostra "15,8%". Mais
+    // casas dariam ares de precisão a uma tabela que é, ela própria, referência.
+    percent: Math.round((Math.abs(diffCents) / fipeCents) * 1000) / 10,
+    // `>= 0` inclui o empate: FIPE igual ao piso não está ACIMA da FIPE. Quem
+    // renderiza decide se mostra "no valor da FIPE" quando a diferença é zero.
+    belowFipe: diffCents >= 0,
+  };
 }
 
 // ============================================================================

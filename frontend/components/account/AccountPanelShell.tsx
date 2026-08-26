@@ -9,6 +9,7 @@ import AccountNotificationsBell from "@/components/account/AccountNotificationsB
 import { AccountNotificationsProvider } from "@/components/account/AccountNotificationsProvider";
 import AccountPlanCard from "@/components/account/AccountPlanCard";
 import AccountUserMenu from "@/components/account/AccountUserMenu";
+import { isFocusModeRoute } from "@/lib/account/focus-routes";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 
 export type AccountPanelVariant = "pf" | "lojista";
@@ -243,6 +244,33 @@ export default function AccountPanelShell({
     if (href === basePath) return pathname === basePath;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
+
+  /**
+   * MODO FOCO (Fase 4.11A, §4) — o detalhe da oportunidade sai da moldura.
+   *
+   * Retorno ANTECIPADO, e não uma classe condicional espalhada pelo JSX abaixo.
+   * Esconder a barra com `hidden` a manteria montada: o `<aside>` continuaria no
+   * DOM, o `AccountPlanCard` continuaria buscando o plano e o
+   * `AccountNotificationsProvider` continuaria pedindo o contador de
+   * notificações — duas requests por carga para uma tela que não mostra nenhuma
+   * das duas coisas. O sino que o lojista vê nesta tela é o do cabeçalho global,
+   * que tem a própria fonte.
+   *
+   * O que fica: o fundo do painel e a própria página. O cabeçalho global vem do
+   * layout raiz (`app/layout.tsx` monta `PublicHeader` para o site inteiro) e
+   * nunca esteve dentro deste componente — por isso ele sobrevive ao retorno
+   * antecipado sem nada ser feito aqui.
+   *
+   * Sem `max-w-[1400px]`: o §7 pede a largura ampliada, e ela é definida pela
+   * própria página. O shell só entrega o espaço.
+   */
+  if (isFocusModeRoute(pathname, basePath)) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-[#F4F6FA]" data-panel-mode="focus">
+        {children}
+      </div>
+    );
+  }
 
   return (
     // O provider envolve o painel inteiro para que os DOIS sinos (barra mobile

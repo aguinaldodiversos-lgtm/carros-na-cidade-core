@@ -7,6 +7,7 @@ import {
 
 import { useState } from "react";
 import {
+  NOT_INFORMED,
   fipeDistance,
   formatMoneyValue,
   offerDigitsToDecimal,
@@ -14,7 +15,7 @@ import {
   submitSaleOffer,
   type DealerOfferState,
 } from "@/lib/sale-requests/dealer-api";
-import { formatMoneyInput, moneyDigits } from "@/lib/sale-requests/api";
+import { moneyDigits } from "@/lib/sale-requests/api";
 
 /**
  * Decimal do backend ("62500.00") → CENTAVOS inteiros.
@@ -35,60 +36,67 @@ function toCents(raw: string | null): number | null {
 }
 
 /**
- * O painel de proposta.
+ * Dígitos (centavos) → "62.500,00", SEM o "R$".
  *
- * ────────────────────────────────────────────────────────────────────────────
- * O QUE APARECE, E O QUE NUNCA VAI APARECER
- * ────────────────────────────────────────────────────────────────────────────
- * Aparece: a sua proposta, a MAIOR proposta atual, quantas propostas existem, e
- * um campo para propor mais.
+ * O símbolo virou um prefixo fixo à esquerda do campo (§28), então mantê-lo
+ * dentro do valor produziria "R$ R$ 62.500,00". `formatMoneyInput` continua
+ * existindo e sendo usada pelo resto do projeto — o que muda aqui é só a
+ * apresentação deste campo.
+ */
+function formatAmountDigits(digits: string): string {
+  const clean = moneyDigits(digits);
+  if (clean === "") return "";
+  return (Number(clean) / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * NEGOCIAÇÃO — a coluna comercial do detalhe (Fase 4.11A, §21 a §31, §36, §39).
  *
- * Não aparece — e não é esquecimento:
+ * ════════════════════════════════════════════════════════════════════════════
+ * A HIERARQUIA MUDOU; A LÓGICA, NÃO
+ * ════════════════════════════════════════════════════════════════════════════
+ * Validações, atalhos de incremento, envio, tratamento de recusa e propagação de
+ * estado são os MESMOS da 4.3. Esta fase mexeu em ordem, tamanho e rótulo — em
+ * nada que decida se uma proposta entra ou não.
  *
+ * O que mudou de lugar, e por quê:
+ *
+ *   O PISO virou o número grande do topo. Ele era uma linha de 12px espremida
+ *   entre o título e a faixa cinza, e é a primeira pergunta que o lojista faz:
+ *   "quanto o dono quer receber?". Dar-lhe o corpo maior da coluna é dizer que a
+ *   conversa começa nele.
+ *
+ *   MAIOR OFERTA e SUA OFERTA dividem uma linha logo abaixo, no mesmo tamanho —
+ *   são pares, e um maior que o outro sugeriria que um deles decide mais.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * AUSÊNCIA É FRASE, NÃO TRAVESSÃO E MUITO MENOS ZERO (§22)
+ * ════════════════════════════════════════════════════════════════════════════
+ * "R$ 0,00" seria uma proposta de nada — e não existe proposta nenhuma. O
+ * travessão dizia a verdade, mas obrigava o leitor a interpretá-lo. As frases
+ * ("Nenhuma oferta recebida ainda.", "Você ainda não fez uma oferta.") dizem
+ * qual dos dois estados é.
+ *
+ * O piso ausente segue a mesma regra e chega ao extremo do §55: o bloco continua
+ * na tela dizendo "Valor não informado", porque sumir com ele faria a pergunta
+ * mais importante da coluna desaparecer sem explicação.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE NUNCA VAI APARECER AQUI
+ * ════════════════════════════════════════════════════════════════════════════
  *   • nome, id ou qualquer traço da loja concorrente. A API não devolve nenhum;
  *   • a palavra "Confidencial". Ela diria que o VALOR é segredo, que é o oposto
  *     da regra: o valor líder é público entre lojistas, a identidade é que não é;
  *   • cronômetro, prazo ou "faltam X minutos". Não existe prazo neste MVP;
- *   • "Margem potencial". Preparação, impostos, garantia e revenda não estão
- *     calculados em lugar nenhum — o que existe é a DISTÂNCIA para a FIPE, e é
- *     assim que ela é rotulada;
- *   • stepper de fases futuras (avaliação presencial, documentação, negociação).
- *     Nenhuma delas tem estado no banco, e um stepper decorativo prometeria um
- *     fluxo que ninguém escreveu ainda.
+ *   • "Margem potencial". O que existe é a DISTÂNCIA para a FIPE, e é assim que
+ *     ela é rotulada;
+ *   • "Salvar oportunidade". A referência visual desta fase mostra o botão, mas
+ *     não existe favorito de oportunidade no backend — nem tabela, nem rota. O
+ *     §30 é explícito: não inventar funcionalidade porque ela aparece na imagem.
  */
-
-/** Um valor monetário grande, com rótulo. */
-function Figure({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | null;
-  tone?: "default" | "highlight" | "leading";
-}) {
-  const formatted = formatMoneyValue(value);
-  const toneClass =
-    tone === "highlight"
-      ? "text-[#0e62d8]"
-      : tone === "leading"
-        ? "text-[#067647]"
-        : "text-[#1D2440]";
-
-  return (
-    <div className="min-w-0">
-      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#98A2B3]">
-        {label}
-      </p>
-      <p className={`mt-0.5 text-[19px] font-bold leading-tight tabular-nums ${toneClass}`}>
-        {/* Ausência é travessão, nunca "R$ 0,00": zero seria uma proposta de
-            nada, e ainda não existe proposta nenhuma. */}
-        {formatted || "—"}
-      </p>
-    </div>
-  );
-}
-
 export default function DealerOfferPanel({
   saleRequestId,
   state,
@@ -111,8 +119,12 @@ export default function DealerOfferPanel({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showTerms, setShowTerms] = useState(false);
 
   const distance = fipeDistance(fipeReferenceValue, state.my_offer);
+  const minimumMoney = formatMoneyValue(minimumAcceptedPrice);
+  const highestMoney = formatMoneyValue(state.current_highest_offer);
+  const myOfferMoney = formatMoneyValue(state.my_offer);
 
   /**
    * Atalhos de incremento.
@@ -215,62 +227,104 @@ export default function DealerOfferPanel({
 
   return (
     <section
-      className="rounded-2xl border-2 border-[#DBE7FB] bg-white p-4 shadow-[0_4px_16px_-6px_rgba(14,98,216,0.15)]"
+      className="overflow-hidden rounded-2xl border border-[#E5E9F2] bg-white shadow-[0_2px_10px_-4px_rgba(16,32,64,0.10)]"
       data-testid="dealer-offer-panel"
+      aria-label="Negociação"
     >
-      <h2 className="text-[15px] font-bold text-[#0e62d8]">Sua proposta</h2>
-
-      {/*
-        O ESTADO DA DISPUTA, num bloco só.
-        A versão anterior espalhava valores, badge, distância FIPE e contagem em
-        quatro alturas soltas antes do campo — o lojista lia um relatório para
-        depois encontrar o formulário. Aqui os dois números dividem uma faixa
-        cinza, com a posição logo abaixo, e o formulário começa em seguida.
-
-        A ordem "maior primeiro" também mudou: é o número que decide quanto ele
-        precisa oferecer, e vinha em segundo.
-      */}
-      {/*
-        O PISO DO PROPRIETÁRIO (4.3.3) — acima da disputa, porque é a primeira
-        barreira e a única que já existe antes de qualquer proposta.
-
-        Fica FORA da faixa cinza dos valores de disputa de propósito: os dois de
-        lá mudam a cada lance; este não muda mais depois da publicação. Colocá-lo
-        na mesma faixa sugeriria que ele também sobe.
-      */}
-      {minimumAcceptedPrice ? (
-        <p
-          className="mt-3 rounded-xl border border-[#E5E9F2] bg-white px-3 py-2.5 text-[12px] text-[#667085]"
-          data-testid="dealer-offer-minimum"
+      <header className="flex items-center gap-2 border-b border-[#F2F4F7] px-4 py-3.5 sm:px-5">
+        <span
+          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EEF4FF] text-[#0e62d8]"
+          aria-hidden="true"
         >
-          Valor mínimo do proprietário:{" "}
-          <span className="text-[14px] font-bold text-[#1D2440]">
-            {formatMoneyValue(minimumAcceptedPrice)}
-          </span>
-        </p>
-      ) : null}
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <path d="M3 21h8M6.5 14.5l6-6M4 11l5-5 3.5 3.5-5 5zM14 4l6 6M15.5 9.5l4.5 4.5-2 2-4.5-4.5z" />
+          </svg>
+        </span>
+        <h2 className="text-[15px] font-bold text-[#161f34]">Negociação</h2>
+      </header>
 
-      <div className="mt-3 rounded-xl bg-[#F7F9FC] p-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <Figure
-            label="Maior proposta"
-            value={state.current_highest_offer}
-            tone={state.is_leading ? "default" : "highlight"}
-          />
-          <Figure
-            label="Sua proposta"
-            value={state.my_offer}
-            tone={state.is_leading ? "leading" : "default"}
-          />
+      <div className="px-4 py-4 sm:px-5">
+        {/*
+          O PISO — o número grande da coluna (§22/§23/§55).
+
+          Dois `data-testid` aninhados, e não por acaso:
+            `dealer-detail-minimum` é o BLOCO, e existe sempre;
+            `dealer-offer-minimum`  é o VALOR, e só existe quando há piso real.
+          É o que permite a uma tela só responder "o mínimo aparece" e "não há
+          número inventado quando ele falta" sem que as duas respostas se
+          atrapalhem.
+        */}
+        <div data-testid="dealer-detail-minimum">
+          <p className="text-[11.5px] font-semibold uppercase tracking-wide text-[#98A2B3]">
+            Valor mínimo do vendedor
+          </p>
+          {minimumMoney ? (
+            <p
+              className="mt-1 text-[30px] font-bold leading-none tabular-nums text-[#0e62d8] sm:text-[32px]"
+              data-testid="dealer-offer-minimum"
+            >
+              {minimumMoney}
+            </p>
+          ) : (
+            /*
+              §55 — "Valor não informado", e nunca "R$ 0,00" nem um travessão
+              solto. O tamanho cai porque não é mais um número: uma frase em
+              corpo 30 gritaria uma ausência.
+            */
+            <p className="mt-1 text-[15px] font-bold leading-tight text-[#667085]">
+              {NOT_INFORMED}
+            </p>
+          )}
+          <p className="mt-1 text-[11px] leading-relaxed text-[#98A2B3]">
+            Valor declarado pelo proprietário como mínimo aceito nesta rodada.
+          </p>
+        </div>
+
+        {/*
+          A DISPUTA — os dois valores lado a lado (§26/§27/§39).
+          `grid-cols-2` desde 360px: são dois números curtos, e empilhá-los
+          gastaria a altura que o formulário precisa acima da dobra.
+        */}
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#F2F4F7] pt-3.5">
+          <div className="min-w-0">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#98A2B3]">
+              Maior oferta atual
+            </p>
+            {highestMoney ? (
+              <p className="mt-0.5 text-[17px] font-bold leading-tight tabular-nums text-[#1D2440]">
+                {highestMoney}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[12px] leading-snug text-[#98A2B3]">
+                Nenhuma oferta recebida ainda.
+              </p>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#98A2B3]">
+              Sua última oferta
+            </p>
+            {myOfferMoney ? (
+              <p
+                className={`mt-0.5 text-[17px] font-bold leading-tight tabular-nums ${
+                  state.is_leading ? "text-[#067647]" : "text-[#1D2440]"
+                }`}
+              >
+                {myOfferMoney}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[12px] leading-snug text-[#98A2B3]">
+                Você ainda não fez uma oferta.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Badge de posição — sem nomes, dos dois lados. */}
         {state.my_offer ? (
           <p
-            className={`mt-2.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[11.5px] font-bold leading-none ${
-              state.is_leading
-                ? "bg-[#ECFDF3] text-[#067647]"
-                : "bg-[#FFF4ED] text-[#B93815]"
+            className={`mt-3 flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[12px] font-bold leading-none ${
+              state.is_leading ? "bg-[#ECFDF3] text-[#067647]" : "bg-[#FFF4ED] text-[#B93815]"
             }`}
             data-testid="dealer-offer-standing"
           >
@@ -284,139 +338,190 @@ export default function DealerOfferPanel({
             ? "Nenhuma proposta recebida ainda."
             : `${state.offers_count} ${state.offers_count === 1 ? "proposta recebida" : "propostas recebidas"}.`}
         </p>
-      </div>
 
-      {/*
-        Distância para a FIPE — rotulada como distância, e nunca como margem ou
-        lucro. Só aparece quando existem os DOIS lados (FIPE resolvida e proposta
-        enviada); sem um deles não há diferença a mostrar.
-      */}
-      {distance ? (
-        <p className="mt-2.5 text-[12px] text-[#667085]" data-testid="dealer-offer-fipe-distance">
-          Distância para a referência FIPE:{" "}
-          <span className="font-semibold text-[#1D2440]">
-            {formatMoneyValue(distance.amount)}
-          </span>{" "}
-          {distance.belowFipe ? "abaixo" : "acima"}
-        </p>
-      ) : null}
+        {/*
+          Distância para a FIPE — rotulada como distância, e nunca como margem ou
+          lucro. Só aparece quando existem os DOIS lados (FIPE resolvida e
+          proposta enviada); sem um deles não há diferença a mostrar.
+        */}
+        {distance ? (
+          <p className="mt-2 text-[12px] text-[#667085]" data-testid="dealer-offer-fipe-distance">
+            Distância da sua oferta para a FIPE:{" "}
+            <span className="font-semibold text-[#1D2440]">
+              {formatMoneyValue(distance.amount)}
+            </span>{" "}
+            {distance.belowFipe ? "abaixo" : "acima"}
+          </p>
+        ) : null}
 
-      <form onSubmit={handleSubmit} className="mt-4">
-        <label
-          htmlFor="dealer-offer-amount"
-          className="text-[11.5px] font-semibold text-[#475467]"
-        >
-          Nova proposta
-        </label>
-        <input
-          id="dealer-offer-amount"
-          inputMode="numeric"
-          value={formatMoneyInput(digits)}
-          onChange={(event) => {
-            setDigits(moneyDigits(event.target.value));
-            setError(null);
-            setSuccess(null);
-          }}
-          placeholder="R$ 0,00"
-          className="mt-1.5 h-14 w-full rounded-xl border border-[#E5E9F2] bg-white px-3.5 text-[22px] font-bold tabular-nums text-[#1D2440] outline-none transition placeholder:text-[19px] placeholder:font-normal placeholder:text-[#C3CDDE] focus:border-[#0e62d8] focus:ring-2 focus:ring-[#0e62d8]/15"
-          data-testid="dealer-offer-amount"
-        />
+        <form onSubmit={handleSubmit} className="mt-4 border-t border-[#F2F4F7] pt-4">
+          <label
+            htmlFor="dealer-offer-amount"
+            className="text-[12px] font-bold text-[#1D2440]"
+          >
+            Sua nova oferta
+          </label>
 
-        {bumpFrom ? (
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            {[500, 1000, 2000].map((increment) => (
-              <button
-                key={increment}
-                type="button"
-                onClick={() => applyBump(increment)}
-                className="h-9 rounded-lg border border-[#DBE7FB] bg-white text-[12px] font-bold text-[#0e62d8] transition hover:bg-[#F0F6FF]"
-                data-testid={`dealer-offer-bump-${increment}`}
-              >
-                + R$ {increment.toLocaleString("pt-BR")}
-              </button>
-            ))}
+          {/*
+            Prefixo "R$" FORA do campo (§28): dentro, ele era apagado junto com o
+            valor a cada limpeza e reaparecia só depois do primeiro dígito. Fora,
+            a moeda é constante e o campo guarda apenas o número.
+
+            `focus-within` no invólucro para que o anel de foco contorne prefixo e
+            campo como uma peça só — sem isto o foco desenharia um retângulo no
+            meio do controle.
+          */}
+          <div className="mt-1.5 flex items-stretch overflow-hidden rounded-xl border border-[#E5E9F2] bg-white transition focus-within:border-[#0e62d8] focus-within:ring-2 focus-within:ring-[#0e62d8]/15">
+            <span
+              className="flex shrink-0 items-center border-r border-[#E5E9F2] bg-[#F7F9FC] px-3 text-[13px] font-bold text-[#667085]"
+              aria-hidden="true"
+            >
+              R$
+            </span>
+            <input
+              id="dealer-offer-amount"
+              inputMode="numeric"
+              value={formatAmountDigits(digits)}
+              onChange={(event) => {
+                setDigits(moneyDigits(event.target.value));
+                setError(null);
+                setSuccess(null);
+              }}
+              placeholder="Ex.: 62.500,00"
+              /* O leitor de tela não recebe o "R$" do prefixo (ele é
+                 `aria-hidden`), então o rótulo acessível carrega a moeda. */
+              aria-label="Valor da sua nova oferta, em reais"
+              className="h-14 w-full min-w-0 bg-transparent px-3 text-[20px] font-bold tabular-nums text-[#1D2440] outline-none placeholder:text-[15px] placeholder:font-normal placeholder:text-[#C3CDDE]"
+              data-testid="dealer-offer-amount"
+            />
           </div>
-        ) : null}
 
-        <label htmlFor="dealer-offer-note" className="mt-4 block text-[11px] font-semibold text-[#64748b]">
-          Observações para avaliação (opcional)
-        </label>
-        {/*
-          "Observações para avaliação", e não "Mensagem". O campo NÃO é canal de
-          conversa: não existe resposta, não existe histórico de thread, e o
-          vendedor não vê este texto nesta fase. Um rótulo de mensagem faria o
-          lojista escrever esperando resposta.
-        */}
-        <textarea
-          id="dealer-offer-note"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          rows={2}
-          maxLength={500}
-          placeholder="Ex.: sujeito a avaliação presencial dos pneus."
-          className="mt-1 w-full resize-y rounded-xl border border-[#E5E9F2] bg-white px-3.5 py-2.5 text-[13px] text-[#1D2440] outline-none placeholder:text-[#B6C0D4] focus:border-[#0e62d8]"
-          data-testid="dealer-offer-note"
-        />
+          {bumpFrom ? (
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[500, 1000, 2000].map((increment) => (
+                <button
+                  key={increment}
+                  type="button"
+                  onClick={() => applyBump(increment)}
+                  className="h-9 rounded-lg border border-[#DBE7FB] bg-white text-[12px] font-bold text-[#0e62d8] transition hover:bg-[#F0F6FF] focus-visible:ring-2 focus-visible:ring-[#0e62d8]"
+                  data-testid={`dealer-offer-bump-${increment}`}
+                >
+                  + R$ {increment.toLocaleString("pt-BR")}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
-        {error ? (
-          <p
-            className="mt-3 rounded-[12px] border border-[#FECDCA] bg-[#FEF3F2] px-3.5 py-2.5 text-[13px] text-[#b42318]"
-            role="alert"
-            data-testid="dealer-offer-error"
+          {/*
+            "Observações para avaliação", e não "Mensagem". O campo NÃO é canal de
+            conversa: não existe resposta, não existe histórico de thread, e o
+            vendedor não vê este texto nesta fase. Um rótulo de mensagem faria o
+            lojista escrever esperando resposta.
+          */}
+          <label
+            htmlFor="dealer-offer-note"
+            className="mt-3.5 block text-[11px] font-semibold text-[#64748b]"
           >
-            {error}
-          </p>
-        ) : null}
+            Observações para avaliação (opcional)
+          </label>
+          <textarea
+            id="dealer-offer-note"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Ex.: sujeito a avaliação presencial dos pneus."
+            className="mt-1 w-full resize-y rounded-xl border border-[#E5E9F2] bg-white px-3.5 py-2.5 text-[13px] text-[#1D2440] outline-none placeholder:text-[#B6C0D4] focus:border-[#0e62d8]"
+            data-testid="dealer-offer-note"
+          />
 
-        {success ? (
-          <p
-            className="mt-3 rounded-[12px] border border-[#ABEFC6] bg-[#ECFDF3] px-3.5 py-2.5 text-[13px] text-[#067647]"
-            role="status"
-            data-testid="dealer-offer-success"
+          {error ? (
+            <p
+              className="mt-3 rounded-[12px] border border-[#FECDCA] bg-[#FEF3F2] px-3.5 py-2.5 text-[13px] text-[#b42318]"
+              role="alert"
+              data-testid="dealer-offer-error"
+            >
+              {error}
+            </p>
+          ) : null}
+
+          {success ? (
+            <p
+              className="mt-3 rounded-[12px] border border-[#ABEFC6] bg-[#ECFDF3] px-3.5 py-2.5 text-[13px] text-[#067647]"
+              role="status"
+              data-testid="dealer-offer-success"
+            >
+              {success}
+            </p>
+          ) : null}
+
+          {/*
+            "Fazer oferta" (§29). O card do feed já dizia "Fazer oferta" e o
+            detalhe dizia "Enviar oferta" — a mesma ação com dois nomes, um em
+            cada tela do mesmo fluxo. Alinhar pelo primeiro custa uma string e
+            elimina a divergência; alinhar pelo segundo custaria mexer no card,
+            no teste do card e no E2E do feed.
+          */}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="mt-4 h-12 w-full rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.25)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            data-testid="dealer-offer-submit"
           >
-            {success}
+            {submitting ? "Enviando…" : "Fazer oferta"}
+          </button>
+
+          {/*
+            §36 — AS CONDIÇÕES CONTINUAM INTEIRAS, EM UM CLIQUE.
+
+            A versão anterior empilhava três parágrafos de regra sob o botão. Eles
+            ocupavam mais altura que o formulário e, por serem sempre iguais,
+            passaram a ser mobiliário: quem abre a décima oportunidade não lê a
+            décima vez.
+
+            Nada foi removido nem reescrito — `DEALER_OFFER_COMMITMENT_NOTICE` e
+            `DEALER_OFFER_INSPECTION_NOTICE` são as mesmas constantes. O que
+            mudou é que a regra ESSENCIAL (a oferta é um compromisso) virou uma
+            linha visível no caminho do olho, e o detalhamento ficou atrás de "Ver
+            condições".
+
+            Botão, e não `<details>`: o resumo precisa herdar o estilo do resto do
+            painel, e o marcador nativo do `<summary>` varia entre navegadores.
+          */}
+          <p
+            className="mt-3 text-[11.5px] leading-relaxed text-[#667085]"
+            data-testid="dealer-offer-commitment"
+          >
+            {DEALER_OFFER_COMMITMENT_NOTICE}
           </p>
-        ) : null}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-4 h-12 w-full rounded-xl bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] px-4 text-sm font-bold text-white shadow-[0_8px_24px_rgba(14,98,216,0.25)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-          data-testid="dealer-offer-submit"
-        >
-          {submitting ? "Enviando…" : "Enviar oferta"}
-        </button>
+          <button
+            type="button"
+            onClick={() => setShowTerms((open) => !open)}
+            aria-expanded={showTerms}
+            aria-controls="dealer-offer-terms"
+            className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold text-[#0e62d8] hover:underline focus-visible:ring-2 focus-visible:ring-[#0e62d8]"
+            data-testid="dealer-offer-terms-toggle"
+          >
+            {showTerms ? "Ocultar condições" : "Ver condições"}
+            <span aria-hidden="true">{showTerms ? "▴" : "▾"}</span>
+          </button>
 
-        {/*
-          §6 — A REGRA PRECISA ESTAR VISÍVEL ANTES DO SUBMIT.
-          ────────────────────────────────────────────────────
-          A copy anterior dizia "a proposta é preliminar". A 4.7 removeu essa
-          leitura: o lojista envia uma oferta porque tem intenção REAL de comprar
-          pelo valor informado. "Preliminar" convidava a ofertar alto para ganhar
-          a disputa e renegociar na visita — exatamente o comportamento que
-          desgasta o produto dos dois lados.
-
-          Sem checkbox: o padrão "ao enviar, você declara" já é o do projeto, e um
-          aceite explícito aqui viraria mais um clique numa tela que já tem o
-          essencial. O que importa é que a regra seja LIDA, e ela está no caminho
-          do olho entre o campo e o botão.
-        */}
-        <p
-          className="mt-3 text-[11.5px] leading-relaxed text-[#667085]"
-          data-testid="dealer-offer-commitment"
-        >
-          {DEALER_OFFER_COMMITMENT_NOTICE}
-        </p>
-        <p
-          className="mt-1.5 text-[11.5px] leading-relaxed text-[#98A2B3]"
-          data-testid="dealer-offer-inspection-notice"
-        >
-          {DEALER_OFFER_INSPECTION_NOTICE}
-        </p>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-[#98A2B3]">
-          A oferta precisa superar a maior proposta atual.
-        </p>
-      </form>
+          {showTerms ? (
+            <div id="dealer-offer-terms" className="mt-2 space-y-1.5">
+              <p
+                className="text-[11.5px] leading-relaxed text-[#98A2B3]"
+                data-testid="dealer-offer-inspection-notice"
+              >
+                {DEALER_OFFER_INSPECTION_NOTICE}
+              </p>
+              <p className="text-[11px] leading-relaxed text-[#98A2B3]">
+                A oferta precisa superar a maior proposta atual.
+              </p>
+            </div>
+          ) : null}
+        </form>
+      </div>
     </section>
   );
 }
