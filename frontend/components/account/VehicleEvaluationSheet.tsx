@@ -255,10 +255,10 @@ export default function VehicleEvaluationSheet({
    * As duas telas que compartilham esta ficha têm VIZINHANÇAS diferentes, e o
    * título certo depende da vizinhança:
    *
-   *   • no detalhe do LOJISTA existe, logo acima, um cartão "Resumo do veículo"
-   *     com um dado rotulado "Estado geral". Um título de seção com o mesmo
-   *     texto faz o leitor procurar a diferença entre os dois — por isso ali o
-   *     grupo se chama "Conservação";
+   *   • no detalhe do LOJISTA a ficha já entra sob um título próprio,
+   *     "Condição declarada pelo vendedor" (Fase 4.11A). Um primeiro grupo
+   *     chamado "Estado geral e pneus" logo abaixo dele repetiria o assunto do
+   *     título uma linha depois — por isso ali o grupo se chama "Conservação";
    *
    *   • na tela do DONO não existe esse resumo, e "Estado geral e pneus" é o
    *     texto que ele já conhece desde a Fase 4.2. Mudá-lo seria alterar a tela

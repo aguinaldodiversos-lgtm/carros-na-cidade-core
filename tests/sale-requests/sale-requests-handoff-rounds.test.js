@@ -764,3 +764,118 @@ describe("autorização (§45)", () => {
     }
   });
 });
+
+/**
+ * O PISO QUE O LOJISTA LÊ (Fase 4.11A, §25 e §54).
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * A REGRESSÃO QUE ESTE BLOCO TRANCA
+ * ════════════════════════════════════════════════════════════════════════════
+ * Da 4.7 até a 4.11A, `sale-requests.dealer.repository.js` projetava
+ * `sr.minimum_accepted_price` — o piso da RODADA 1, que `openNewRound` nunca
+ * atualiza. Enquanto isso `sale-requests.offers.service.js` já validava contra
+ * `round.minimum_accepted_price`.
+ *
+ * O sintoma não era um erro: era a tela do lojista pedindo R$ 70.000 numa
+ * disputa que a API aceitava por R$ 62.500. Ninguém recebia exceção, e o único
+ * jeito de descobrir era ofertar.
+ *
+ * Estes testes falham se alguém devolver o `sr.minimum_accepted_price` direto:
+ * `projectDealer` do fake decide o piso LENDO o SQL, então sem o
+ * `LEFT JOIN sale_request_rounds` o valor volta a ser o da rodada 1 e as
+ * asserções abaixo acusam.
+ */
+describe("o piso do lojista vem da rodada CORRENTE (§25, §54)", () => {
+  const ROUND_1_MINIMUM = "70000.00";
+  const ROUND_2_MINIMUM = "62500.00";
+
+  /**
+   * Leva a solicitação até `handoff_failed`, pronta para uma rodada nova.
+   *
+   * NÃO usa `seedThreeOffers`: os valores fixos daquele helper (65.000, 63.500,
+   * 62.000) não alcançam o piso de 70.000 desta história, e o backend recusaria
+   * as três com 409. O piso alto é justamente o ponto — é dele que a rodada 2
+   * vai descer.
+   */
+  async function seedUpToFailedHandoff(app, overrides = {}) {
+    const row = seedRequest({ minimum_accepted_price: ROUND_1_MINIMUM, ...overrides });
+
+    await sendOffer(app, { user: DEALER_A, id: row.id, amount: "72000" });
+    const offer = db.saleRequestOffers.find(
+      (item) => String(item.sale_request_id) === String(row.id)
+    );
+
+    await acceptOffer(app, { id: row.id, offerId: offer.id });
+    await noAgreement(app, { id: row.id });
+    return row;
+  }
+
+  it("§54 — depois da rodada 2, o DETALHE mostra o piso novo, nunca o da rodada 1", async () => {
+    const app = buildApp();
+    const row = await seedUpToFailedHandoff(app);
+
+    await newRound(app, { id: row.id, minimum: "62500" });
+
+    const response = await dealerDetail(app, { id: row.id });
+
+    expect(response.status).toBe(200);
+    expect(response.body.sale_opportunity.minimum_accepted_price).toBe(ROUND_2_MINIMUM);
+    // A asserção negativa é a que trava a regressão: o valor da rodada 1
+    // continua existindo no banco, e é exatamente ele que voltaria a aparecer se
+    // a junção saísse do repository.
+    expect(response.body.sale_opportunity.minimum_accepted_price).not.toBe(ROUND_1_MINIMUM);
+  });
+
+  it("§54 — o FEED acompanha o detalhe: um piso só, o da rodada corrente", async () => {
+    const app = buildApp();
+    const row = await seedUpToFailedHandoff(app);
+    await newRound(app, { id: row.id, minimum: "62500" });
+
+    const response = await asDealer(request(app).get(DEALER_BASE), DEALER_A);
+
+    expect(response.status).toBe(200);
+    const card = response.body.items.find((item) => String(item.id) === String(row.id));
+    // O card e a ficha lêem a MESMA coluna projetada. Se divergirem, o lojista
+    // vê um piso na lista e outro ao abrir — e nenhuma das duas telas erra
+    // sozinha o bastante para alguém desconfiar.
+    expect(card.minimum_accepted_price).toBe(ROUND_2_MINIMUM);
+  });
+
+  it("§53 — na rodada 1 o piso declarado continua chegando inteiro", async () => {
+    const app = buildApp();
+    const row = seedRequest({ minimum_accepted_price: "62500.00" });
+
+    const response = await dealerDetail(app, { id: row.id });
+
+    expect(response.status).toBe(200);
+    expect(response.body.sale_opportunity.minimum_accepted_price).toBe("62500.00");
+  });
+
+  it("§55 — solicitação legada sem piso chega como null, e nunca como zero", async () => {
+    const app = buildApp();
+    const row = seedRequest({ minimum_accepted_price: null });
+
+    const response = await dealerDetail(app, { id: row.id });
+
+    expect(response.status).toBe(200);
+    // `null` é "não foi declarado". `"0"` seria "aceita qualquer valor" — e a
+    // tela tem de poder distinguir os dois para não convidar a uma oferta de
+    // nada em nome de quem nunca abriu mão de piso algum.
+    expect(response.body.sale_opportunity.minimum_accepted_price).toBeNull();
+  });
+
+  it("a rodada 1 permanece no histórico com o piso original", async () => {
+    const app = buildApp();
+    const row = await seedUpToFailedHandoff(app);
+    await newRound(app, { id: row.id, minimum: "62500" });
+
+    const rounds = roundsOf(row.id).sort((a, b) => a.round_number - b.round_number);
+
+    // O piso antigo não é apagado: ele é o contexto das ofertas da rodada 1, e
+    // sem ele aquelas ofertas viram números sem régua.
+    expect(rounds.map((round) => round.minimum_accepted_price)).toEqual([
+      ROUND_1_MINIMUM,
+      ROUND_2_MINIMUM,
+    ]);
+  });
+});

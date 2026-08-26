@@ -73,9 +73,29 @@ const DEALER_COLUMNS = `
   sr.declared_condition,
   sr.known_issues,
 
-  -- O PISO do proprietario. E o UNICO valor financeiro que o card mostra, e a
-  -- primeira barreira que uma proposta precisa vencer.
-  sr.minimum_accepted_price,
+  -- ──────────────────────────────────────────────────────────────────────────
+  -- O PISO DO PROPRIETARIO — DA RODADA CORRENTE, NAO DA SOLICITACAO
+  -- ──────────────────────────────────────────────────────────────────────────
+  -- Ate a Fase 4.11A esta linha era "sr.minimum_accepted_price", e isso estava
+  -- ERRADO desde a 4.7. A 4.7 moveu o piso para a rodada: openNewRound insere
+  -- uma linha nova em sale_request_rounds com o piso novo e move o ponteiro
+  -- current_round_number — mas NAO atualiza sr.minimum_accepted_price, que
+  -- continua guardando o piso da rodada 1.
+  --
+  -- O resultado era uma divergencia viva entre o que a tela mostrava e o que a
+  -- API cobrava: sale-requests.offers.service.js valida contra
+  -- round.minimum_accepted_price (o piso NOVO), enquanto o lojista lia o piso
+  -- VELHO. Depois de uma republicacao que baixou o minimo de 70.000 para
+  -- 62.500, a tela pedia 70.000 para uma disputa que aceitava 62.500.
+  --
+  -- Por que COALESCE, e por que ele nao pode ressuscitar um piso vencido:
+  -- validateMinimumAcceptedPrice LANCA quando o valor e nulo, entao openNewRound
+  -- nao consegue criar uma rodada >= 2 sem piso. O unico NULL possivel em
+  -- rnd.minimum_accepted_price e o da rodada 1 retrobackfillada pela migration
+  -- 060 — que copiou justamente sr.minimum_accepted_price. Nesse caso os dois
+  -- lados sao NULL e o COALESCE devolve NULL, que e a resposta certa.
+  COALESCE(rnd.minimum_accepted_price, sr.minimum_accepted_price)
+    AS minimum_accepted_price,
 
   sr.tire_condition,
   sr.financing_status,
@@ -103,6 +123,31 @@ const DEALER_COLUMNS = `
   c.name  AS city_name,
   c.state AS city_state,
   c.slug  AS city_slug
+`;
+
+/**
+ * A junção da RODADA CORRENTE — escrita uma vez, usada pelo feed e pelo detalhe.
+ *
+ * O par `(sale_request_id, round_number)` casa a UNIQUE de
+ * `sale_request_rounds`, então a junção é exata: devolve no máximo uma linha,
+ * nunca multiplica o resultado e não precisa de `DISTINCT`.
+ *
+ * `LEFT JOIN`, e não `JOIN`, de propósito. Toda solicitação deveria ter a rodada
+ * corrente — a migration 060 retrobackfillou a rodada 1 de todas as linhas
+ * existentes, e a criação grava solicitação e rodada na mesma transação. Mas se
+ * um dia uma linha aparecer sem rodada, um `JOIN` a APAGARIA do feed: o lojista
+ * veria uma cidade com menos veículos e ninguém receberia erro nenhum. O
+ * `LEFT JOIN` degrada para o piso legado da solicitação em vez de sumir com o
+ * veículo — o modo de falha barulhento é preferível ao silencioso.
+ *
+ * O alias é `rnd` e não `r`: `sale-requests.rounds.repository.js` já usa `r`
+ * para a mesma tabela, e dois aliases iguais em queries diferentes convidam a
+ * copiar um predicado de lá para cá sem notar que o `FROM` é outro.
+ */
+const CURRENT_ROUND_JOIN = `
+    LEFT JOIN sale_request_rounds rnd
+      ON rnd.sale_request_id = sr.id
+     AND rnd.round_number = sr.current_round_number
 `;
 
 /**
@@ -165,6 +210,7 @@ function buildFeedSource({ cityId, filters = {} }) {
   const sql = `
     FROM sale_requests sr
     JOIN cities c ON c.id = sr.city_id
+${CURRENT_ROUND_JOIN}
     WHERE ${conditions.join("\n      AND ")}
   `;
 
@@ -319,6 +365,7 @@ export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId)
       sel.amount AS selected_offer_amount
     FROM sale_requests sr
     JOIN cities c ON c.id = sr.city_id
+${CURRENT_ROUND_JOIN}
     LEFT JOIN sale_request_offers sel ON sel.id = sr.selected_offer_id
     WHERE sr.id = $1
       AND sr.city_id = $2
