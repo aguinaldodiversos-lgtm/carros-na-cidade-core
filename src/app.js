@@ -52,6 +52,7 @@ import purchaseIntentsDealerRoutes from "./modules/purchase-intents/purchase-int
 import purchaseIntentsRoutes from "./modules/purchase-intents/purchase-intents.routes.js";
 import saleRequestsRoutes from "./modules/sale-requests/sale-requests.routes.js";
 import saleRequestsDealerRoutes from "./modules/sale-requests/sale-requests.dealer.routes.js";
+import dealerOpportunitiesSummaryRoutes from "./modules/dealers/dealer-opportunities-summary.routes.js";
 import regionsRoutes from "./modules/regions/regions.routes.js";
 import locationRoutes from "./modules/location/location.routes.js";
 import supportRoutes from "./modules/support/support.routes.js";
@@ -308,6 +309,12 @@ app.use("/api/account/notifications", notificationsRoutes);
 //
 // Guardas diferentes: procuras exigem só sessão (CPF/pending publicam);
 // oportunidades exigem sessão + conta CNPJ.
+// O RESUMO do hub vem antes dos dois feeds. Não é preferência de estilo: os
+// caminhos são irmãos (`.../opportunities/summary` não é subcaminho de
+// `.../opportunities/purchase-intents`), mas manter a ordem "mais específico
+// primeiro" é a convenção deste arquivo inteiro — e é ela que impede que uma
+// rota futura com parâmetro capture um caminho literal declarado depois.
+app.use("/api/account/opportunities/summary", dealerOpportunitiesSummaryRoutes);
 app.use("/api/account/opportunities/purchase-intents", purchaseIntentsDealerRoutes);
 app.use("/api/account/purchase-intents", purchaseIntentsRoutes);
 
