@@ -109,3 +109,63 @@ export const PURCHASE_INTENT_LIMITS = Object.freeze({
   MAX_PRICE_MIN: 1000,
   MAX_PRICE_MAX: 9999999.99,
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// FEED DO LOJISTA — ORDENAÇÃO (Fase 4.11C)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Até aqui a listagem do lojista tinha UMA ordem fixa (`created_at DESC`) e
+// nenhum filtro. A tela nova oferece as duas coisas, e as duas precisam ser
+// resolvidas no SERVIDOR: ordenar ou filtrar apenas os cards já carregados
+// produziria uma ordem que mente sobre o conjunto — "maior orçamento" mostraria
+// o maior da PRIMEIRA página, não da cidade.
+
+export const DEALER_OPPORTUNITY_SORT = Object.freeze({
+  RECENT: "recent",
+  OLDEST: "oldest",
+  BUDGET_DESC: "budget_desc",
+  BUDGET_ASC: "budget_asc",
+});
+
+export const DEALER_OPPORTUNITY_SORTS = Object.freeze(Object.values(DEALER_OPPORTUNITY_SORT));
+
+/**
+ * Espelho de `SALE_OPPORTUNITY_SORT_SPEC` (Produto 2) — mesmo formato de
+ * propósito, porque o problema é o mesmo e a solução já foi revisada uma vez.
+ *
+ * Objeto CONGELADO: é o único ponto em que texto entra no `ORDER BY`. Um valor
+ * fora deste mapa nunca chega a ser interpolado — o repository lança antes.
+ *
+ * `keyType` existe por causa do cursor: a chave de tempo precisa de
+ * `::timestamptz` dentro da comparação de tupla (o driver manda a string ISO
+ * como `text` e o Postgres não tem de onde inferir o tipo), e a de dinheiro
+ * precisa de `::numeric` pelo mesmo motivo. Sem o cast a paginação quebra na
+ * SEGUNDA página — a primeira não tem cursor, então o defeito passa
+ * despercebido por qualquer teste que só abra a tela.
+ */
+export const DEALER_OPPORTUNITY_SORT_SPEC = Object.freeze({
+  [DEALER_OPPORTUNITY_SORT.RECENT]: Object.freeze({
+    column: "pi.created_at",
+    direction: "DESC",
+    keyType: "timestamptz",
+    key: "created_at",
+  }),
+  [DEALER_OPPORTUNITY_SORT.OLDEST]: Object.freeze({
+    column: "pi.created_at",
+    direction: "ASC",
+    keyType: "timestamptz",
+    key: "created_at",
+  }),
+  [DEALER_OPPORTUNITY_SORT.BUDGET_DESC]: Object.freeze({
+    column: "pi.max_price",
+    direction: "DESC",
+    keyType: "numeric",
+    key: "max_price",
+  }),
+  [DEALER_OPPORTUNITY_SORT.BUDGET_ASC]: Object.freeze({
+    column: "pi.max_price",
+    direction: "ASC",
+    keyType: "numeric",
+    key: "max_price",
+  }),
+});

@@ -17,6 +17,7 @@
 
 import { query } from "../../infrastructure/database/db.js";
 import { ADVERTISER_STATUS } from "../../shared/constants/status.js";
+import { DEALER_OPPORTUNITY_SORT_SPEC } from "./purchase-intents.constants.js";
 import {
   advertiserIsOperational,
   ADVERTISER_IS_OPERATIONAL,
@@ -205,22 +206,87 @@ export async function closeForBuyer(purchaseIntentId, buyerUserId) {
 }
 
 /**
- * Oportunidades ATIVAS de UMA cidade, para o lojista.
+ * A FONTE do feed do lojista — o `FROM` + `WHERE` que listagem e contagem
+ * compartilham.
  *
- * Os três filtros são o produto inteiro desta fase:
+ * As três condições INCONDICIONAIS continuam sendo o produto:
  *   - `pi.city_id = $1` — mesma cidade, sem raio, sem region_memberships,
  *     sem cidade vizinha. `cityId` vem SEMPRE do advertiser do usuário
  *     autenticado, nunca do navegador.
  *   - `pi.status = 'active'` — encerrada some na hora.
  *   - `pi.expires_at > NOW()` — vencida some sozinha, sem job.
+ *
+ * Os filtros da Fase 4.11C SOMAM-SE a elas, nunca as substituem: `add` empurra
+ * um `AND` a mais na mesma lista. É por isso que nenhum filtro consegue afrouxar
+ * o escopo territorial — não existe caminho em que um deles reescreva `$1`.
+ *
+ * Uma fonte só para as duas queries é o que impede o cabeçalho ("N
+ * oportunidades") de discordar da lista logo abaixo dele.
  */
-export async function listActiveByCity({ cityId, limit, cursor }) {
+function buildDealerFeedSource({ cityId, filters = {} }) {
   const params = [cityId];
+  const conditions = ["pi.city_id = $1", "pi.status = 'active'", "pi.expires_at > NOW()"];
+
+  /** Acrescenta `<coluna> <operador> $n` com o parâmetro na posição certa. */
+  const add = (fragment, value) => {
+    params.push(value);
+    conditions.push(fragment.replace("$?", `$${params.length}`));
+  };
+
+  if (filters.intentType) add("pi.intent_type = $?", filters.intentType);
+
+  // Marca e carroceria são EXCLUDENTES por construção do domínio: o CHECK da
+  // tabela obriga `specific_model` a ter marca/modelo e `open_category` a ter
+  // carroceria, com a outra metade NULL. Filtrar pelos dois ao mesmo tempo
+  // devolve vazio — e isso é a leitura correta, não um bug a ser "consertado"
+  // com um OR: quem pede marca Volkswagen E carroceria SUV está pedindo uma
+  // procura que não existe neste vocabulário.
+  if (filters.brandSlug) add("pi.brand_slug = $?", filters.brandSlug);
+  if (filters.bodyType) add("pi.body_type = $?", filters.bodyType);
+
+  if (filters.transmission) add("pi.transmission = $?", filters.transmission);
+  if (filters.purchaseTimeframe) add("pi.purchase_timeframe = $?", filters.purchaseTimeframe);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // A FAIXA DE ORÇAMENTO COMPARA TETO COM TETO
+  // ──────────────────────────────────────────────────────────────────────────
+  // `max_price` é o TETO que o comprador declarou, não o preço de um carro.
+  // "de R$ 40.000 a R$ 60.000" aqui significa "compradores cujo teto está nessa
+  // faixa" — que é o que o lojista quer saber para escolher o que oferecer.
+  if (filters.budgetMin != null) add("pi.max_price >= $?", filters.budgetMin);
+  if (filters.budgetMax != null) add("pi.max_price <= $?", filters.budgetMax);
+
+  const sql = `
+    FROM purchase_intents pi
+    JOIN cities c ON c.id = pi.city_id
+    WHERE ${conditions.join("\n      AND ")}
+  `;
+
+  return { sql, params };
+}
+
+export async function listActiveByCity({ cityId, filters, sort, limit, cursor }) {
+  const spec = DEALER_OPPORTUNITY_SORT_SPEC[sort];
+  if (!spec) {
+    // Chegar aqui significa que a validação foi contornada; falhar alto é o
+    // comportamento certo — um default silencioso ordenaria por outra coisa.
+    throw new Error(`[purchase-intents] ordenação desconhecida: ${sort}`);
+  }
+
+  const source = buildDealerFeedSource({ cityId, filters });
+  const params = [...source.params];
   let cursorClause = "";
 
   if (cursor) {
-    params.push(cursor.createdAt, cursor.id);
-    cursorClause = `AND (pi.created_at, pi.id) < ($${params.length - 1}::timestamptz, $${params.length})`;
+    params.push(cursor.key, cursor.id);
+    const comparator = spec.direction === "ASC" ? ">" : "<";
+
+    // O CAST explícito na chave não é decoração. O driver `pg` envia a string
+    // como `text`, e dentro de uma comparação de ROW o PostgreSQL não tem de
+    // onde inferir o tipo: sem ele o operador não resolve e a paginação quebra
+    // na SEGUNDA página — a primeira não tem cursor, então o defeito passa
+    // despercebido em qualquer teste que só carregue a tela.
+    cursorClause = `AND (${spec.column}, pi.id) ${comparator} ($${params.length - 1}::${spec.keyType}, $${params.length})`;
   }
 
   params.push(limit + 1);
@@ -228,13 +294,9 @@ export async function listActiveByCity({ cityId, limit, cursor }) {
   const result = await query(
     `
     SELECT ${DEALER_COLUMNS}
-    FROM purchase_intents pi
-    JOIN cities c ON c.id = pi.city_id
-    WHERE pi.city_id = $1
-      AND pi.status = 'active'
-      AND pi.expires_at > NOW()
+    ${source.sql}
     ${cursorClause}
-    ORDER BY pi.created_at DESC, pi.id DESC
+    ORDER BY ${spec.column} ${spec.direction}, pi.id ${spec.direction}
     LIMIT $${params.length}
     `,
     params
@@ -242,6 +304,29 @@ export async function listActiveByCity({ cityId, limit, cursor }) {
 
   const rows = result.rows.slice(0, limit);
   return { rows, hasMore: result.rows.length > limit };
+}
+
+/**
+ * Quantas oportunidades o feed mostraria — com os MESMOS filtros.
+ *
+ * Existe porque o cabeçalho anuncia "N oportunidades ativas", e esse número não
+ * pode ser `items.length`: a lista é paginada, então contar o que chegou diria
+ * "20" para uma cidade com 53 procuras. Sai da MESMA fonte da listagem
+ * (`buildDealerFeedSource`), então filtro aplicado à lista e filtro aplicado à
+ * contagem não têm como divergir.
+ */
+export async function countActiveByCity({ cityId, filters }) {
+  const source = buildDealerFeedSource({ cityId, filters });
+
+  const result = await query(
+    `
+    SELECT COUNT(*)::int AS total
+    ${source.sql}
+    `,
+    source.params
+  );
+
+  return result.rows[0]?.total ?? 0;
 }
 
 /**

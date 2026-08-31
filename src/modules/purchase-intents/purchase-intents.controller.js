@@ -52,11 +52,18 @@ export async function closeMyPurchaseIntent(req, res) {
 
 // --- Lojista (CNPJ) ---------------------------------------------------------
 
+/**
+ * A query string INTEIRA vai para o service — que a valida campo a campo com
+ * uma allowlist (`parseDealerFeedFilters`). Encaminhar o objeto cru não é
+ * frouxidão: nenhum valor daqui chega ao SQL sem passar por essa allowlist, e
+ * enumerar os nomes no controller faria um filtro novo precisar ser lembrado em
+ * DOIS lugares — o tipo de esquecimento que devolve o feed sem filtro nenhum.
+ *
+ * `city_id` continua sem efeito por CONSTRUÇÃO: o parser não o lê, e a cidade é
+ * resolvida no service a partir do advertiser do usuário autenticado.
+ */
 export async function listDealerOpportunities(req, res) {
-  const result = await service.listDealerOpportunities(req.user.id, {
-    limit: req.query?.limit,
-    cursor: req.query?.cursor,
-  });
+  const result = await service.listDealerOpportunities(req.user.id, req.query || {});
   applyPrivateHeaders(res);
   return res.json({ success: true, ...result });
 }
