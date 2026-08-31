@@ -10,6 +10,7 @@ import {
   describeOpportunityCriteria,
   describeOpportunityTitle,
   formatBudgetParts,
+  inferBodyTypeFromModel,
   type DealerOpportunity,
 } from "@/lib/purchase-intents/api";
 
@@ -131,7 +132,7 @@ describe("a ilustração desenha a categoria DECLARADA — e nunca adivinha", ()
     }
   });
 
-  it("`specific_model` cai no GENÉRICO — o modo não declara carroceria", () => {
+  it("`specific_model` infere a carroceria pelo NOME COMERCIAL", () => {
     render(
       <ActiveBuyerCard
         opportunity={makeOpportunity({ brand: "Volkswagen", model: "Gol" })}
@@ -140,13 +141,77 @@ describe("a ilustração desenha a categoria DECLARADA — e nunca adivinha", ()
     );
 
     /*
-      Derivar "Gol → hatch" de uma tabela de nomes seria um PALPITE nosso
-      apresentado como dado do comprador, e erraria em silêncio no primeiro
-      modelo que muda de categoria entre gerações. O CHECK da tabela obriga
-      `body_type` a ser NULL neste modo; a figura respeita isso.
+      O modo específico não declara carroceria (o CHECK da tabela obriga
+      `body_type` a ser NULL), então a figura é INFERIDA do nome comercial.
+
+      A fase anterior desenhava o genérico aqui, para não apresentar palpite
+      nosso como dado do comprador. Ficava honesto e ilegível: numa grade real
+      a maioria das procuras é por modelo, e o lojista via a mesma figura
+      repetida linha após linha. A inferência é de APRESENTAÇÃO — não vai ao
+      banco, não filtra, não participa de matching — e o desconhecido cai no
+      genérico em vez de chutar.
     */
-    expect(screen.getByTestId("active-buyer-art")).toHaveAttribute("data-body-type", "generic");
-    expect(artBodyTypeFor(makeOpportunity({ brand: "Volkswagen", model: "Gol" }))).toBe("generic");
+    expect(screen.getByTestId("active-buyer-art")).toHaveAttribute("data-body-type", "hatch");
+    expect(artBodyTypeFor(makeOpportunity({ brand: "Volkswagen", model: "Gol" }))).toBe("hatch");
+  });
+
+  it("a inferência cobre as quatro carrocerias que o lojista separa de relance", () => {
+    const cases: Array<[string, string]> = [
+      ["Gol", "hatch"],
+      ["Argo", "hatch"],
+      ["HB20", "hatch"],
+      ["Corolla", "sedan"],
+      ["Civic", "sedan"],
+      ["HR-V", "suv"],
+      ["Tracker Premier Turbo 1.0", "suv"],
+      ["Compass", "suv"],
+      ["Strada", "picape"],
+      ["Hilux", "picape"],
+      ["Spin", "minivan"],
+    ];
+
+    for (const [model, expected] of cases) {
+      expect(inferBodyTypeFromModel(model)).toBe(expected);
+    }
+  });
+
+  it("vence a chave MAIS LONGA: os pares que se contêm dariam a resposta errada", () => {
+    /*
+      `onix` é hatch e `onix plus` é sedã; `corolla` é sedã e `corolla cross` é
+      SUV; `hb20` é hatch e `hb20s` é sedã. Casar pelo primeiro prefixo que
+      bate erraria nos três — e erraria em silêncio, desenhando um hatch para
+      quem procura um sedã.
+    */
+    expect(inferBodyTypeFromModel("Onix")).toBe("hatch");
+    expect(inferBodyTypeFromModel("Onix Plus 1.0 Turbo")).toBe("sedan");
+    expect(inferBodyTypeFromModel("Corolla XEi")).toBe("sedan");
+    expect(inferBodyTypeFromModel("Corolla Cross XRE")).toBe("suv");
+    expect(inferBodyTypeFromModel("HB20 Comfort")).toBe("hatch");
+    expect(inferBodyTypeFromModel("HB20S Evolution")).toBe("sedan");
+  });
+
+  it("modelo não mapeado NÃO vira palpite: cai no genérico", () => {
+    // Um nome que ninguém mapeou tem de cair na figura neutra. Inventar "SUV"
+    // para um desconhecido seria pior do que não afirmar nada.
+    expect(inferBodyTypeFromModel("Modelo Que Nao Existe")).toBeNull();
+    expect(inferBodyTypeFromModel(null)).toBeNull();
+    expect(inferBodyTypeFromModel("")).toBeNull();
+    expect(artBodyTypeFor(makeOpportunity({ brand: "Xyz", model: "Zzz 1.0" }))).toBe("generic");
+  });
+
+  it("carroceria DECLARADA vence a inferência — dado do comprador manda", () => {
+    /*
+      Se a procura é de categoria aberta e diz "picape", a figura é picape ainda
+      que algum `model` viesse junto. O declarado nunca é sobrescrito por
+      heurística nossa.
+    */
+    expect(
+      artBodyTypeFor({
+        intent_type: "open_category",
+        body_type: "picape",
+        model: "Corolla",
+      })
+    ).toBe("picape");
   });
 
   it("carroceria desconhecida não some: cai no genérico", () => {

@@ -570,24 +570,154 @@ export function formatBudgetParts(value: string | number | null | undefined): {
 }
 
 /**
+ * Modelo comercial → carroceria, para a ILUSTRAÇÃO do card.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * ISTO É UMA INFERÊNCIA DE APRESENTAÇÃO, E SÓ ISSO
+ * ════════════════════════════════════════════════════════════════════════════
+ * Não vai para o banco, não entra em filtro, não participa de matching e não é
+ * devolvido em DTO nenhum. Escolhe qual das oito figuras desenhar quando a
+ * procura é por modelo específico — modo em que o CHECK da tabela obriga
+ * `body_type` a ser NULL, então não há carroceria declarada para ler.
+ *
+ * A versão anterior desenhava o genérico nesses casos, para não apresentar um
+ * palpite nosso como dado do comprador. O card ficava honesto e ilegível: numa
+ * grade real a maioria das procuras é por modelo, e o lojista via a mesma
+ * figura repetida linha após linha, sem conseguir separar de relance quem
+ * procura picape de quem procura hatch — que é a primeira triagem que ele faz
+ * contra o próprio pátio.
+ *
+ * O risco da inferência é menor do que o custo daquela repetição, por três
+ * motivos: a figura é declaradamente ilustrativa (o `aria-label` diz
+ * "categoria do veículo procurado"), a carroceria de um nome comercial é
+ * estável no mercado brasileiro, e o desconhecido cai no genérico em vez de
+ * chutar. O que a figura NUNCA afirma é cor, ano, geração ou versão.
+ *
+ * Chave = nome comercial normalizado. Vence a MAIS LONGA que casa, porque os
+ * pares que importam são exatamente os que se contêm: `onix` é hatch e
+ * `onix plus` é sedã; `corolla` é sedã e `corolla cross` é SUV; `hb20` é hatch
+ * e `hb20s` é sedã. Casar pelo primeiro prefixo daria a resposta errada nos
+ * três.
+ */
+const MODEL_BODY_TYPE: Readonly<Record<string, string>> = Object.freeze({
+  // ── hatch ────────────────────────────────────────────────────────────────
+  gol: "hatch", argo: "hatch", hb20: "hatch", onix: "hatch", mobi: "hatch",
+  up: "hatch", polo: "hatch", sandero: "hatch", kwid: "hatch", march: "hatch",
+  fox: "hatch", celta: "hatch", uno: "hatch", palio: "hatch", punto: "hatch",
+  ka: "hatch", fiesta: "hatch", fit: "hatch", golf: "hatch", i30: "hatch",
+  c3: "hatch", clio: "hatch", corsa: "hatch", agile: "hatch", bravo: "hatch",
+  stilo: "hatch", "208": "hatch", "206": "hatch", "207": "hatch",
+  yaris: "hatch", etios: "hatch", picanto: "hatch", soul: "hatch",
+  // ── sedã ─────────────────────────────────────────────────────────────────
+  corolla: "sedan", civic: "sedan", jetta: "sedan", cruze: "sedan",
+  virtus: "sedan", voyage: "sedan", prisma: "sedan", "onix plus": "sedan",
+  hb20s: "sedan", versa: "sedan", sentra: "sedan", logan: "sedan",
+  cobalt: "sedan", siena: "sedan", "grand siena": "sedan", linea: "sedan",
+  cerato: "sedan", elantra: "sedan", fluence: "sedan", cronos: "sedan",
+  city: "sedan", accord: "sedan", passat: "sedan", vento: "sedan",
+  classic: "sedan", lancer: "sedan", "408": "sedan", "308": "sedan",
+  // ── SUV ──────────────────────────────────────────────────────────────────
+  "hr-v": "suv", hrv: "suv", tracker: "suv", compass: "suv",
+  renegade: "suv", creta: "suv", kicks: "suv", captur: "suv", duster: "suv",
+  ecosport: "suv", "t-cross": "suv", tcross: "suv", nivus: "suv",
+  tiguan: "suv", tucson: "suv", "santa fe": "suv", sorento: "suv",
+  sportage: "suv", sw4: "suv", rav4: "suv", "corolla cross": "suv",
+  pulse: "suv", fastback: "suv", territory: "suv", bronco: "suv",
+  "cr-v": "suv", crv: "suv", outlander: "suv", asx: "suv", pajero: "suv",
+  trailblazer: "suv", equinox: "suv", edge: "suv", commander: "suv",
+  tiggo: "suv", haval: "suv", "2008": "suv", "3008": "suv", aircross: "suv",
+  "c4 cactus": "suv", "grand cherokee": "suv", cherokee: "suv",
+  // ── picape ───────────────────────────────────────────────────────────────
+  strada: "picape", saveiro: "picape", montana: "picape", toro: "picape",
+  hilux: "picape", s10: "picape", ranger: "picape", amarok: "picape",
+  frontier: "picape", l200: "picape", oroch: "picape", maverick: "picape",
+  courier: "picape", rampage: "picape", dakota: "picape", "f-250": "picape",
+  // ── minivan ──────────────────────────────────────────────────────────────
+  spin: "minivan", livina: "minivan", "grand livina": "minivan",
+  zafira: "minivan", meriva: "minivan", picasso: "minivan", doblo: "minivan",
+  kangoo: "minivan", partner: "minivan", berlingo: "minivan",
+  scenic: "minivan", touran: "minivan", sharan: "minivan", caravan: "minivan",
+  // ── perua ────────────────────────────────────────────────────────────────
+  parati: "wagon", quantum: "wagon", spacefox: "wagon", weekend: "wagon",
+  "palio weekend": "wagon", "golf variant": "wagon", fielder: "wagon",
+  // ── cupê ─────────────────────────────────────────────────────────────────
+  mustang: "coupe", camaro: "coupe", tt: "coupe", supra: "coupe",
+  cayman: "coupe", brz: "coupe", "370z": "coupe",
+});
+
+/**
+ * Normaliza para comparação: sem acento, sem caixa, sem pontuação.
+ *
+ * `model` guarda o texto comercial como o comprador o escolheu, e ele costuma
+ * vir com versão colada — "Tracker Premier Turbo 1.0". Por isso a comparação é
+ * por PREFIXO de palavra, nunca por igualdade: o que identifica a carroceria é
+ * o começo do nome, e o resto é motorização e acabamento.
+ */
+function normalizeModelName(value: string): string {
+  return value
+    .normalize("NFD")
+    // Escape explícito: os combinantes crus no fonte fazem o git ver binário.
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * AS CHAVES PASSAM PELA MESMA NORMALIZAÇÃO QUE A ENTRADA.
+ *
+ * Sem isto, toda chave com hífen fica inalcançável: a entrada "HR-V" vira
+ * "hr v", a chave escrita `"hr-v"` continua com o hífen, e a comparação nunca
+ * casa — `hr-v`, `t-cross`, `cr-v` e `f-250` cairiam TODAS no genérico, em
+ * silêncio, com a tabela parecendo perfeitamente correta na leitura. Foi um
+ * teste de caso concreto que pegou, não a revisão do diff.
+ *
+ * Ordenadas da mais longa para a mais curta: `onix plus` tem de ser testada
+ * antes de `onix`, senão o prefixo curto responde primeiro e erra.
+ */
+const MODEL_BODY_TYPE_NORMALIZED: Readonly<Record<string, string>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(MODEL_BODY_TYPE).map(([key, body]) => [normalizeModelName(key), body])
+  )
+);
+
+const MODEL_BODY_TYPE_KEYS = Object.keys(MODEL_BODY_TYPE_NORMALIZED).sort(
+  (a, b) => b.length - a.length
+);
+
+/**
+ * A carroceria inferida do nome comercial, ou `null` quando não reconhecido.
+ *
+ * `null` — e não um palpite — é a resposta certa para o desconhecido: o
+ * genérico é uma figura neutra apresentável, e inventar "SUV" para um nome que
+ * ninguém mapeou seria pior do que não afirmar nada.
+ */
+export function inferBodyTypeFromModel(model: string | null | undefined): string | null {
+  const normalized = normalizeModelName(String(model ?? ""));
+  if (!normalized) return null;
+
+  const key = MODEL_BODY_TYPE_KEYS.find(
+    (candidate) => normalized === candidate || normalized.startsWith(`${candidate} `)
+  );
+  return key ? MODEL_BODY_TYPE_NORMALIZED[key] : null;
+}
+
+/**
  * A CARROCERIA que a ilustração deve desenhar.
  *
- * `open_category` declara a carroceria — a ilustração desenha exatamente ela.
+ * `open_category` DECLARA a carroceria — desenha exatamente ela, sem inferir
+ * nada. É dado do comprador, e dado do comprador sempre vence.
  *
- * `specific_model` NÃO declara: o CHECK da tabela obriga `body_type` a ser NULL
- * quando há marca e modelo. Derivar "Gol → hatch" de uma tabela de nomes seria
- * um PALPITE nosso apresentado como dado do comprador, e ele erraria em silêncio
- * no primeiro modelo que mudou de categoria entre gerações.
- *
- * Por isso o modo específico cai no veículo GENÉRICO. O texto do card já diz
- * "Volkswagen Gol"; a ilustração não precisa (nem pode) confirmar a carroceria.
+ * `specific_model` não declara; aí sim entra a inferência pelo nome comercial,
+ * e o que ela não reconhece cai no genérico.
  */
 export function artBodyTypeFor(opportunity: {
   intent_type: PurchaseIntentType;
   body_type?: string | null;
+  model?: string | null;
 }): string {
   if (opportunity.intent_type === "open_category" && opportunity.body_type) {
     return opportunity.body_type;
   }
-  return "generic";
+  return inferBodyTypeFromModel(opportunity.model) ?? "generic";
 }

@@ -80,8 +80,13 @@ function CardSkeleton() {
     <li className="h-full" data-testid="active-buyer-skeleton" aria-hidden="true">
       <div className="flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-[#e5eaf3] bg-white">
         <div className="bg-[#f7faff] px-3 pt-3">
-          {/* Mesma proporção do `viewBox` da ilustração (320×112). */}
-          <div className="aspect-[320/112] w-full rounded-xl bg-[#e8eef8]" />
+          {/*
+            Mesma proporção do `viewBox` da ilustração (320×132). Precisa andar
+            JUNTO com o `viewBox`: o E2E mede o esqueleto contra o card real com
+            tolerância de 8px, e uma proporção defasada aqui vira salto de
+            layout no momento em que o feed chega.
+          */}
+          <div className="aspect-[320/132] w-full rounded-xl bg-[#e8eef8]" />
         </div>
         <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5 sm:px-5 sm:pb-5">
           {/* Título: uma linha de `text-[16px] leading-snug`. */}

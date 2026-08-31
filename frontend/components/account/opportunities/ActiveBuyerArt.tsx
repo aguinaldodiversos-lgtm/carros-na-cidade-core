@@ -19,10 +19,39 @@ import { BODY_TYPE_LABEL } from "@/lib/purchase-intents/api";
  * que aquela geração é exigida e que a configuração é a procurada. O lojista
  * montaria a abordagem em cima de nenhuma dessas informações.
  *
- * A lupa é o assunto da figura. O carro atrás dela é a CATEGORIA, desenhada em
- * traço claramente ilustrativo — volume por gradiente, sem textura, sem placa,
- * sem logo de fabricante. Marca e modelo já estão escritos no título; a figura
- * não repete (nem contradiz) o texto.
+ * ════════════════════════════════════════════════════════════════════════════
+ * O CARRO É O ASSUNTO. A LUPA É UM ADJETIVO.
+ * ════════════════════════════════════════════════════════════════════════════
+ * A primeira versão desta figura invertia isso: uma lupa de raio 26 (metade da
+ * altura útil) sobreposta a uma silhueta chapada. O olho batia na lupa, não no
+ * veículo — e o que o lojista precisa reconhecer em meio segundo é a
+ * CARROCERIA, porque é ela que diz se aquela procura casa com o pátio dele.
+ *
+ * Agora a lupa é um selo pequeno no canto superior direito: presente para
+ * marcar "isto é uma procura", pequena o bastante para não competir. O carro
+ * ocupa a faixa inteira.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * O QUE FAZ UM DESENHO PARECER UM CARRO
+ * ════════════════════════════════════════════════════════════════════════════
+ * Não é quantidade de detalhe — é ONDE o detalhe está. A versão anterior era
+ * uma silhueta fechada de fundo plano com duas rodas apoiadas por baixo, que é
+ * a construção de um ícone, não de um veículo. Quatro coisas mudam a leitura:
+ *
+ *  1. CAIXA DE RODA. O corpo é recortado por um arco acima de cada roda. Sem
+ *     ele o carro parece um adesivo pousado sobre dois círculos; com ele a roda
+ *     entra na lataria, que é como todo carro real se parece.
+ *  2. RODA COM ARO E RAIOS. Pneu escuro, aro claro, raios e cubo. Um disco com
+ *     um furo no meio lê como argola; quatro camadas leem como roda.
+ *  3. VIDRO MAIS ESCURO QUE A LATARIA. Vidro claro sobre lataria clara vira uma
+ *     mancha só. A inversão de valor é o que separa a cabine do corpo.
+ *  4. FARÓIS E LANTERNAS. Duas manchas minúsculas — uma fria na frente, uma
+ *     quente atrás — dão frente e traseira ao veículo. Sem elas o desenho é
+ *     simétrico e ambíguo, e o olho não sabe para onde o carro aponta.
+ *
+ * O DESENHO CONTINUA SENDO DESENHO: gradiente e traço, sem textura, sem placa,
+ * sem logo de fabricante, sem reflexo fotográfico. Marca e modelo já estão
+ * escritos no título; a figura não repete nem contradiz o texto.
  *
  * ════════════════════════════════════════════════════════════════════════════
  * POR QUE SVG INLINE
@@ -34,7 +63,18 @@ import { BODY_TYPE_LABEL } from "@/lib/purchase-intents/api";
  *
  * O peso importa mais aqui do que lá: o hub tem duas ilustrações, este grid tem
  * uma por card. Uma família de PNGs custaria uma request por card e um salto de
- * layout a cada imagem que chegasse fora de ordem.
+ * layout a cada imagem que chegasse fora de ordem — e um acervo de fotos por
+ * modelo seria impossível de manter honesto (ver o bloco de cima).
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * A METADE DE BAIXO É COMPARTILHADA DE PROPÓSITO
+ * ════════════════════════════════════════════════════════════════════════════
+ * Chão, altura de soleira, caixas de roda e desenho da roda saem de código
+ * comum; só o PERFIL SUPERIOR é próprio de cada carroceria. É o que mantém as
+ * oito figuras na mesma família visual — um SUV que subisse o chão pareceria
+ * flutuar ao lado de um sedã na mesma linha do grid — enquanto a diferença
+ * entre elas fica exatamente onde uma pessoa procura: teto, caimento da
+ * traseira e distância entre eixos.
  *
  * ════════════════════════════════════════════════════════════════════════════
  * OS IDs DE GRADIENTE SÃO ÚNICOS POR INSTÂNCIA — NÃO POR ARQUIVO
@@ -44,9 +84,9 @@ import { BODY_TYPE_LABEL } from "@/lib/purchase-intents/api";
  *
  * Aqui não basta: vinte cards montam vinte cópias desta mesma figura na mesma
  * página, e um prefixo fixo produziria vinte `id="activeBuyerGlass"`. O
- * navegador resolve `url(#…)` pela PRIMEIRA ocorrência — todas as lupas passariam
- * a pintar com o gradiente da primeira, e o sintoma seria sutil (um degradê
- * levemente errado) sem um único aviso no console.
+ * navegador resolve `url(#…)` pela PRIMEIRA ocorrência — todas as latarias
+ * passariam a pintar com o gradiente da primeira, e o sintoma seria sutil (um
+ * degradê levemente errado) sem um único aviso no console.
  *
  * `useId()` dá um sufixo estável entre servidor e cliente, então não há
  * divergência de hidratação. Os dois-pontos que o React usa no identificador
@@ -68,109 +108,269 @@ export const ART_BODY_TYPES = [
 export type ArtBodyType = (typeof ART_BODY_TYPES)[number];
 
 /**
- * A silhueta de cada carroceria, na tela de 320×112.
+ * A tela é 320×132 e o CHÃO é y=114 para todas as carrocerias.
  *
- * `shell` é o contorno fechado do veículo; `glass` são os vidros; `wheels` são
- * os dois centros de roda — que variam, porque a distância entre eixos é parte
- * do que distingue um cupê de uma minivan.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * A PROPORÇÃO DA TELA NÃO É ARBITRÁRIA
- * ────────────────────────────────────────────────────────────────────────────
- * 320×112 (≈2,9:1) é a proporção da FAIXA que o card reserva à figura. Uma tela
- * mais quadrada seria encaixada por ALTURA dentro dessa faixa (`preserveAspect
- * Ratio` faz "meet" por padrão), sobrando barras laterais vazias e encolhendo o
- * carro para pouco mais da metade da largura disponível — foi exatamente o que
- * aconteceu na primeira versão desta figura.
- *
- * ────────────────────────────────────────────────────────────────────────────
- * O QUE PRECISA SER DISTINTO, E O QUE PRECISA SER IGUAL
- * ────────────────────────────────────────────────────────────────────────────
- * IGUAL: a linha do chão (y=94) e a espessura do traço. Um SUV que subisse o
- * chão pareceria flutuar ao lado de um sedã na mesma linha do grid.
- *
- * DISTINTO: altura do teto, comprimento do teto, inclinação da traseira e
- * distância entre eixos — que é como uma pessoa distingue as carrocerias de
- * relance. A ~310px de largura (o tamanho real no grid a 1440), a diferença
- * entre um teto a y=20 e outro a y=34 é visível; a diferença entre dois faróis
- * desenhados não é. Por isso não há faróis, maçanetas nem retrovisores: detalhe
- * que some no tamanho de uso só acrescenta peso ao SVG.
+ * A proporção (≈2,42:1) é a da faixa que o card reserva à figura — o esqueleto
+ * de carregamento repete o mesmo `aspect-[320/132]`. Uma tela mais quadrada
+ * seria encaixada por ALTURA dentro da faixa (`preserveAspectRatio` faz "meet"
+ * por padrão), sobrando barras laterais vazias e encolhendo o carro; foi
+ * exatamente o que aconteceu na primeira versão desta figura.
  */
-const SILHOUETTE: Record<
-  ArtBodyType,
-  { shell: string; glass: string; wheels: [number, number]; label: string }
-> = {
-  // Teto curto, traseira caída e balanço traseiro CURTO — o carro "acaba" logo
-  // depois da roda.
+const GROUND = 114;
+
+type Silhouette = {
+  /** Perfil superior: de (frontX, bottom) por cima do carro até (rearX, bottom). */
+  upper: string;
+  frontX: number;
+  rearX: number;
+  /** Linha da soleira. SUV e picape a levantam — é o vão livre deles. */
+  bottom: number;
+  /** Centros de roda em x. A distância entre eixos distingue as carrocerias. */
+  wheels: [number, number];
+  wheelR: number;
+  /** Raio da caixa de roda. Sempre > wheelR, senão o arco corta o pneu. */
+  archR: number;
+  glass: string;
+  /** Recorte de porta. Cupê não tem: porta única e longa. */
+  doorLine: string;
+  headlight: string;
+  taillight: string;
+  handles: Array<[number, number]>;
+  label: string;
+};
+
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ * PROPORÇÃO MODERNA, DIFERENÇA EXAGERADA
+ * ════════════════════════════════════════════════════════════════════════════
+ * Duas regras valem para as oito carrocerias, e vieram de dois defeitos reais:
+ *
+ *  • BALANÇO DIANTEIRO ≈ 30% DA DISTÂNCIA ENTRE EIXOS. A ~40% o nariz avança
+ *    demais à frente da roda e o carro escorre para a frente — foi o que fez a
+ *    primeira versão com caixa de roda sair com cara de sedã dos anos 80. Roda
+ *    perto da quina é a assinatura de carro contemporâneo.
+ *  • CABINE ALTA E ADIANTADA. O para-brisa começa logo atrás da roda dianteira.
+ *    Cabine baixa e recuada sobre capô comprido é a proporção que lê como carro
+ *    velho, por melhor que seja o traço.
+ *
+ * E uma terceira que contraria o instinto de fidelidade:
+ *
+ *  • A DIFERENÇA ENTRE CARROCERIAS É EXAGERADA DE PROPÓSITO. Medida fiel não
+ *    sobrevive ao tamanho de uso. Num card de ~310px o SUV real é ~12% mais
+ *    alto que o hatch, e 12% de 130px de tela some: a versão anterior desenhava
+ *    as oito silhuetas corretamente e mesmo assim hatch, sedã e SUV liam igual
+ *    na grade — só a picape se destacava. Aqui o SUV ganha teto muito mais
+ *    alto, roda maior e soleira levantada; o hatch encurta de verdade; o sedã
+ *    estica a traseira. É caricatura controlada, e é o que faz a triagem de
+ *    meio segundo funcionar.
+ *
+ * O que NÃO varia: a linha do chão (y=114) e a espessura do traço. Um SUV que
+ * subisse o chão pareceria flutuar ao lado de um sedã na mesma linha do grid.
+ */
+const SILHOUETTE: Record<ArtBodyType, Silhouette> = {
+  // CURTO. Comprimento total ~224 contra ~270 do sedã: o hatch tem de PARECER
+  // menor, não só ter a traseira diferente. Tampa quase vertical logo depois
+  // da roda traseira.
   hatch: {
-    shell:
-      "M18 94C18 78 24 70 40 66L82 56L106 30C109 27 113 25 118 25H172C178 25 182 27 185 32L204 62L226 67C238 70 244 77 244 86V94Z",
-    glass: "M112 33H144V57H96ZM152 33H172C175 33 177 34 179 37L195 57H152Z",
-    wheels: [70, 200],
+    upper:
+      "C41 91 42 82 49 78L62 73C72 69 84 66 100 64L114 63L138 37C141 35 145 34 150 34L202 34C208 34 212 36 215 41L236 62L250 67C260 71 266 78 267 88L268 100",
+    frontX: 44,
+    rearX: 268,
+    bottom: 100,
+    wheels: [90, 230],
+    wheelR: 19,
+    archR: 25,
+    glass:
+      "M122 62L140 40C142 39 145 39 148 39L168 39L168 62ZM175 39L200 39C205 39 208 40 210 44L224 62L175 62Z",
+    doorLine: "M171 63L171 92",
+    headlight: "M50 78L66 72L69 79L53 83Z",
+    taillight: "M258 72L266 75L266 88L258 86Z",
+    handles: [
+      [154, 69],
+      [196, 69],
+    ],
     label: "hatch",
   },
-  // Três volumes: o porta-malas é um degrau horizontal depois do vidro traseiro.
+
+  // TRÊS VOLUMES E COMPRIDO. O degrau horizontal da tampa do porta-malas, mais
+  // o balanço traseiro esticado, é o que separa o sedã do hatch de relance.
   sedan: {
-    shell:
-      "M16 94C16 78 22 70 38 66L80 57L104 32C107 29 111 27 116 27H178C184 27 188 29 191 34L210 60L258 67C270 69 276 76 276 86V94Z",
-    glass: "M110 35H143V58H94ZM151 35H176C179 35 181 36 183 39L200 58H151Z",
-    wheels: [68, 214],
-    label: "sedan",
+    upper:
+      "C23 91 24 82 31 78L46 72C58 68 72 65 90 63L104 62L126 35C129 33 133 32 138 32L200 32C206 32 210 34 213 39L234 60L282 63C292 65 295 72 296 82L296 100",
+    frontX: 26,
+    rearX: 296,
+    bottom: 100,
+    wheels: [80, 238],
+    wheelR: 19,
+    archR: 25,
+    glass:
+      "M112 60L129 38C131 37 134 37 137 37L164 37L164 60ZM171 37L198 37C203 37 206 38 208 42L221 60L171 60Z",
+    doorLine: "M168 61L168 92",
+    headlight: "M32 78L50 72L53 79L35 83Z",
+    taillight: "M285 70L294 73L294 86L285 84Z",
+    handles: [
+      [148, 67],
+      [194, 67],
+    ],
+    label: "sedã",
   },
-  // Alto e quadrado: teto a y=18, carroceria mais alta e traseira quase
-  // vertical.
+
+  // ALTO DE VERDADE. Teto a y=16 contra 34 do hatch, roda de raio 25 contra 19
+  // e soleira levantada para 94. São os três juntos — e não só o teto — que
+  // separam o SUV do sedã no tamanho do card.
   suv: {
-    shell:
-      "M16 94C16 74 22 65 38 61L74 52L94 22C97 18 102 16 108 16H196C203 16 208 19 211 25L226 52L252 59C266 62 272 70 272 82V94Z",
-    glass: "M100 26H140V54H82ZM148 26H190C193 26 195 27 197 30L212 54H148Z",
-    wheels: [70, 214],
-    label: "suv",
+    upper:
+      "C27 78 28 64 35 60L50 53C62 48 76 44 94 41L108 39L122 19C125 17 129 16 134 16L218 16C225 16 229 18 232 23L246 41L266 46C280 49 285 58 286 68L286 94",
+    frontX: 30,
+    rearX: 286,
+    bottom: 94,
+    wheels: [84, 240],
+    wheelR: 25,
+    archR: 32,
+    glass:
+      "M110 42L124 22C126 21 129 21 132 21L162 21L162 42ZM169 21L214 21C219 21 222 22 224 26L236 42L169 42Z",
+    doorLine: "M166 43L166 84",
+    headlight: "M36 60L54 54L57 61L39 65Z",
+    taillight: "M275 54L284 57L284 74L275 72Z",
+    handles: [
+      [146, 49],
+      [196, 49],
+    ],
+    label: "SUV",
   },
-  // Cabine curta seguida de CAÇAMBA aberta — a parede da caçamba é o traço que
-  // identifica a picape de relance.
+
+  // Cabine curta e CAÇAMBA aberta. A parede da caçamba — o degrau horizontal
+  // longo atrás da cabine — identifica a picape à distância, e foi a única
+  // carroceria que já se distinguia antes deste exagero.
   picape: {
-    shell:
-      "M16 94C16 74 22 65 38 61L72 52L92 22C95 18 100 16 106 16H158C165 16 170 19 173 25L188 52V56H268C275 56 280 61 280 68V94Z",
-    glass: "M98 26H136V54H80ZM144 26H154C157 26 159 27 161 30L174 54H144Z",
-    wheels: [70, 224],
+    upper:
+      "C21 78 22 64 29 60L44 53C56 48 70 44 88 41L102 39L118 21C121 19 125 18 130 18L176 18C182 18 186 20 188 25L194 41L196 50L292 50C296 50 298 53 298 57L298 94",
+    frontX: 24,
+    rearX: 298,
+    bottom: 94,
+    wheels: [80, 246],
+    wheelR: 25,
+    archR: 32,
+    glass:
+      "M106 42L120 23C122 22 125 22 128 22L156 22L156 42ZM163 22L174 22C179 22 182 23 184 27L189 42L163 42Z",
+    doorLine: "M160 23L160 84",
+    headlight: "M30 60L48 54L51 61L33 65Z",
+    taillight: "M288 56L297 58L297 72L288 70Z",
+    handles: [[144, 49]],
     label: "picape",
   },
-  // Baixo e comprido, com a traseira em fastback: o teto desce direto até a
-  // ponta, sem degrau de porta-malas.
+
+  // Baixo e comprido, teto recuado e traseira em fastback: o teto desce direto
+  // até o para-choque, sem degrau de porta-malas.
   coupe: {
-    shell:
-      "M14 94C14 80 20 72 36 68L84 58L118 34C123 30 129 28 136 28H172C179 28 184 31 187 37L200 60L262 72C274 75 280 82 280 92V94Z",
-    glass: "M124 37H152V59H106ZM160 37H172C175 37 177 38 179 41L190 59H160Z",
-    wheels: [72, 220],
-    label: "coupe",
+    upper:
+      "C25 91 26 82 33 78L50 71C64 66 82 63 104 61L128 59L152 41C156 39 160 38 166 38L192 38C198 38 202 40 205 45L232 64L266 70C282 73 292 80 293 90L294 100",
+    frontX: 28,
+    rearX: 294,
+    bottom: 100,
+    wheels: [84, 244],
+    wheelR: 19,
+    archR: 25,
+    glass:
+      "M134 61L154 44C156 43 159 43 162 43L178 43L178 61ZM184 43L190 43C195 43 198 44 200 47L214 61L184 61Z",
+    doorLine: "",
+    headlight: "M34 78L54 71L57 78L37 83Z",
+    taillight: "M282 72L292 75L292 89L282 87Z",
+    handles: [[172, 69]],
+    label: "cupê",
   },
-  // Monovolume: teto altíssimo e LONGO, nariz curto e inclinado, sem capô
-  // horizontal.
+
+  // Monovolume: teto altíssimo e LONGO, nariz curto e muito inclinado — não há
+  // capô horizontal, o para-brisa começa quase no para-choque.
   minivan: {
-    shell:
-      "M16 94C16 72 22 62 38 57L66 48L88 20C91 15 96 12 103 12H196C205 12 211 17 213 26L226 57C244 61 252 69 252 82V94Z",
-    glass: "M96 22H140V50H78ZM148 22H192C195 22 197 24 198 27L205 50H148Z",
-    wheels: [70, 206],
+    upper:
+      "C23 80 24 66 32 62L46 55C56 50 64 44 76 36L94 20C98 17 103 16 110 16L230 16C238 16 242 19 244 26L252 54L268 58C282 61 287 68 288 78L288 96",
+    frontX: 26,
+    rearX: 288,
+    bottom: 96,
+    wheels: [82, 240],
+    wheelR: 21,
+    archR: 27,
+    glass:
+      "M98 46L110 21C112 20 115 20 118 20L142 20L142 46ZM149 20L228 20C233 20 236 21 237 25L243 46L149 46Z",
+    doorLine: "M146 48L146 86",
+    headlight: "M32 62L50 55L53 62L35 67Z",
+    taillight: "M277 58L286 61L286 78L277 76Z",
+    handles: [
+      [130, 54],
+      [196, 54],
+    ],
     label: "minivan",
   },
-  // Perua: o teto do sedã ESTICADO até a traseira, que desce quase reta.
+
+  // Perua: o teto do sedã ESTICADO até a traseira, que desce quase reta. É o
+  // oposto do hatch — mesmo nariz, mas o teto não acaba.
   wagon: {
-    shell:
-      "M16 94C16 76 22 67 38 63L78 54L100 26C103 22 108 20 113 20H214C221 20 226 23 229 29L240 54C256 57 264 65 264 78V94Z",
-    glass: "M106 30H142V56H90ZM150 30H210C213 30 215 31 216 34L224 56H150Z",
-    wheels: [68, 212],
-    label: "wagon",
+    upper:
+      "C23 91 24 82 31 78L46 72C58 68 72 65 90 63L104 62L126 34C129 32 133 31 138 31L246 31C253 31 257 33 259 38L264 60L274 63C284 66 291 72 292 82L292 100",
+    frontX: 26,
+    rearX: 292,
+    bottom: 100,
+    wheels: [80, 242],
+    wheelR: 19,
+    archR: 25,
+    glass:
+      "M112 60L129 37C131 36 134 36 137 36L164 36L164 60ZM171 36L242 36C247 36 250 37 251 41L255 60L171 60Z",
+    doorLine: "M168 61L168 92",
+    headlight: "M32 78L50 72L53 79L35 83Z",
+    taillight: "M280 62L290 65L290 82L280 80Z",
+    handles: [
+      [148, 67],
+      [198, 67],
+    ],
+    label: "perua",
   },
-  // Proporção neutra, entre o hatch e o sedã. É a figura do modo "compra
-  // específica", que não declara carroceria nenhuma.
+
+  // Proporção neutra, entre o hatch e o sedã. É a figura de quem não declarou
+  // carroceria E cujo modelo não foi reconhecido — por isso não pode puxar para
+  // nenhum extremo: precisa estar certa o bastante para qualquer carro.
   generic: {
-    shell:
-      "M16 94C16 78 22 70 38 66L80 56L105 31C108 28 112 26 117 26H176C182 26 186 28 189 33L208 61L242 67C254 69 260 76 260 86V94Z",
-    glass: "M111 34H144V57H95ZM152 34H174C177 34 179 35 181 38L198 57H152Z",
-    wheels: [70, 206],
+    upper:
+      "C31 91 32 82 39 78L54 72C66 68 78 65 96 63L110 62L132 36C135 34 139 33 144 33L202 33C208 33 212 35 215 40L237 61L256 66C268 70 276 77 277 87L282 100",
+    frontX: 34,
+    rearX: 282,
+    bottom: 100,
+    wheels: [84, 236],
+    wheelR: 19,
+    archR: 25,
+    glass:
+      "M118 61L134 39C136 38 139 38 142 38L166 38L166 61ZM173 38L200 38C205 38 208 39 210 43L225 61L173 61Z",
+    doorLine: "M169 62L169 92",
+    headlight: "M40 78L58 72L61 79L43 83Z",
+    taillight: "M270 71L279 74L279 88L270 86Z",
+    handles: [
+      [152, 68],
+      [196, 68],
+    ],
     label: "veículo",
   },
 };
+
+/**
+ * Fecha a silhueta: perfil superior + soleira recortada pelas caixas de roda.
+ *
+ * A soleira é percorrida da traseira para a frente, e em cada roda o traço sobe
+ * num semicírculo. `sweep-flag = 0` porque, indo da direita para a esquerda por
+ * CIMA do círculo (3h → 12h → 9h), o arco corre no sentido anti-horário na
+ * tela; com `1` o arco desceria e o recorte viraria uma barriga.
+ */
+function shellPath(s: Silhouette): string {
+  const [front, rear] = s.wheels;
+  return [
+    `M${s.frontX} ${s.bottom}`,
+    s.upper,
+    `L${rear + s.archR} ${s.bottom}`,
+    `A${s.archR} ${s.archR} 0 0 0 ${rear - s.archR} ${s.bottom}`,
+    `L${front + s.archR} ${s.bottom}`,
+    `A${s.archR} ${s.archR} 0 0 0 ${front - s.archR} ${s.bottom}`,
+    "Z",
+  ].join("");
+}
 
 function isArtBodyType(value: string): value is ArtBodyType {
   return (ART_BODY_TYPES as readonly string[]).includes(value);
@@ -189,6 +389,9 @@ export function resolveArtBodyType(value: string | null | undefined): ArtBodyTyp
   return isArtBodyType(slug) ? slug : "generic";
 }
 
+/** Cinco raios. Menos que isso lê como hélice; mais, como disco cheio. */
+const SPOKES = [0, 72, 144, 216, 288];
+
 export default function ActiveBuyerArt({
   bodyType,
   className = "",
@@ -197,7 +400,8 @@ export default function ActiveBuyerArt({
   className?: string;
 }) {
   const resolved = resolveArtBodyType(bodyType);
-  const silhouette = SILHOUETTE[resolved];
+  const s = SILHOUETTE[resolved];
+  const wheelCy = GROUND - s.wheelR;
 
   // Sem os dois-pontos do React: `url(#…)` funciona com eles, mas
   // `querySelector` e qualquer CSS que aponte para o gradiente não.
@@ -221,12 +425,12 @@ export default function ActiveBuyerArt({
     resolved === "generic"
       ? "Ilustração da categoria do veículo procurado"
       : `Ilustração da categoria do veículo procurado: ${
-          BODY_TYPE_LABEL[resolved] || silhouette.label
+          BODY_TYPE_LABEL[resolved] || s.label
         }`;
 
   return (
     <svg
-      viewBox="0 0 320 112"
+      viewBox="0 0 320 132"
       className={className}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -238,119 +442,144 @@ export default function ActiveBuyerArt({
       <title>{description}</title>
 
       <defs>
-        <linearGradient id={id("backdrop")} x1="40" y1="8" x2="280" y2="104" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#E7F0FF" />
-          <stop offset="1" stopColor="#F7FAFF" />
+        <linearGradient id={id("backdrop")} x1="40" y1="6" x2="280" y2="120" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#EAF2FD" />
+          <stop offset="1" stopColor="#F8FBFF" />
         </linearGradient>
+
         {/*
-          O VOLUME DA LATARIA VEM DAQUI, E PRECISA DE AMPLITUDE
-
-          A primeira versão ia de #FFFFFF a #D5E0F0 — 8% de luminância entre o
-          teto e a soleira. A essa amplitude a carroceria vira uma silhueta
-          chapada quase branca, e a coisa mais escura da figura passa a ser o
-          pneu: no grid, nove cards lidos de relance viram nove pares de
-          argolas pretas, e as carrocerias (que É o que distingue um card do
-          outro) deixam de ser o assunto.
-
-          A rampa agora fecha em #B3C8E3 e concentra a virada na metade de
-          baixo — que é onde a luz de fato cai numa lataria. O teto continua
-          branco: o contraste é interno à figura, não um escurecimento geral.
+          A LATARIA. Vertical, do teto à soleira — é assim que a luz cai num
+          carro, e é o que dá volume sem precisar de nenhum reflexo desenhado.
+          A amplitude é grande de propósito: uma rampa curta (branco → cinza
+          clarinho) achata a lataria e faz o PNEU virar a coisa mais escura da
+          figura, que foi o defeito da versão anterior.
         */}
-        <linearGradient id={id("shell")} x1="60" y1="16" x2="220" y2="94" gradientUnits="userSpaceOnUse">
+        <linearGradient id={id("body")} x1="0" y1="24" x2="0" y2="104" gradientUnits="userSpaceOnUse">
           <stop stopColor="#FFFFFF" />
-          <stop offset="0.42" stopColor="#EDF3FB" />
-          <stop offset="0.72" stopColor="#D3E0F1" />
-          <stop offset="1" stopColor="#B3C8E3" />
+          <stop offset="0.34" stopColor="#F3F8FD" />
+          <stop offset="0.72" stopColor="#D8E5F4" />
+          <stop offset="1" stopColor="#AFC5E0" />
         </linearGradient>
-        <linearGradient id={id("glass")} x1="90" y1="14" x2="220" y2="60" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#C6DCF7" />
-          <stop offset="1" stopColor="#9DC0EA" />
+
+        {/*
+          O VIDRO É MAIS ESCURO QUE A LATARIA — de propósito.
+
+          Vidro claro sobre lataria clara vira uma mancha só, e a cabine
+          desaparece. A inversão de valor é o que separa greenhouse de corpo em
+          qualquer ilustração automotiva.
+        */}
+        <linearGradient id={id("glass")} x1="110" y1="24" x2="240" y2="62" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#9DBEE2" />
+          <stop offset="1" stopColor="#6E93C4" />
         </linearGradient>
-        <linearGradient id={id("lens")} x1="240" y1="8" x2="296" y2="64" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FFFFFF" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#CFE2FF" stopOpacity="0.68" />
+
+        <linearGradient id={id("tire")} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+          <stop stopColor="#3A465C" />
+          <stop offset="1" stopColor="#1B2432" />
         </linearGradient>
-        <linearGradient id={id("ring")} x1="238" y1="6" x2="302" y2="72" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#4C93F2" />
-          <stop offset="1" stopColor="#0E4FB8" />
+
+        <linearGradient id={id("rim")} x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+          <stop stopColor="#F2F6FB" />
+          <stop offset="1" stopColor="#C6D5E7" />
         </linearGradient>
+
+        <linearGradient id={id("lamp")} x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+          <stop stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#B9D8F5" />
+        </linearGradient>
+
+        <linearGradient id={id("tail")} x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+          <stop stopColor="#F0A6A2" />
+          <stop offset="1" stopColor="#D2635E" />
+        </linearGradient>
+
         <radialGradient
           id={id("ground")}
           cx="0"
           cy="0"
           r="1"
           gradientUnits="userSpaceOnUse"
-          gradientTransform="translate(150 96) scale(132 12)"
+          gradientTransform={`translate(158 ${GROUND + 2}) scale(126 9)`}
         >
-          <stop stopColor="#1D3E76" stopOpacity="0.18" />
+          <stop stopColor="#1D3E76" stopOpacity="0.22" />
           <stop offset="1" stopColor="#1D3E76" stopOpacity="0" />
         </radialGradient>
       </defs>
 
       {/* A "mancha" de fundo — a mesma linguagem do hub da 4.11B. */}
       <path
-        d="M30 34C42 12 82 2 132 4c50 2 92 14 118 32 26 18 22 48-6 60-28 12-84 18-136 14C56 106 20 92 14 72 8 52 18 56 30 34Z"
+        d="M32 36C46 12 88 2 140 4c52 2 96 14 122 32 26 18 22 52-8 66-30 14-88 20-142 16C60 114 22 98 16 76 10 54 18 60 32 36Z"
         fill={`url(#${id("backdrop")})`}
       />
 
-      {/* Sombra no chão: o apoio que impede o carro de parecer flutuando. */}
-      <ellipse cx="150" cy="96" rx="128" ry="10" fill={`url(#${id("ground")})`} />
+      {/* Sombra de contato: o apoio que impede o carro de parecer flutuando. */}
+      <ellipse cx="158" cy={GROUND + 2} rx="126" ry="9" fill={`url(#${id("ground")})`} />
 
-      <path d={silhouette.shell} fill={`url(#${id("shell")})`} />
+      {/*
+        RODAS ANTES DA LATARIA.
+
+        Pintadas primeiro, elas ficam ATRÁS do corpo: a caixa de roda recorta o
+        topo do pneu e a roda entra na lataria, em vez de ficar pousada por
+        baixo dela como um adesivo.
+      */}
+      {s.wheels.map((cx) => (
+        <g key={cx}>
+          <circle cx={cx} cy={wheelCy} r={s.wheelR} fill={`url(#${id("tire")})`} />
+          <circle cx={cx} cy={wheelCy} r={s.wheelR * 0.6} fill={`url(#${id("rim")})`} />
+          {SPOKES.map((deg) => {
+            const rad = (deg * Math.PI) / 180;
+            return (
+              <line
+                key={deg}
+                x1={cx}
+                y1={wheelCy}
+                x2={cx + Math.cos(rad) * s.wheelR * 0.52}
+                y2={wheelCy + Math.sin(rad) * s.wheelR * 0.52}
+                stroke="#A9BDD6"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            );
+          })}
+          <circle cx={cx} cy={wheelCy} r={s.wheelR * 0.17} fill="#7E93AE" />
+        </g>
+      ))}
+
+      {/* Lataria. */}
+      <path d={shellPath(s)} fill={`url(#${id("body")})`} />
+
+      {/* Lanternas e faróis por baixo do contorno, para o traço fechar por cima. */}
+      <path d={s.headlight} fill={`url(#${id("lamp")})`} />
+      <path d={s.taillight} fill={`url(#${id("tail")})`} />
+
       <path
-        d={silhouette.shell}
-        stroke="#8FAAD0"
-        strokeWidth="2.6"
+        d={shellPath(s)}
+        stroke="#7F9BC0"
+        strokeWidth="2"
         strokeLinejoin="round"
         strokeLinecap="round"
       />
-      <path d={silhouette.glass} fill={`url(#${id("glass")})`} />
+
+      <path d={s.glass} fill={`url(#${id("glass")})`} fillRule="evenodd" />
+
+      {/* Recorte de porta e maçanetas: escala, sem virar detalhe barulhento. */}
+      {s.doorLine ? (
+        <path d={s.doorLine} stroke="#A9BFDA" strokeWidth="1.6" strokeLinecap="round" />
+      ) : null}
+      {s.handles.map(([hx, hy]) => (
+        <rect key={`${hx}-${hy}`} x={hx} y={hy} width="11" height="3" rx="1.5" fill="#9DB4D2" />
+      ))}
 
       {/*
-        Rodas. Aro claro dentro do pneu escuro — volume sem textura.
+        A LUPA — pequena, no canto, fora do caminho do carro.
 
-        Os centros vêm da silhueta: a distância entre eixos faz parte do que
-        distingue as carrocerias, e rodas em posição fixa colocariam a roda
-        traseira da minivan no meio da carroceria.
+        Ela marca "isto é uma procura, não um anúncio". Grande, roubava o card:
+        o lojista precisa reconhecer a CARROCERIA em meio segundo, e nada pode
+        competir com ela nessa faixa.
       */}
-      <g>
-        {silhouette.wheels.map((cx) => (
-          <g key={cx}>
-            <circle cx={cx} cy="92" r="13" fill="#2B3D5C" />
-            {/*
-              Aro em DOIS passos, não um furo branco.
-
-              Pneu escuro + miolo quase branco (r=6 em r=14) desenhava uma
-              argola: a área clara era pequena demais para ler como aro e
-              grande demais para ler como cubo, então o olho via um anel
-              preto. Com o aro de #C8D8EC ocupando r=7,5 e o cubo por cima, a
-              roda tem a mesma leitura da referência — pneu, aro, centro — sem
-              nenhuma textura.
-            */}
-            <circle cx={cx} cy="92" r="7.5" fill="#C8D8EC" />
-            <circle cx={cx} cy="92" r="3" fill="#6E86A8" />
-          </g>
-        ))}
-      </g>
-
-      {/* A LUPA — o assunto da figura, e o que a marca como "procura". */}
-      <g>
-        <circle cx="268" cy="36" r="26" fill={`url(#${id("lens")})`} />
-        <circle cx="268" cy="36" r="26" stroke={`url(#${id("ring")})`} strokeWidth="6" />
-        <path
-          d="M287 55l14 14"
-          stroke={`url(#${id("ring")})`}
-          strokeWidth="9"
-          strokeLinecap="round"
-        />
-        {/* Brilho: um arco claro no quadrante superior esquerdo do vidro. */}
-        <path
-          d="M254 25a19 19 0 0 1 11-7"
-          stroke="#FFFFFF"
-          strokeWidth="4"
-          strokeLinecap="round"
-          opacity="0.9"
-        />
+      <g opacity="0.9">
+        <circle cx="291" cy="21" r="9.5" stroke="#2F6FD0" strokeWidth="3" fill="#FFFFFF" fillOpacity="0.55" />
+        <path d="M298 28l7 7" stroke="#2F6FD0" strokeWidth="3.4" strokeLinecap="round" />
       </g>
     </svg>
   );

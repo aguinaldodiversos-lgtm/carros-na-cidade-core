@@ -157,7 +157,72 @@ AccountPanelShell (header global + sidebar — PRESERVADOS)
 
 Tela de **navegação**, não de foco: a sidebar continua montada (§9).
 
-## 9. Ilustrações
+## 9-bis. Correção cirúrgica da arte (rodada de revisão)
+
+A arte anterior era legível mas **icônica**: silhueta fechada de fundo plano com
+duas rodas apoiadas por baixo, lupa de raio 26 dominando a faixa. Refeita para
+parecer veículo, sem virar fotografia. Continua SVG inline, sem `<img>`, sem
+request e sem acervo por modelo.
+
+**O que mudou na figura**
+
+1. **Caixa de roda.** As rodas são pintadas ANTES da lataria e o corpo é
+   recortado por um semicírculo acima de cada uma. Sem isso o carro é um adesivo
+   pousado sobre dois círculos.
+2. **Roda em quatro camadas** — pneu, aro, cinco raios, cubo. Disco com furo lê
+   como argola; quatro camadas leem como roda.
+3. **Vidro mais ESCURO que a lataria.** Vidro claro sobre lataria clara vira uma
+   mancha só; a inversão de valor é o que separa a cabine do corpo.
+4. **Faróis frios na frente, lanternas quentes atrás.** Sem elas o desenho é
+   simétrico e o olho não sabe para onde o carro aponta.
+5. **A lupa virou selo de canto** (raio 9,5, topo à direita), como na referência
+   nova. O carro é o assunto; a lupa é o adjetivo que diz "isto é uma procura".
+6. **Tela 320×132** (era 320×112), com o esqueleto de carregamento seguindo a
+   mesma proporção — os dois têm de andar juntos ou o E2E acusa salto de layout.
+
+**Duas rodadas de proporção, ambas achadas por captura e não por teste**
+
+- *Rodada 1:* balanço dianteiro a ~40% da distância entre eixos e cabine baixa e
+  recuada — proporção de sedã dos anos 80. Corrigido para ~30% com a cabine
+  adiantada, que é a assinatura de carro contemporâneo.
+- *Rodada 2:* com as oito silhuetas **corretas**, hatch, sedã e SUV ainda liam
+  IGUAL na grade; só a picape se destacava. Medida fiel não sobrevive ao tamanho
+  de uso — num card de ~310px o SUV real é ~12% mais alto que o hatch, e 12% de
+  130px some. A diferença passou a ser **exagerada de propósito**: o SUV ganhou
+  teto a y=16 (contra 34), roda de raio 25 (contra 19) e soleira levantada; o
+  hatch encurtou para ~224 de comprimento contra ~270 do sedã; o sedã esticou a
+  traseira com degrau de porta-malas.
+
+Nenhum teste pegou nenhuma das duas: eles provam QUAL figura foi escolhida
+(`data-body-type`, path por carroceria), nunca se ela chega ao olho. As duas
+saíram de olhar `02-buyers-desktop-grid.png` — a grade inteira, que é como o
+lojista lê a tela.
+
+**A figura do modo específico deixou de ser genérica**
+
+`artBodyTypeFor` agora infere a carroceria do nome comercial
+(`Gol/Argo/HB20 → hatch`, `HR-V/Tracker → SUV`, `Strada → picape`,
+`Corolla → sedã`). É inferência de APRESENTAÇÃO: não vai ao banco, não filtra,
+não entra em matching, não sai em DTO. A carroceria **declarada** (categoria
+aberta) nunca é sobrescrita por ela, e nome não reconhecido cai no genérico em
+vez de chutar.
+
+A fase anterior desenhava o genérico aqui de propósito, para não apresentar
+palpite como dado do comprador. Ficava honesto e ilegível: a maioria das
+procuras reais é por modelo, então o lojista via a mesma figura repetida linha
+após linha, sem separar quem procura picape de quem procura hatch — que é a
+primeira triagem que ele faz contra o próprio pátio. O risco da inferência é
+menor que o custo dessa repetição, e o que a figura nunca afirma é cor, ano,
+geração ou versão.
+
+> **Defeito real pego por teste nesta rodada:** toda chave com hífen (`hr-v`,
+> `t-cross`, `cr-v`, `f-250`) era **inalcançável**. A normalização transformava
+> a ENTRADA "HR-V" em `hr v`, mas as CHAVES continuavam com hífen — as quatro
+> caíam no genérico em silêncio, com a tabela parecendo perfeita na leitura. As
+> chaves passaram a atravessar a mesma normalização. Um caso concreto por
+> carroceria pegou o que a revisão do diff não pegaria.
+
+## 9. Ilustrações (versão original desta fase)
 
 `ActiveBuyerArt.tsx` — SVG **inline**, `viewBox 320×112`, família de 8
 carrocerias (`hatch`, `sedan`, `suv`, `picape`, `coupe`, `minivan`, `wagon`,
