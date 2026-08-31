@@ -242,10 +242,25 @@ export default function ActiveBuyerArt({
           <stop stopColor="#E7F0FF" />
           <stop offset="1" stopColor="#F7FAFF" />
         </linearGradient>
+        {/*
+          O VOLUME DA LATARIA VEM DAQUI, E PRECISA DE AMPLITUDE
+
+          A primeira versão ia de #FFFFFF a #D5E0F0 — 8% de luminância entre o
+          teto e a soleira. A essa amplitude a carroceria vira uma silhueta
+          chapada quase branca, e a coisa mais escura da figura passa a ser o
+          pneu: no grid, nove cards lidos de relance viram nove pares de
+          argolas pretas, e as carrocerias (que É o que distingue um card do
+          outro) deixam de ser o assunto.
+
+          A rampa agora fecha em #B3C8E3 e concentra a virada na metade de
+          baixo — que é onde a luz de fato cai numa lataria. O teto continua
+          branco: o contraste é interno à figura, não um escurecimento geral.
+        */}
         <linearGradient id={id("shell")} x1="60" y1="16" x2="220" y2="94" gradientUnits="userSpaceOnUse">
           <stop stopColor="#FFFFFF" />
-          <stop offset="0.5" stopColor="#F2F6FC" />
-          <stop offset="1" stopColor="#D5E0F0" />
+          <stop offset="0.42" stopColor="#EDF3FB" />
+          <stop offset="0.72" stopColor="#D3E0F1" />
+          <stop offset="1" stopColor="#B3C8E3" />
         </linearGradient>
         <linearGradient id={id("glass")} x1="90" y1="14" x2="220" y2="60" gradientUnits="userSpaceOnUse">
           <stop stopColor="#C6DCF7" />
@@ -284,7 +299,7 @@ export default function ActiveBuyerArt({
       <path d={silhouette.shell} fill={`url(#${id("shell")})`} />
       <path
         d={silhouette.shell}
-        stroke="#B9CBE4"
+        stroke="#8FAAD0"
         strokeWidth="2.6"
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -301,8 +316,19 @@ export default function ActiveBuyerArt({
       <g>
         {silhouette.wheels.map((cx) => (
           <g key={cx}>
-            <circle cx={cx} cy="92" r="14" fill="#1E2E4A" />
-            <circle cx={cx} cy="92" r="6" fill="#E9EFF8" />
+            <circle cx={cx} cy="92" r="13" fill="#2B3D5C" />
+            {/*
+              Aro em DOIS passos, não um furo branco.
+
+              Pneu escuro + miolo quase branco (r=6 em r=14) desenhava uma
+              argola: a área clara era pequena demais para ler como aro e
+              grande demais para ler como cubo, então o olho via um anel
+              preto. Com o aro de #C8D8EC ocupando r=7,5 e o cubo por cima, a
+              roda tem a mesma leitura da referência — pneu, aro, centro — sem
+              nenhuma textura.
+            */}
+            <circle cx={cx} cy="92" r="7.5" fill="#C8D8EC" />
+            <circle cx={cx} cy="92" r="3" fill="#6E86A8" />
           </g>
         ))}
       </g>

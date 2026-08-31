@@ -180,7 +180,7 @@ vinte cards montam vinte cópias, e `url(#…)` resolve pela PRIMEIRA ocorrênci
 todas as lupas passariam a pintar com o gradiente da primeira, sem um único
 aviso no console. Há teste de unicidade (jsdom) **e** no DOM real (E2E).
 
-**Dois defeitos reais achados na comparação visual e corrigidos:**
+**Três defeitos reais achados na comparação visual e corrigidos:**
 
 1. `viewBox` 320×170 dentro de uma faixa de 104px fazia o SVG ser encaixado por
    ALTURA — sobravam barras laterais e o carro ficava com ~60% da largura
@@ -189,6 +189,29 @@ aviso no console. Há teste de unicidade (jsdom) **e** no DOM real (E2E).
 2. As silhuetas iniciais eram indistinguíveis entre si. Refeitas variando teto,
    comprimento, traseira e distância entre eixos — que é como uma pessoa
    distingue carrocerias de relance.
+3. **A lataria não tinha amplitude tonal, e o pneu virou o assunto da figura.**
+   Achado na revisão, olhando o grid inteiro (`02-buyers-desktop-grid.png`) em
+   vez de um card isolado — que é como o lojista lê a tela.
+
+   O gradiente da carroceria ia de `#FFFFFF` a `#D5E0F0`: ~8% de luminância
+   entre teto e soleira. A essa amplitude a lataria lê como silhueta chapada
+   quase branca, e a coisa mais escura da figura passa a ser o pneu
+   (`#1E2E4A`, com um miolo quase branco de r=6 dentro de r=14, que desenha
+   uma ARGOLA em vez de uma roda). Resultado: nove cards de relance viravam
+   nove pares de argolas pretas, e a carroceria — que é justamente o que
+   distingue um card do outro — deixava de ser o assunto.
+
+   Isto é o inverso do defeito 2: lá as formas eram iguais; aqui as formas já
+   estavam certas e **corretas no DOM**, mas não chegavam ao olho. Os testes de
+   forma (`data-body-type`, path por carroceria) passavam durante o defeito
+   inteiro — eles provam qual figura foi escolhida, nunca se ela é legível.
+
+   Corrigido em três pontos: rampa da lataria fechando em `#B3C8E3` com a
+   virada concentrada na metade de baixo (o teto segue branco — o contraste é
+   interno à figura, não um escurecimento geral); contorno de `#B9CBE4` para
+   `#8FAAD0`; e roda em três camadas (pneu `#2B3D5C` r=13 → aro `#C8D8EC`
+   r=7,5 → cubo `#6E86A8` r=3), que é a leitura pneu/aro/centro da referência,
+   sem textura nenhuma.
 
 ## 10. Cards
 
@@ -377,6 +400,32 @@ azul de largura total **seguem a referência**.
    com revisão de conteúdo.
 
 ## 21. Regressões verificadas
+
+### 21.1 Re-execução na revisão (após a correção 3 da seção 9)
+
+| Suíte | Resultado |
+| --- | --- |
+| `tests/purchase-intents/**` | **306 verdes** (7 arquivos, inclui os 25 do feed) |
+| `ActiveBuyerArt` + `DealerOpportunities` + `PurchaseIntentsPagination` | **63 verdes** |
+| `ActiveBuyerArt.test.tsx` isolado, após a mudança de cor | **18 verdes** |
+| `tsc --noEmit` | limpo |
+| E2E 4.11C | **21/21**, com as dez capturas regeradas |
+
+**Prova de mordida re-executada na revisão:** apagando
+`add("pi.transmission = $?", …)` do repository, **exatamente 2 testes falham**
+(`a contagem respeita os MESMOS filtros da lista` e `câmbio e prazo de compra
+filtram de verdade`). A sabotagem foi revertida e `git diff HEAD` voltou vazio
+antes de qualquer commit.
+
+**Armadilha de execução registrada:** o `webServer` do `playwright.config.ts` só
+sobe com `PW_START_SERVER=1`. Sem essa variável não há servidor, os 21 testes
+morrem no `page.goto` e o placar lê **"21 failed"** — que parece regressão e não
+é. Pior: `npx playwright test … | tail -40` devolve o código de saída do `tail`,
+ou seja **0**, então o run aparenta sucesso enquanto reporta 21 falhas. O
+comando correto é `PW_START_SERVER=1 npx playwright test …` com a saída
+redirecionada para arquivo, nunca canalizada.
+
+### 21.2 Suítes completas (execução original da implementação)
 
 | Suíte | Resultado |
 | --- | --- |
