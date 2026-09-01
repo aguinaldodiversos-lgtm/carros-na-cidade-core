@@ -7,7 +7,9 @@ import { HomeCarousels } from "@/components/home/sections/HomeCarousels";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
+import { fetchPublishedBlogPosts } from "@/lib/blog/blog-cms";
 import { fetchHomeDiscovery } from "@/lib/home/home-discovery";
+import { buildHomeContentCards, HOME_CONTENT_CARD_LIMIT } from "@/lib/home/home-content-cards";
 import { fetchHomeAboveFold, fetchHomeHero } from "@/lib/home/public-home";
 import { buildHomeJsonLd } from "@/lib/seo/home-structured-data";
 import { resolveTerritory } from "@/lib/territory/territory-resolver";
@@ -88,11 +90,18 @@ async function HomeAsyncContent({ searchParams }: { searchParams: SearchParams }
   // 2026-07-11 (substituído pelo bloco SEO "Continue sua busca").
   const regionalEnabled = isRegionalPageEnabled();
 
-  const [aboveFold, heroBanners, discovery] = await Promise.all([
+  // Os cards de conteúdo saem dos posts REAIS do CMS (SEO Fase 4.1A, achado
+  // P1-4: os seis slugs hardcoded da seção respondiam 404). Entra no mesmo
+  // `Promise.all` — nenhum round-trip a mais em série — e reusa o cache do
+  // blog (`revalidate: 300`, tag `public-blog`), sem fetch por card.
+  const [aboveFold, heroBanners, discovery, blog] = await Promise.all([
     fetchHomeAboveFold(),
     fetchHomeHero(),
     fetchHomeDiscovery(territory.state.code),
+    fetchPublishedBlogPosts({ limit: HOME_CONTENT_CARD_LIMIT }),
   ]);
+
+  const contentCards = buildHomeContentCards(blog.posts);
 
   return (
     <HomePageClient
@@ -102,6 +111,7 @@ async function HomeAsyncContent({ searchParams }: { searchParams: SearchParams }
       detectedCity={detectedCity}
       regionalEnabled={regionalEnabled}
       heroBanners={heroBanners}
+      contentCards={contentCards}
       profiles={discovery.profiles}
       carousels={
         <HomeCarousels

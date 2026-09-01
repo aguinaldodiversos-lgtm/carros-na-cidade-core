@@ -7,7 +7,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/AppProviders";
 import { cityContextFromSlug } from "@/lib/buy/territory-variant";
 import { extractCitySlugFromPathname } from "@/lib/city/city-from-pathname";
-import { DEFAULT_CITY } from "@/lib/city/city-default";
+import { resolvePublicDefaultCity } from "@/lib/city/public-default-city";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import type { CityRef } from "@/lib/city/city-types";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
@@ -155,16 +155,30 @@ type RootLayoutProps = Readonly<{
  *      header interno `x-cnc-pathname` injetado pelo middleware.
  *      Quando presente, é a fonte mais confiável (URL do usuário).
  *   2. Cookie `cnc_city` salvo em visitas anteriores.
- *   3. `DEFAULT_CITY` (sao-paulo-sp) — última linha.
+ *   3. Cidade pública PRIMÁRIA, resolvida do estoque real.
+ *   4. `null` — o portal não tem cidade nenhuma.
  *
  * Sem este resolver, todas as páginas territoriais de outras cidades
  * (`/carros-em/atibaia-sp`, `/carros-usados/regiao/atibaia-sp`, etc.)
- * recebiam SSR com `DEFAULT_CITY` → header com links errados (links
+ * recebiam SSR com a cidade padrão → header com links errados (links
  * para `sao-paulo-sp` em página de Atibaia). O fix do `CityContext`
  * client-side cobria o caso pós-hidratação mas deixava flash inicial
  * e crawlers sem JS verem incoerência.
+ *
+ * ── Por que os passos 3 e 4 mudaram (SEO Fase 4.1A, achado P1-2) ────────
+ * A última linha era `DEFAULT_CITY`, o literal `sao-paulo-sp` — cidade com
+ * ZERO anúncios ativos, que o gate territorial responde 404. Como o
+ * Googlebot nunca manda cookie, o crawler caía SEMPRE nessa linha e recebia
+ * o chrome do site inteiro apontando para seis URLs mortas.
+ *
+ * Agora o piso é o estoque real, e a ausência de estoque é representada por
+ * `null` — não por uma cidade inventada. `getTerritorialRoutesForCity(null)`
+ * já degrada para as rotas-índice, que existem e respondem 200.
  */
-function resolveSsrInitialCity(pathname: string | null, cookieValue: string | undefined): CityRef {
+async function resolveSsrInitialCity(
+  pathname: string | null,
+  cookieValue: string | undefined
+): Promise<CityRef | null> {
   if (pathname) {
     const slug = extractCitySlugFromPathname(pathname);
     if (slug) {
@@ -177,7 +191,13 @@ function resolveSsrInitialCity(pathname: string | null, cookieValue: string | un
       };
     }
   }
-  return parseCityCookieValue(cookieValue) ?? DEFAULT_CITY;
+
+  const fromCookie = parseCityCookieValue(cookieValue);
+  if (fromCookie) return fromCookie;
+
+  // Backend fora devolve `null` aqui também: sem saber qual cidade existe, o
+  // chrome sai sem links territoriais em vez de sair com links quebrados.
+  return resolvePublicDefaultCity();
 }
 
 export default async function RootLayout({ children }: RootLayoutProps) {
@@ -185,12 +205,16 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   const headerStore = await headers();
   const rawCity = cookieStore.get(CITY_COOKIE_NAME)?.value;
   const pathname = headerStore.get("x-cnc-pathname");
-  const initialCity = resolveSsrInitialCity(pathname, rawCity);
-
   // Inventário do rodapé resolvido no servidor: o footer é client component e
   // não pode buscar sozinho sem virar fetch no browser em toda página. Cache de
   // 1h no fetch; falha devolve inventário vazio (as colunas somem) e loga.
-  const footerInventory = await fetchFooterInventory();
+  //
+  // Em paralelo com a cidade inicial: as duas leituras são independentes e
+  // ambas já são cacheadas: encadeá-las custaria um round-trip por navegação.
+  const [initialCity, footerInventory] = await Promise.all([
+    resolveSsrInitialCity(pathname, rawCity),
+    fetchFooterInventory(),
+  ]);
 
   return (
     <html lang="pt-BR" className={inter.variable}>

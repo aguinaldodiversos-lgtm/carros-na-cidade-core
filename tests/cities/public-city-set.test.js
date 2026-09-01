@@ -190,7 +190,11 @@ describe("estado derivado", () => {
 
   it("site sem estoque nenhum devolve conjunto vazio, sem quebrar", () => {
     const set = buildPublicCitySet([]);
-    expect(set).toEqual({ cities: {}, ufs: {}, total: 0, indexable: 0 });
+    // `primaryCity: null` faz parte do contrato desde a SEO Fase 4.1A: sem
+    // estoque em lugar nenhum, NÃO existe cidade padrão. Quem consome degrada
+    // para rota não-territorial em vez de inventar um slug — era exatamente o
+    // literal `sao-paulo-sp` inventado que gerava os links 404 do achado P1-2.
+    expect(set).toEqual({ cities: {}, ufs: {}, total: 0, indexable: 0, primaryCity: null });
   });
 
   it("UF perde a última cidade com estoque → deixa de existir", () => {

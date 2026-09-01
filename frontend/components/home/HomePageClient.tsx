@@ -4,6 +4,7 @@ import { Suspense, type ReactNode } from "react";
 import { LocationRegionalPrompt } from "@/components/home/LocationRegionalPrompt";
 import { SiteBottomNav } from "@/components/shell/SiteBottomNav";
 import { ContentCardsSection } from "@/components/home/sections/ContentCardsSection";
+import type { HomeContentCard } from "@/lib/home/home-content-cards";
 import { HomeAnnounceBanner } from "@/components/home/sections/HomeAnnounceBanner";
 import { HomeCarouselsSkeleton } from "@/components/home/sections/HomeCarouselsSkeleton";
 import {
@@ -84,6 +85,12 @@ interface HomePageClientProps {
    * a Home renderiza estático; 2-3, carrossel CSS scroll-snap.
    */
   heroBanners?: readonly HomeHeroBannerOverride[] | null;
+  /**
+   * Cards da seção de conteúdo, montados no servidor a partir dos posts
+   * PUBLICADOS do CMS. Lista vazia oculta a seção — ver
+   * `lib/home/home-content-cards.ts` (SEO Fase 4.1A, achado P1-4).
+   */
+  contentCards?: HomeContentCard[];
 }
 
 function parseTotalAds(value: number | string | undefined): number | undefined {
@@ -105,6 +112,7 @@ export function HomePageClient({
   regionalEnabled,
   heroOverride = null,
   heroBanners = null,
+  contentCards = [],
 }: HomePageClientProps) {
   const totalAds = parseTotalAds(data?.stats?.total_ads);
 
@@ -163,7 +171,7 @@ export function HomePageClient({
         <HomePrimaryActions />
 
         {/* 10. Conteúdo / Blog. */}
-        <ContentCardsSection />
+        <ContentCardsSection cards={contentCards} />
       </div>
 
       <SiteBottomNav />

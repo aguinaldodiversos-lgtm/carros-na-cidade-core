@@ -23,8 +23,6 @@
 
 import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
 
-import { DEFAULT_PUBLIC_CITY_SLUG } from "./public-config";
-
 export type TerritorialContext = {
   /** Slug canônico da cidade ativa (ex.: "atibaia-sp"). Opcional. */
   citySlug?: string | null;
@@ -63,10 +61,24 @@ export type TerritorialRoutesOptions = {
  * preferível a um cabeçalho vazio, e uma falha de rede não pode apagar a
  * navegação do site. Mesma política do gate no servidor.
  */
-export function getTerritorialRoutesForCity(citySlug: string, opts?: TerritorialRoutesOptions) {
-  const slug = (citySlug || DEFAULT_PUBLIC_CITY_SLUG).trim() || DEFAULT_PUBLIC_CITY_SLUG;
+export function getTerritorialRoutesForCity(
+  citySlug: string | null | undefined,
+  opts?: TerritorialRoutesOptions
+) {
+  // SEM cidade é SEM cidade (SEO Fase 4.1A, achado P1-2).
+  //
+  // Aqui havia `citySlug || DEFAULT_PUBLIC_CITY_SLUG` — e o default era o
+  // literal `sao-paulo-sp`, cidade com ZERO anúncios ativos. A ausência de
+  // cidade virava, silenciosamente, uma cidade que o gate territorial responde
+  // 404. Como o Googlebot nunca carrega cookie, o crawler recebia essa
+  // substituição em TODA página sem contexto territorial: cinco links mortos
+  // por página, medidos em produção em 2026-08-31.
+  //
+  // Agora a ausência cai no MESMO ramo de "cidade não é pública" logo abaixo —
+  // rotas-índice, que existem e respondem 200. Nenhum slug é inventado.
+  const slug = String(citySlug || "").trim();
   const enc = encodeURIComponent(slug);
-  const canonicalCity = getCanonicalCityPath(slug);
+  const canonicalCity = slug ? getCanonicalCityPath(slug) : null;
 
   // Slug inválido cai no mesmo tratamento de cidade não-pública: rotas-índice.
   // Montar `/carros-em/<lixo>` produziria link para 404 no chrome global.
@@ -104,7 +116,20 @@ export function getTerritorialRoutesForCity(citySlug: string, opts?: Territorial
   } as const;
 }
 
-const DEFAULT_TERRITORY = getTerritorialRoutesForCity(DEFAULT_PUBLIC_CITY_SLUG);
+/**
+ * Rotas do chrome global quando NÃO há cidade resolvida.
+ *
+ * Era `getTerritorialRoutesForCity(DEFAULT_PUBLIC_CITY_SLUG)`, com o literal
+ * `sao-paulo-sp` — ou seja, `SITE_ROUTES.blog` era `/blog/sao-paulo-sp` (404),
+ * `SITE_ROUTES.fipe` era `/tabela-fipe/sao-paulo-sp` (404), e assim por diante,
+ * em constantes usadas pelo site inteiro.
+ *
+ * Passando `null`, caímos no ramo não-territorial: `/comprar`, `/blog`,
+ * `/tabela-fipe`, `/simulador-financiamento` — todas 200 e indexáveis. Quando
+ * há cidade, quem monta o link é `getTerritorialRoutesForCity(slug)` com o
+ * slug real; estas constantes são só o piso seguro.
+ */
+const DEFAULT_TERRITORY = getTerritorialRoutesForCity(null);
 
 export const SITE_ROUTES = {
   home: "/",
@@ -234,11 +259,15 @@ function buildModelsTitle(inventory: FooterInventoryInput): string {
 }
 
 export function buildFooterNavSections(
-  citySlug: string,
+  citySlug: string | null | undefined,
   context: TerritorialContext = {},
-  inventory: FooterInventoryInput = EMPTY_FOOTER_INVENTORY_INPUT
+  inventory: FooterInventoryInput = EMPTY_FOOTER_INVENTORY_INPUT,
+  opts?: TerritorialRoutesOptions
 ): SiteNavSection[] {
-  const territorial = getTerritorialRoutesForCity(citySlug);
+  // `opts` propaga o MESMO sinal que o cabeçalho já usava (`isCityPublic`). O
+  // rodapé montava rotas territoriais para qualquer slug, público ou não — foi
+  // o caminho por onde os links de `sao-paulo-sp` chegavam a toda página.
+  const territorial = getTerritorialRoutesForCity(citySlug, opts);
 
   // "Carros por região" prefere link contextual:
   //   - Se a página atual tem cidade ativa → Página Regional dessa cidade.
@@ -338,8 +367,11 @@ export function buildFooterNavSections(
  * Header — mantém o set curto de 3 pilares para caber na barra.
  * Não foi tocado pelo briefing do footer.
  */
-export function buildHeaderNavSections(citySlug: string): SiteNavSection[] {
-  const r = getTerritorialRoutesForCity(citySlug);
+export function buildHeaderNavSections(
+  citySlug: string | null | undefined,
+  opts?: TerritorialRoutesOptions
+): SiteNavSection[] {
+  const r = getTerritorialRoutesForCity(citySlug, opts);
   return [
     {
       id: "comprar",
@@ -366,10 +398,16 @@ export function buildHeaderNavSections(citySlug: string): SiteNavSection[] {
   ];
 }
 
-/** Rodapé completo — fallback com cidade padrão (SSR / testes). */
-export const FOOTER_NAV_SECTIONS = buildFooterNavSections(DEFAULT_PUBLIC_CITY_SLUG);
+/**
+ * Rodapé/cabeçalho SEM cidade — o piso seguro (SSR / testes).
+ *
+ * Usavam `DEFAULT_PUBLIC_CITY_SLUG` e por isso nasciam cheios de links para
+ * `sao-paulo-sp`. Sem cidade, as seções territoriais degradam para as
+ * rotas-índice; nenhum link 404 é emitido.
+ */
+export const FOOTER_NAV_SECTIONS = buildFooterNavSections(null);
 
-export const HEADER_NAV_SECTIONS = buildHeaderNavSections(DEFAULT_PUBLIC_CITY_SLUG);
+export const HEADER_NAV_SECTIONS = buildHeaderNavSections(null);
 
 /** Ativo considerando pathname, query e sub-rotas conhecidas (blog, FIPE, cidade…). */
 export function isNavLinkActive(

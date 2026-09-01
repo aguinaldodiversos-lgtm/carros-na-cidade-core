@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { sanitizeCtaUrl } from "@/lib/home/cta-url";
 import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
 
@@ -375,7 +376,12 @@ function HeroSlide({
   offersBadge: string | null;
   priority: boolean;
 }) {
-  const overrideCtaUrl = hasContent(slide.cta_url) ? slide.cta_url : null;
+  // `sanitizeCtaUrl` em vez de `hasContent` (SEO Fase 4.1A, achado P1-5): o
+  // banco pode conter valor gravado antes da validação de escrita existir — em
+  // produção, `home_hero_3.cta_url = "/abaixo da fipe"`, que virava
+  // `href="/abaixo da fipe"` e 404 no link mais visível do site. Valor inválido
+  // é DESCARTADO, e o `??` abaixo cai no destino canônico calculado localmente.
+  const overrideCtaUrl = sanitizeCtaUrl(slide.cta_url);
   const overrideImage = hasContent(slide.image_desktop_url) ? slide.image_desktop_url : null;
   const overrideMobile = hasContent(slide.image_mobile_url) ? slide.image_mobile_url : null;
   const overrideAlt = hasContent(slide.image_alt) ? slide.image_alt : null;

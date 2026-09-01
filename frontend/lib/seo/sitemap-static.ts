@@ -55,10 +55,18 @@ export function getStaticSitemapEntries(): PublicSitemapEntry[] {
     // raiz só redireciona para `/simulador-financiamento/[cidade]`, que é
     // `noindex` (ferramenta interativa). URL noindex/redirect não pode constar
     // no sitemap.
-    {
-      loc: "/tabela-fipe",
-      changefreq: "weekly",
-      priority: 0.6,
-    },
+    //
+    // `/tabela-fipe` removido pelo MESMO critério (SEO Fase 4.1A, achado P1-3).
+    // Ficou aqui por um descuido de simetria: é rota de navegação, igual à do
+    // simulador — não tem conteúdo próprio, só escolhe a cidade e redireciona
+    // para `/tabela-fipe/[cidade]`. Medido em produção em 2026-08-31, era a
+    // ÚNICA das 53 URLs do sitemap que violava o critério de entrada: respondia
+    // 200 com a metadata do layout raiz (canonical `/`, a home) e despachava
+    // para `/tabela-fipe/sao-paulo-sp`, que é 404.
+    //
+    // A rota continua existindo, agora como Route Handler com 307 real, e
+    // continua linkada pelo header e pelo rodapé. Quem entra no sitemap é o
+    // DESTINO: `/tabela-fipe/[cidade]` já é listada em `content.xml`, gateada
+    // por estoque ativo.
   ];
 }

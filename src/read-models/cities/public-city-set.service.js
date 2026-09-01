@@ -30,11 +30,61 @@ import { getCityExistsMinAds, getCityIndexMinAds } from "./city-thresholds.js";
 const MAX_ROWS = 100000;
 
 /**
+ * CIDADE PÚBLICA PRIMÁRIA — a resposta a "se eu precisar de UMA cidade, qual?".
+ *
+ * Existe porque o frontend tinha um literal `sao-paulo-sp` como cidade padrão
+ * (`FALLBACK_PUBLIC_CITY` em lib/site/public-config.ts). São Paulo tem ZERO
+ * anúncios ativos, logo o gate territorial responde 404 — e o Googlebot, que
+ * nunca carrega o cookie de cidade, recebia SEMPRE essa variante: cinco links
+ * mortos no rodapé de toda página (auditoria SEO Fase 4, achado P1-2).
+ *
+ * Trocar o literal por outro literal só moveria o defeito. A cidade padrão tem
+ * de ser CONSEQUÊNCIA do estoque, igual ao resto do invariante territorial.
+ *
+ * ── Por que aqui, e não no frontend ──────────────────────────────────────────
+ * Derivamos da MESMA passagem que monta `cities`. Uma consulta nova no
+ * frontend seria uma segunda fonte de verdade sobre "qual cidade existe" — o
+ * padrão que produziu o bug original. E `Object.keys()` do mapa `cities` não
+ * serve: o JS não garante ordem de inserção para chaves não-numéricas de forma
+ * contratual, e o consumidor não deve depender de acidente de serialização.
+ *
+ * ── Determinismo ─────────────────────────────────────────────────────────────
+ * Maior número de anúncios ativos vence. Empate resolve por slug ASC — critério
+ * estável e disponível, para que dois processos leiam a mesma cidade.
+ *
+ * `null` quando NÃO HÁ cidade pública. Não inventamos slug: sem estoque em
+ * lugar nenhum, o portal não tem cidade, e quem consome tem de degradar para
+ * rota não-territorial em vez de linkar para um 404.
+ *
+ * @param {Record<string, number>} cities mapa slug → anúncios ativos
+ * @param {Record<string, string>} ufBySlug UF por slug, para devolver junto
+ * @returns {{ slug: string, uf: string|null, activeAds: number } | null}
+ */
+export function pickPrimaryPublicCity(cities, ufBySlug = {}) {
+  let best = null;
+
+  for (const [slug, rawTotal] of Object.entries(cities || {})) {
+    const total = Number(rawTotal) || 0;
+    if (total <= 0) continue;
+
+    if (
+      !best ||
+      total > best.activeAds ||
+      (total === best.activeAds && slug.localeCompare(best.slug) < 0)
+    ) {
+      best = { slug, uf: ufBySlug[slug] || ufFromCitySlug(slug) || null, activeAds: total };
+    }
+  }
+
+  return best;
+}
+
+/**
  * Parte PURA — testável sem banco.
  *
  * @param {Array<{city_slug: string, state?: string, total: number}>} rows
  * @param {{ existsMinAds?: number, indexMinAds?: number }} [opts]
- * @returns {{ cities: Record<string, number>, total: number, indexable: number }}
+ * @returns {{ cities: Record<string, number>, ufs: Record<string, number>, total: number, indexable: number, primaryCity: object|null }}
  */
 export function buildPublicCitySet(rows, opts = {}) {
   const existsMin = Number(opts.existsMinAds ?? getCityExistsMinAds());
@@ -42,6 +92,8 @@ export function buildPublicCitySet(rows, opts = {}) {
 
   const cities = {};
   const ufs = {};
+  /** UF por slug — só para `pickPrimaryPublicCity` devolver a UF junto. */
+  const ufBySlug = {};
   let indexable = 0;
 
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -61,14 +113,23 @@ export function buildPublicCitySet(rows, opts = {}) {
     // sufixo do slug canônico (`atibaia-sp` → `sp`), que é o mesmo formato que
     // as rotas de UF recebem.
     const uf = normalizeUf(row?.state) || ufFromCitySlug(slug);
-    if (uf) ufs[uf] = (ufs[uf] || 0) + total;
+    if (uf) {
+      ufs[uf] = (ufs[uf] || 0) + total;
+      ufBySlug[slug] = uf;
+    }
   }
 
   for (const total of Object.values(cities)) {
     if (total >= indexMin) indexable += 1;
   }
 
-  return { cities, ufs, total: Object.keys(cities).length, indexable };
+  return {
+    cities,
+    ufs,
+    total: Object.keys(cities).length,
+    indexable,
+    primaryCity: pickPrimaryPublicCity(cities, ufBySlug),
+  };
 }
 
 function normalizeUf(value) {

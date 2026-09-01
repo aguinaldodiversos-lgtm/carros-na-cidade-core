@@ -33,12 +33,26 @@ export function CmsBlogPostArticle({
 }: {
   post: CmsBlogPost;
   relatedPosts: CmsBlogPost[];
-  citySlug: string;
-  cityName: string;
-  cityLabel: string;
+  /**
+   * Cidade PÚBLICA de contexto, ou `null`.
+   *
+   * Era um literal: a página passava `prettifyCitySlug("sao-paulo-sp")` como
+   * "contexto neutro para CTAs locais". São Paulo tem zero anúncios ativos, e o
+   * resultado medido em produção em 2026-08-31 foram OITO links 404 em cada um
+   * dos 13 posts indexáveis do CMS — `/carros-em/sao-paulo-sp`,
+   * `/tabela-fipe/sao-paulo-sp`, `/blog/sao-paulo-sp/<slug>`, etc.
+   * (SEO Fase 4.1A, achado P1-2.)
+   */
+  citySlug: string | null;
+  cityName: string | null;
+  cityLabel: string | null;
 }) {
+  // `buildCanonicalCityHref(null, "/comprar")` já devolve `/comprar`.
   const buyHref = buildCanonicalCityHref(citySlug, "/comprar");
-  const blogHref = `/blog/${encodeURIComponent(citySlug)}`;
+  const blogHref = citySlug ? `/blog/${encodeURIComponent(citySlug)}` : "/blog";
+  // Sem cidade, a copy perde a cláusula territorial em vez de nomear uma cidade
+  // que o portal não atende.
+  const inCity = cityName ? ` em ${cityName}` : "";
   const coverImage = post.cover_image_url || PLACEHOLDER_IMAGE;
   const categoryLabel = post.category
     ? (findCategoryDefinition(post.category)?.label ?? post.category)
@@ -47,7 +61,7 @@ export function CmsBlogPostArticle({
   const related = relatedPosts
     .filter((p) => p.id !== post.id)
     .slice(0, 3)
-    .map((p) => cmsPostToBlogPost(p, cityLabel));
+    .map((p) => cmsPostToBlogPost(p, cityLabel ?? ""));
 
   return (
     <>
@@ -137,7 +151,7 @@ export function CmsBlogPostArticle({
                     Vitrine local
                   </p>
                   <h2 className="mt-1 text-[18px] font-extrabold leading-tight sm:text-[22px]">
-                    Encontre o carro ideal em {cityName}
+                    Encontre o carro ideal{inCity}
                   </h2>
                   <p className="mt-1 text-[13px] leading-snug text-white/85 sm:text-[14px]">
                     Explore ofertas reais com filtros, abaixo da FIPE e contato direto com o
@@ -149,7 +163,7 @@ export function CmsBlogPostArticle({
                   href={buyHref}
                   className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 text-[13px] font-extrabold text-primary shadow-card transition hover:bg-white/90"
                 >
-                  Ver carros em {cityName}
+                  Ver carros{inCity}
                   <svg
                     viewBox="0 0 24 24"
                     aria-hidden="true"

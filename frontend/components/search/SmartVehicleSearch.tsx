@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useCityOptional } from "@/lib/city/CityContext";
-import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 import { useSemanticAutocomplete } from "../../hooks/useSemanticAutocomplete";
 import { buildSearchUrl } from "../../lib/search/build-search-url";
 import type { FlatAutocompleteSuggestion } from "../../lib/search/semantic-autocomplete";
@@ -13,7 +12,7 @@ import type { FlatAutocompleteSuggestion } from "../../lib/search/semantic-autoc
 export interface SmartVehicleSearchProps {
   placeholder?: string;
   resultsBasePath?: string;
-  /** Se omitido, usa `useCity().city.slug` após hidratação; senão, cidade padrão pública. */
+  /** Se omitido, usa `useCity().city?.slug` após hidratação; senão, busca sem recorte de cidade. */
   currentCitySlug?: string | null;
   className?: string;
   minLength?: number;
@@ -67,15 +66,19 @@ export function SmartVehicleSearch({
 }: SmartVehicleSearchProps) {
   const router = useRouter();
   const cityCtx = useCityOptional();
+  // `null` = busca SEM recorte de cidade. Antes caía em
+  // `DEFAULT_PUBLIC_CITY_SLUG` (`sao-paulo-sp`, zero anúncios), o que fazia a
+  // busca de quem não tem cidade filtrar por uma cidade vazia — resultado
+  // zerado e navegação para rota 404 (SEO Fase 4.1A, achado P1-2).
   const effectiveCitySlug = useMemo(() => {
     if (currentCitySlug != null && String(currentCitySlug).trim() !== "") {
       return String(currentCitySlug).trim();
     }
-    if (cityCtx?.isReady) {
+    if (cityCtx?.isReady && cityCtx.city) {
       return cityCtx.city.slug;
     }
-    return DEFAULT_PUBLIC_CITY_SLUG;
-  }, [currentCitySlug, cityCtx?.isReady, cityCtx?.city.slug]);
+    return null;
+  }, [currentCitySlug, cityCtx?.isReady, cityCtx?.city]);
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);

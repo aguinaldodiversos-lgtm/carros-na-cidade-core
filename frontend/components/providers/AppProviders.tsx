@@ -12,7 +12,7 @@ export function AppProviders({
   initialCity,
 }: {
   children: ReactNode;
-  initialCity: CityRef;
+  initialCity: CityRef | null;
 }) {
   return (
     <Suspense fallback={null}>

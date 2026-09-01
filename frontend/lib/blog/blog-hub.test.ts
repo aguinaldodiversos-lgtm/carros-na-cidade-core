@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyCmsPostsToHubContent } from "@/lib/blog/blog-hub";
+import { applyCmsPostsToHubContent, buildBlogPostHref } from "@/lib/blog/blog-hub";
 import type { BlogPageContent, BlogPost } from "@/lib/blog/blog-page";
 
 function makeContent(): BlogPageContent {
@@ -94,5 +94,29 @@ describe("applyCmsPostsToHubContent", () => {
     const snapshot = JSON.stringify(content);
     applyCmsPostsToHubContent(content, makeCmsCards(3), "sao-paulo-sp");
     expect(JSON.stringify(content)).toBe(snapshot);
+  });
+});
+
+describe("buildBlogPostHref — sem cidade, canônica global", () => {
+  it("com cidade pública, usa a variante territorial", () => {
+    expect(buildBlogPostHref("atibaia-sp", "ipva-2025")).toBe("/blog/atibaia-sp/ipva-2025");
+  });
+
+  it.each([null, undefined, "", "   "])("sem cidade (%p) usa /blog/<slug>", (city) => {
+    // `/blog/post/<slug>` NÃO é rota do App Router — o fallback antigo era 404.
+    expect(buildBlogPostHref(city as string | null, "ipva-2025")).toBe("/blog/ipva-2025");
+  });
+
+  it("sem slug de post, cai no hub correspondente", () => {
+    expect(buildBlogPostHref("atibaia-sp", "")).toBe("/blog/atibaia-sp");
+    expect(buildBlogPostHref(null, "")).toBe("/blog");
+  });
+
+  it("o hub sem cidade não emite /blog/<cidade>/ em trending", () => {
+    const result = applyCmsPostsToHubContent(makeContent(), makeCmsCards(4), null);
+    for (const item of result.trendingPosts) {
+      expect(item.href).not.toMatch(/^\/blog\/[a-z-]+-[a-z]{2}\//);
+      expect(item.href).toMatch(/^\/blog\/[a-z0-9-]+$/);
+    }
   });
 });

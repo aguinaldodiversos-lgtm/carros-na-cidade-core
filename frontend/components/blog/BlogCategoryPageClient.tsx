@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import type { BlogCategory, BlogCategoryId, BlogPageContent, BlogPost } from "@/lib/blog/blog-page";
+import { buildBlogPostHref } from "@/lib/blog/blog-hub";
 import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
-import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogCategoryPageClientProps {
   content: BlogPageContent & {
@@ -15,7 +15,8 @@ interface BlogCategoryPageClientProps {
   };
 }
 
-const FALLBACK_BLOG_CITY_HREF = `/blog/${DEFAULT_PUBLIC_CITY_SLUG}`;
+// Sem cidade: a rota-índice do blog (200). Antes: `/blog/sao-paulo-sp` (404).
+const FALLBACK_BLOG_CITY_HREF = "/blog";
 const FALLBACK_POST_IMAGE = "/images/blog/banner-blog.jpg";
 
 function toText(value: unknown, fallback = "") {
@@ -31,12 +32,14 @@ function normalizeHref(value: unknown, fallback: string) {
   return href.startsWith("/") || href.startsWith("http") ? href : fallback;
 }
 
-function normalizePostHref(post: BlogPost, citySlug?: string) {
+function normalizePostHref(post: BlogPost, citySlug?: string | null) {
   const slug = toText(post.slug, "");
   if (!slug) {
     return citySlug ? `/blog/${citySlug}` : FALLBACK_BLOG_CITY_HREF;
   }
-  return citySlug ? `/blog/${citySlug}/${slug}` : `/blog/post/${slug}`;
+  // `/blog/post/<slug>` não é rota do App Router — era 404. Sem cidade, a
+  // canônica global do post.
+  return buildBlogPostHref(citySlug, slug);
 }
 
 const CATEGORY_STYLES: Record<
@@ -205,7 +208,7 @@ function CategoryPostCard({
   featured = false,
 }: {
   post: BlogPost;
-  citySlug: string;
+  citySlug: string | null;
   styles: (typeof CATEGORY_STYLES)[BlogCategoryId];
   featured?: boolean;
 }) {
@@ -278,7 +281,9 @@ function CategoryPostCard({
 }
 
 export function BlogCategoryPageClient({ content }: BlogCategoryPageClientProps) {
-  const citySlug = toText(content.citySlug, DEFAULT_PUBLIC_CITY_SLUG);
+  // `null` = sem cidade pública (SEO Fase 4.1A, achado P1-2).
+  const citySlug = toText(content.citySlug, "") || null;
+  const hubHref = citySlug ? `/blog/${citySlug}` : "/blog";
   const cityName = toText(content.cityName, "São Paulo");
   const categoryId = content.categoryId;
   const categoryLabel = toText(content.categoryLabel, categoryId);
@@ -308,7 +313,7 @@ export function BlogCategoryPageClient({ content }: BlogCategoryPageClientProps)
               Início
             </Link>
             <span>/</span>
-            <Link href={`/blog/${citySlug}`} className="hover:text-[#1D2440]">
+            <Link href={hubHref} className="hover:text-[#1D2440]">
               Blog
             </Link>
             <span>/</span>
@@ -363,7 +368,7 @@ export function BlogCategoryPageClient({ content }: BlogCategoryPageClientProps)
               {cityName}. Volte em breve para conferir as novidades.
             </p>
             <Link
-              href={`/blog/${citySlug}`}
+              href={hubHref}
               className="mt-5 inline-flex h-[48px] items-center justify-center rounded-[12px] bg-[#2F67F6] px-6 text-[15px] font-extrabold text-white transition hover:bg-[#2457DC]"
             >
               Voltar para o blog
