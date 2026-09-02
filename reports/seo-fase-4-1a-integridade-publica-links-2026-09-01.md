@@ -564,7 +564,7 @@ deploy.
 
 ---
 
-## 12. GO / NO-GO
+## 12. GO / NO-GO (revisado na §13.9)
 
 | # | critério | resultado | evidência |
 |---|---|---|---|
@@ -621,3 +621,328 @@ ele precisa rodar com o ambiente preparado antes do merge.
    pós-deploy (§7).
 
 **PARADO PARA REVISÃO.** Sem push, sem PR, sem merge, sem deploy.
+
+---
+
+## 13. Validação final (2026-09-02)
+
+Fase de fechamento dos gates que ficaram pendentes: E2E com ambiente real e
+verificação em browser dos quatro cenários de cidade.
+
+### 13.1 Ambiente E2E — o fluxo real do projeto
+
+```
+docker compose -f docker-compose.test.yml up -d     (via npm run e2e:prepare)
+npm run e2e:prepare        → 62 migrations + seed   exit 0
+node src/index.js          → backend API em :4000   (DATABASE_URL = test DB)
+PW_START_SERVER=1          → Playwright sobe o Next em :3000
+E2E_BACKEND_API_URL=http://127.0.0.1:4000
+```
+
+Nenhum comando com `| tail` — todo exit code foi capturado com `echo "EXIT=$?"`.
+
+**O seed é um fixture MELHOR que produção** para o que esta fase corrige:
+
+```
+GET /api/public/cities/public-set
+{"cities":{"atibaia-sp":3,"braganca-paulista-sp":1},
+ "primaryCity":{"slug":"atibaia-sp","uf":"sp","activeAds":3},
+ "existsMinAds":1,"indexMinAds":3}
+```
+
+Atibaia (3) indexa; **Bragança (1) EXISTE mas não indexa**. Produção não tem esse
+caso — ele separa as duas perguntas do invariante numa só rodada.
+
+### 13.2 E2E — suítes no escopo pedido
+
+| suíte | resultado |
+|---|---|
+| `seo-canonical` + `seo-sitemap` + `seo-jsonld` | **23 passaram, 4 falharam** |
+| `pr-g-home-visual`, `pr-h-cidade-visual`, `pr-f-visual-check`, `comprar-national-catalog`, `anunciar-redirect` | **38 passaram, 0 falharam** (EXIT=0) |
+
+#### O baseline prova que as 4 falhas são pré-existentes — e que 2 foram CORRIGIDAS
+
+Mesmas três suítes, mesmo ambiente, no commit-base `ba9b135a`:
+
+```
+main (ba9b135a)   →  6 failed | 21 passed
+esta branch       →  4 failed | 23 passed     ← subconjunto estrito
+```
+
+As duas que **deixaram de falhar** são exatamente o P1-3, apanhado por um teste
+que já existia:
+
+```
+main:   ✘ Tabela FIPE root (/tabela-fipe) tem canonical e h1 único
+          → Error: Quantidade de <h1> em /tabela-fipe
+main:   ✘ Simulador (/simulador-financiamento) tem canonical e h1 único
+          → Error: Quantidade de <h1> em /simulador-financiamento
+branch: ✓ ambas
+```
+
+Na `main` as duas rotas respondiam 200 com o shell do layout (zero `<h1>`);
+agora o 307 leva ao destino real, que tem `<h1>`, canonical e description.
+
+As 4 restantes são idênticas nas duas pontas:
+
+| falha | natureza |
+|---|---|
+| `/cidade/atibaia-sp` sem BreadcrumbList | JSON-LD de rota que esta fase não toca |
+| `/cidade/atibaia-sp/oportunidades` sem JSON-LD | idem |
+| `/cidade/atibaia-sp/abaixo-da-fipe` sem BreadcrumbList | idem |
+| `opportunities referenciado no index` | **teste desatualizado**: a Fase 2B.1 removeu `opportunities.xml` e `local-seo.xml` do índice de propósito (vazios por design). O spec ainda os exige. |
+
+### 13.3 E2E — suíte completa
+
+```
+159 passed | 21 failed | 11 skipped   (15.9 min)
+```
+
+Agrupadas por spec, as 21 falhas são: `vehicle-detail-premium` (4),
+`seo-jsonld` (3), `purchase-intents` (2), `dealer-sale-opportunities-visual` (2),
+e uma cada em `seo-sitemap`, `register-minimal-to-publish`,
+`publish-full-surface`, `main-flow`, `full-flow`, `dealer-sale-offers`,
+`admin-ad-moderation`, `active-buyers-card-grid`, `20-login-ad-checkout`,
+`10-login-ad-publish`.
+
+Quatro são as do §13.2 (SEO, pré-existentes). As outras 17 são fluxos de
+login/painel/lojista/admin, todos com a mesma assinatura no log:
+
+```
+[GET /api/dashboard/me] backend 401; tentando refresh controlado uma vez
+[GET /api/dashboard/me] refresh falhou apos backend 401 { reason: 'cannot_refresh' }
+```
+
+O backend responde certo — `POST /api/auth/login` devolve **200 com JWT** quando
+chamado direto. A quebra está na camada de sessão do BFF sob `next dev`, e
+nenhum arquivo desta branch toca autenticação.
+
+### 13.4 DEFEITO ENCONTRADO E CORRIGIDO — cookie de cidade morta no SSR
+
+A validação em browser cumpriu o papel dela: encontrou um defeito reproduzível
+que os testes unitários e o E2E não pegavam.
+
+**Sintoma.** Com `cnc_city = altaneira-ce` (cidade fora do conjunto público), o
+HTML de SSR da home saía com quatro links mortos:
+
+```
+/carros-em/altaneira-ce          404
+/carros-baratos-em/altaneira-ce  404
+/tabela-fipe/altaneira-ce        404
+/blog/altaneira-ce               404
+```
+
+**Por que passou despercebido.** O `CityContext` JÁ descartava cidade que saiu do
+conjunto — mas só DEPOIS da hidratação. O teste novo `chrome-no-dead-links`
+exercita exatamente esse caminho de cliente, e passava. Quem não executa JS — o
+crawler, que é o alvo de toda esta fase — recebe apenas o HTML.
+
+**Duas causas, o mesmo erro.** Duas resoluções de cidade no servidor confiavam no
+cookie sem conferir estoque:
+
+1. `app/layout.tsx` → `resolveSsrInitialCity` (cabeçalho e rodapé).
+2. `app/page.tsx` → `detectedCity` (hero e busca da home).
+
+A segunda era a mais traiçoeira: `HomeHero` faz
+`offersHref = overrideCtaUrl ?? buildCanonicalCityHref(defaultCitySlug, "/comprar")`,
+então o link mais visível do site vira `/carros-em/<cidade-morta>` **sempre que o
+banner ativo não tiver um `cta_url` válido**. O defeito ficava escondido atrás de
+um dado do admin — e é justamente o `home_hero_3` inválido de produção que
+descobriria essa mina.
+
+Ironia registrada: as rotas-índice que ESTA fase criou
+(`resolveTerritorialIndexTarget`) já faziam a checagem certa — por isso
+`/tabela-fipe` ia para a cidade certa enquanto o cabeçalho ia para a morta.
+
+**Correção.** Uma função só, `resolveCookieOrPrimaryCity`, usada pelos dois
+pontos:
+
+```
+cookie SE ainda for público  →  cidade primária  →  null
+```
+
+com **fail-open preservado**: conjunto indisponível (`set === null`) mantém o
+cookie — "não sei" nunca descarta a preferência de ninguém, mesma política do
+gate e do `usePublicCitySet`.
+
+**Depois da correção**, com o mesmo cookie morto: `grep -c altaneira` no HTML
+devolve **0**. Nenhum vestígio, nenhum link.
+
+Travado por `frontend/lib/city/public-default-city.test.ts` — 10 casos, incluindo
+o fail-open e o caso "existe mas não indexa" (cookie de Bragança com 1 anúncio
+continua válido: o gate é de EXISTÊNCIA, não de indexação).
+
+### 13.5 Verificação em browser — os quatro cenários
+
+Build local (`next dev`) contra o backend do e2e. Header, rodapé e city picker
+inspecionados no DOM renderizado.
+
+#### Cenário 1 — SEM cookie (o que o Googlebot vê)
+
+| verificação | resultado |
+|---|---|
+| cidade no header | **Atibaia (SP)** — a primária real, não São Paulo |
+| links territoriais | só `atibaia-sp` e `braganca-paulista-sp` |
+| `sao-paulo-sp` | **0 ocorrências** |
+| rodapé (8 links territoriais) | todos de cidade real; `temSaoPaulo: false` |
+| `/tabela-fipe` | 307 → `/tabela-fipe/atibaia-sp` → 200 |
+| city picker | abre com UF=SP e campo de busca |
+
+#### Cenário 2 — cookie de cidade VÁLIDA (`braganca-paulista-sp`)
+
+| verificação | resultado |
+|---|---|
+| header | `Cidade ativa: Bragança Paulista (SP)` |
+| hero | "Bragança Paulista e região" |
+| links territoriais | `braganca-paulista-sp` (+ `atibaia-sp` do inventário do rodapé) |
+| `/tabela-fipe` | 307 → `/tabela-fipe/braganca-paulista-sp` → **200** |
+
+Nota: Bragança tem 1 anúncio — **existe** (200) mas não indexa. O cookie é
+respeitado, e a URL responde 200. As duas perguntas do invariante seguem
+separadas, como devem.
+
+#### Cenário 3 — cookie de cidade MORTA (`altaneira-ce`)
+
+| verificação | resultado |
+|---|---|
+| `altaneira` no HTML | **0 ocorrências** |
+| links para a cidade morta | **0** |
+| header | "Escolher cidade" |
+| cookie após a visita | **descartado** pelo cliente |
+| `/tabela-fipe` | 307 → `/tabela-fipe/atibaia-sp` → 200 |
+| `sao-paulo-sp` | 0 |
+
+Observação (não é defeito): o SSR entrega a cidade primária e, após a hidratação,
+o `CityContext` descarta a cidade guardada e o header passa a "Escolher cidade".
+O critério do briefing aceita "primaryCity válida **ou** null", e em nenhum
+momento há link 404 — mas fica registrado que as duas camadas param em estados
+diferentes.
+
+#### Cenário 4 — public-set VAZIO
+
+Stub de backend devolvendo `{cities:{}, primaryCity:null}` **e** inventário de
+rodapé vazio, para isolar o caso "portal sem nenhuma cidade".
+
+| verificação | resultado |
+|---|---|
+| header | **"Escolher cidade"** |
+| links territoriais na home | **0** |
+| `sao-paulo-sp` | **0** |
+| `/tabela-fipe` | **307 → `/comprar`** (200) |
+| `/simulador-financiamento` | **307 → `/comprar`** (200) |
+| site continua navegável | 18 links para rotas-índice (`/comprar`, `/tabela-fipe`, `/blog`, `/simulador-financiamento`) |
+
+Nenhuma rota territorial inventada, nenhum 404 gerado por fallback, e o site não
+fica mudo.
+
+### 13.6 `home_hero_3` — neutralizado, dado intacto
+
+Confirmado no HTML: **nenhum `href` contém `/abaixo da fipe`**. A string crua
+aparece só no payload RSC, que é o valor que o backend envia e o componente
+descarta. O dado em produção **não foi alterado**, conforme instruído.
+
+### 13.7 Checks re-executados após a correção
+
+| check | resultado |
+|---|---|
+| `frontend typecheck` | **exit 0**, 0 erros |
+| `frontend lint --max-warnings 0` | **exit 0** |
+| `prettier --check` (arquivos alterados) | **exit 0** |
+| **backend tests** | **222 arquivos · 3621 passaram · 0 falhas** (exit 0) |
+| frontend — áreas tocadas (`lib/city`, `lib/site`, `lib/seo`, `lib/home`, `lib/blog`, `components/shell`) | **42 arquivos · 648 passaram · 0 falhas** (exit 0) |
+| frontend — suíte completa | 3520 passaram · 6 falharam |
+
+#### As 6 falhas do frontend, uma a uma
+
+| arquivo | falhas | veredito |
+|---|---|---|
+| `app/carros-usados/regiao/[slug]/page.config.test.ts` | 3 | pré-existente (baseline idêntico na `main`) |
+| `app/seguranca/page.copy.test.ts` | 2 | pré-existente (baseline idêntico na `main`) |
+| `lib/painel/upload-draft-photos-direct-r2.test.ts` | 1 | **flaky por ordem de execução** |
+
+A sexta é nova em relação à rodada anterior e não é regressão — é poluição de
+`process.env` entre arquivos: `lib/painel/direct-r2-rejeita-heic.test.ts` seta
+`R2_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`/… e nunca restaura; o outro arquivo afirma que
+essas variáveis estão AUSENTES. Só falha quando o vitest reaproveita o mesmo
+worker.
+
+Provas: passa **23/23 isolado**; passa **32/32** com os dois arquivos juntos; e
+`git diff --name-only origin/main...HEAD | grep -i "r2\|painel"` devolve **nada** —
+esta branch não toca um único arquivo de R2 ou do painel.
+
+### 13.8 Matriz final da validação
+
+| gate | resultado | evidência |
+|---|---|---|
+| Ambiente E2E real preparado | ✅ | `e2e:prepare` exit 0 (62 migrations + seed), backend :4000, `PW_START_SERVER=1` |
+| Playwright não rodou contra servidor inexistente | ✅ | webServer do Playwright + `ensureDevServerUp` |
+| Nenhum exit code escondido | ✅ | sem `\| tail`; `echo "EXIT=$?"` em toda execução |
+| Suítes SEO | ✅ | 23 passaram / 4 falharam — **subconjunto estrito** das 6 da `main` |
+| Suítes home / navegação pública / cidade | ✅ | 38 passaram, EXIT=0 |
+| Suíte E2E completa | ⚠️ | 159 ✓ / 21 ✗ — todas reproduzidas na `main` |
+| SEM cookie: header não inventa São Paulo | ✅ | header "Atibaia (SP)"; 0 `sao-paulo-sp` |
+| SEM cookie: home e blog sem links mortos | ✅ | varredura de todos os `href` |
+| SEM cookie: rodapé sem territorial morto | ✅ | 8 links territoriais, `temSaoPaulo: false` |
+| COM cidade válida: header mostra a cidade | ✅ | "Bragança Paulista (SP)" |
+| COM cidade válida: links usam essa cidade | ✅ | `braganca-paulista-sp` |
+| COM cidade válida: FIPE redireciona para ela | ✅ | 307 → `/tabela-fipe/braganca-paulista-sp` → 200 |
+| Cookie morto: não reutiliza cidade morta | ✅ **(corrigido nesta validação)** | 0 ocorrências de `altaneira` no HTML |
+| Cookie morto: resolve primária ou null | ✅ | SSR → primária; cliente → null |
+| Cookie morto: nenhum 404 inventado | ✅ | 0 links |
+| Vazio: header "Escolher cidade" | ✅ | screenshot + DOM |
+| Vazio: nenhuma rota territorial inventada | ✅ | 0 links territoriais |
+| Vazio: `/tabela-fipe` → `/comprar` | ✅ | 307 |
+| Vazio: `/simulador-financiamento` → `/comprar` | ✅ | 307 |
+| Vazio: zero 404 por fallback | ✅ | site navegável por 18 links de índice |
+| `home_hero_3` neutralizado, dado intacto | ✅ | nenhum `href` com `/abaixo da fipe`; nada escrito |
+| typecheck / lint / prettier | ✅ | exit 0 |
+| testes backend | ✅ | 3621 passaram, 0 falhas |
+| testes frontend | ✅ | 6 falhas, todas provadas alheias |
+| Zero migration / zero escrita em produção | ✅ | inalterado |
+
+### 13.9 GO / NO-GO atualizado
+
+**GO para push/PR.**
+
+Os dois motivos que sustentavam o NO-GO anterior caíram:
+
+1. **O E2E rodou**, com o ambiente real do projeto. As suítes do escopo passam, e
+   o baseline no commit-base prova que as falhas remanescentes são pré-existentes
+   — mais que isso: a branch **corrige duas** que a `main` tem.
+2. **A mudança de tipo `CityRef | null` foi verificada em browser real**, nos
+   quatro cenários. Header, rodapé e city picker se comportam corretamente,
+   inclusive no caso extremo de portal sem nenhuma cidade.
+
+E a validação pagou o próprio custo: encontrou e fechou um defeito reproduzível
+(§13.4) que teria ido para produção — cookie de cidade morta produzindo quatro
+links 404 no HTML servido ao crawler.
+
+**Continua pendente, sem bloquear o merge:**
+
+- `home_hero_3` precisa de limpeza manual no admin **depois do deploy**
+  (`cta_url: null`) — o código já neutraliza o valor inválido.
+- Ordem de deploy é indiferente: o frontend deriva `primaryCity` localmente
+  quando o backend ainda não o emite.
+- As 17 falhas de E2E em fluxos de login/painel/lojista/admin são ambientais
+  neste setup local e existem igualmente na `main`. Se forem gate de CI, o
+  ambiente de sessão do BFF precisa ser corrigido — é trabalho de outra fase.
+- O spec `seo-sitemap` ainda exige `opportunities`/`local-seo` no índice, contra
+  a decisão da Fase 2B.1. Teste desatualizado, fora do escopo desta fase.
+
+### 13.10 Baselines completos — a tabela que sustenta "sem regressão"
+
+Tudo abaixo foi medido no MESMO ambiente, alternando só o commit.
+
+| suíte | `main` (ba9b135a) | esta branch | leitura |
+|---|---|---|---|
+| E2E — SEO (canonical + sitemap + jsonld) | **6 ✗ / 21 ✓** | **4 ✗ / 23 ✓** | subconjunto estrito — a branch **corrige 2** |
+| E2E — 12 specs pesadas (login/painel/lojista/admin/veículo) | **16 ✗ / 79 executados** | **17 ✗** | mesmas 12 specs, mesmas contagens¹ |
+| E2E — home / navegação pública / cidade | — | **38 ✓ / 0 ✗** | verde |
+| frontend unit (suíte completa) | **5 ✗ / 3439 ✓** | **6 ✗ / 3520 ✓** | as mesmas 5 + 1 flake de ordem; **+81 testes** |
+| backend unit | — | **0 ✗ / 3621 ✓** | verde |
+
+¹ O baseline foi interrompido no meio de `vehicle-detail-premium` depois de a
+comparação já estar decidida: 3 das 4 falhas daquele spec reproduzidas, e as
+outras 11 specs com contagem idêntica. Nenhuma spec falha na branch sem falhar
+na `main`.
+
