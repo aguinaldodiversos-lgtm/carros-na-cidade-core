@@ -16,6 +16,26 @@
 import type { BlogPageContent, BlogPost, BlogTrendingItem } from "@/lib/blog/blog-page";
 
 /**
+ * URL de um post do hub.
+ *
+ * COM cidade pública: `/blog/<cidade>/<slug>` — a variante territorial, que
+ * canonicaliza para `/blog/<slug>`.
+ * SEM cidade: `/blog/<slug>`, a CANÔNICA global do post. Não existe rota
+ * `/blog/post/<slug>` (verificado), então esse antigo fallback levaria a 404.
+ *
+ * A cidade só chega aqui depois de conferida contra o conjunto público — antes
+ * desta fase o hub montava `/blog/sao-paulo-sp/<slug>` para todo visitante sem
+ * cookie, e São Paulo tem zero anúncios: 20 links sob um prefixo 404 numa só
+ * página (SEO Fase 4.1A, achado P1-2).
+ */
+export function buildBlogPostHref(citySlug: string | null | undefined, slug: string): string {
+  const post = String(slug || "").trim();
+  const city = String(citySlug || "").trim();
+  if (!post) return city ? `/blog/${encodeURIComponent(city)}` : "/blog";
+  return city ? `/blog/${encodeURIComponent(city)}/${post}` : `/blog/${post}`;
+}
+
+/**
  * Mescla os cards do CMS no conteúdo do hub.
  *
  * - `cmsCards` vazio → retorna `content` intacto (o fallback hardcoded
@@ -32,7 +52,7 @@ import type { BlogPageContent, BlogPost, BlogTrendingItem } from "@/lib/blog/blo
 export function applyCmsPostsToHubContent(
   content: BlogPageContent,
   cmsCards: BlogPost[],
-  citySlug: string
+  citySlug: string | null
 ): BlogPageContent {
   if (!Array.isArray(cmsCards) || cmsCards.length === 0) {
     return content;
@@ -46,7 +66,7 @@ export function applyCmsPostsToHubContent(
     id: `trend-${post.id}`,
     title: post.title,
     image: post.coverImage,
-    href: `/blog/${encodeURIComponent(citySlug)}/${post.slug}`,
+    href: buildBlogPostHref(citySlug, post.slug),
   }));
 
   return {

@@ -137,7 +137,11 @@ export function CityPickerModal() {
           <div className="space-y-5 px-5 py-4 md:px-6">
             <div>
               <p className="text-[13px] font-semibold text-[#47506A]">Cidade ativa agora</p>
-              <p className="mt-1 text-[16px] font-bold text-[#1D2440]">{activeCity.label}</p>
+              {/* Sem cidade resolvida o modal continua útil (é onde se escolhe
+                  uma); só não afirma uma cidade ativa que não existe. */}
+              <p className="mt-1 text-[16px] font-bold text-[#1D2440]">
+                {activeCity?.label ?? "Nenhuma cidade selecionada"}
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-[120px_1fr]">

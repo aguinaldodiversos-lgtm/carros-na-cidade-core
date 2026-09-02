@@ -129,8 +129,8 @@ export function PublicHeader() {
   // levarem a 404 — medido em produção 2026-08-05. `undefined` (conjunto
   // carregando ou indisponível) mantém o comportamento territorial.
   const routes = useMemo(
-    () => getTerritorialRoutesForCity(city.slug, { isPublicCity: isCityPublic }),
-    [city.slug, isCityPublic]
+    () => getTerritorialRoutesForCity(city?.slug ?? null, { isPublicCity: isCityPublic }),
+    [city?.slug, isCityPublic]
   );
 
   return (
@@ -241,7 +241,9 @@ export function PublicHeader() {
               <button
                 type="button"
                 onClick={() => openCityPicker()}
-                aria-label={`Cidade selecionada: ${city.label}. Tocar para trocar.`}
+                aria-label={
+                  city ? `Cidade selecionada: ${city.label}. Tocar para trocar.` : "Escolher cidade"
+                }
                 className="inline-flex max-w-[112px] items-center gap-1 truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11.5px] font-semibold text-slate-700 transition hover:border-slate-300"
               >
                 <svg
@@ -258,7 +260,9 @@ export function PublicHeader() {
                   />
                   <circle cx="12" cy="9" r="2.5" />
                 </svg>
-                <span className="truncate">{city.label}</span>
+                {/* Sem cidade resolvida, o rótulo convida à escolha em vez de
+                    afirmar uma cidade que o portal não tem. */}
+                <span className="truncate">{city?.label ?? "Escolher cidade"}</span>
               </button>
               <Link
                 href={
@@ -293,7 +297,7 @@ export function PublicHeader() {
                 }}
                 className="inline-flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800"
               >
-                Cidade: {city.label}
+                {city ? `Cidade: ${city.label}` : "Escolher cidade"}
               </button>
               <HeaderNavLink
                 href={routes.comprar}

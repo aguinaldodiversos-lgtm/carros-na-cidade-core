@@ -32,6 +32,7 @@ import {
   fetchPublishedBlogPosts,
 } from "@/lib/blog/blog-cms";
 import { prettifyCitySlug } from "@/lib/blog/blog-page";
+import { resolvePublicDefaultCity } from "@/lib/city/public-default-city";
 
 type PageProps = {
   params: {
@@ -101,7 +102,12 @@ async function BlogCityAsyncContent({ cidade }: { cidade: string }) {
       ""
     );
     const { posts: recent } = await fetchPublishedBlogPosts({ limit: 4 });
-    const city = prettifyCitySlug("sao-paulo-sp"); // contexto neutro para CTAs locais
+    // Contexto local dos CTAs do post. Era `prettifyCitySlug("sao-paulo-sp")` —
+    // "contexto neutro" que, na prática, colocava OITO links para uma cidade
+    // com zero anúncios em cada um dos 13 posts indexáveis do CMS (SEO Fase
+    // 4.1A, achado P1-2). Agora sai do estoque real, e `null` quando o portal
+    // não tem cidade: os CTAs viram não-territoriais em vez de 404.
+    const city = await resolvePublicDefaultCity();
     const pageUrl = `${siteUrl}/blog/${cmsPost.slug}`;
 
     const articleLd = buildCmsPostJsonLd(cmsPost, pageUrl);
@@ -129,9 +135,9 @@ async function BlogCityAsyncContent({ cidade }: { cidade: string }) {
         <CmsBlogPostArticle
           post={cmsPost}
           relatedPosts={recent}
-          citySlug={city.slug}
-          cityName={city.name}
-          cityLabel={city.label}
+          citySlug={city?.slug ?? null}
+          cityName={city?.name ?? null}
+          cityLabel={city?.label ?? null}
         />
       </>
     );

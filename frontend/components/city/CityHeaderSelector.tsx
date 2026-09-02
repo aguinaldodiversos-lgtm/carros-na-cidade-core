@@ -39,12 +39,12 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 export function CityHeaderSelector() {
   const { city, setCity, openCityPicker } = useCity();
   const [open, setOpen] = useState(false);
-  const [uf, setUf] = useState(city.state || "SP");
+  const [uf, setUf] = useState(city?.state || "SP");
   const [query, setQuery] = useState("");
 
   useEffect(() => {
-    setUf(city.state || "SP");
-  }, [city.state]);
+    setUf(city?.state || "SP");
+  }, [city?.state]);
   const debouncedQ = useDebouncedValue(query, 280);
   const [results, setResults] = useState<ApiCityRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -108,9 +108,9 @@ export function CityHeaderSelector() {
         className="inline-flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-semibold text-[#2F3A52] transition hover:bg-[#F4F7FB]"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Cidade ativa: ${city.label}. Abrir busca de cidade`}
+        aria-label={city ? `Cidade ativa: ${city.label}. Abrir busca de cidade` : "Escolher cidade"}
       >
-        <span className="max-w-[140px] truncate">{city.name}</span>
+        <span className="max-w-[140px] truncate">{city?.name ?? "Escolher cidade"}</span>
         <CityLinkChevronIcon open={open} />
       </button>
 

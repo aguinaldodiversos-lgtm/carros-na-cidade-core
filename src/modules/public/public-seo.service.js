@@ -1,12 +1,51 @@
-import { query } from "../../infrastructure/database/db.js";
-import {
-  SITEMAP_ELIGIBLE_SCP_STATUSES,
-  SITEMAP_ELIGIBLE_SP_STATUSES,
-  sqlInLiteral,
-} from "../seo/constants/seo-status.js";
+// src/modules/public/public-seo.service.js
+//
+// Entradas do sitemap CANÔNICO público (`/api/public/seo/sitemap`,
+// `/sitemap.xml`, `/sitemap.json`).
+//
+// ── O que mudou (SEO Fase 4.1A, 2026-09-01) ──────────────────────────────────
+// Este módulo lia `seo_cluster_plans LEFT JOIN seo_publications` — uma tabela
+// de PLANEJAMENTO que não sabe nada sobre estoque. Medido em produção na
+// auditoria da Fase 4 (2026-08-31):
+//
+//     GET /api/public/seo/sitemap.xml  →  200, 4 <url>, entre elas
+//        /carros-em/braganca-paulista-sp           ← 404 no site
+//        /carros-baratos-em/braganca-paulista-sp   ← 404 no site
+//
+// Bragança tem 3 anúncios, todos `deleted`, zero ativos. As linhas de
+// `seo_publications` são artefatos de um bootstrap de 2026-05-27, quando ainda
+// havia estoque; o pipeline que as escreve está desligado desde então e nada
+// as arquivou quando o estoque zerou. Ou seja: um endpoint público afirmava a
+// existência de URLs que a própria aplicação nega.
+//
+// Era o ÚLTIMO sobrevivente do caminho antigo. `getPublicSitemapByType` migrou
+// para o estoque em 2026-07-04/05 e `getPublicSitemapByRegion` em 2026-08-07 —
+// o canônico ficou para trás, e o comentário de `sitemap-public.repository.js`
+// já registra que esse mesmo defeito voltou duas vezes por essa via.
+//
+// Agora a fonte é `getPublicSitemapAllTypes()`, a MESMA composição de estoque
+// ativo que alimenta `/sitemaps/*.xml`. Não há consulta nova aqui: uma segunda
+// implementação de "esta URL existe?" é justamente o que produziu a
+// divergência. Cidade sem anúncio ativo não pode aparecer, por construção.
+//
+// ── O que NÃO mudou ──────────────────────────────────────────────────────────
+// O contrato HTTP. As rotas continuam existindo, o `content-type`, os headers
+// de cache/robots e o shape `{ loc, lastmod, changefreq, priority }` são os
+// mesmos. `buildChangefreq`/`buildPriority` continuam derivando esses campos do
+// `clusterType`, para que consumidores externos desconhecidos não vejam o
+// formato mudar debaixo deles.
+//
+// Diferença de valor observável: `priority` de `city_below_fipe` cai de 0.9
+// para 0.7. O 0.9 vinha de `seo_cluster_plans.money_page`, coluna que o
+// pipeline de estoque não tem — e `priority` é uma dica que o Google ignora há
+// anos. Preferimos perder o 0.9 a manter uma leitura da tabela congelada só
+// para preservá-lo.
 
-const SCP_STATUS_FILTER = sqlInLiteral(SITEMAP_ELIGIBLE_SCP_STATUSES);
-const SP_STATUS_FILTER = sqlInLiteral(SITEMAP_ELIGIBLE_SP_STATUSES);
+import {
+  getPublicSitemapAllTypes,
+  getPublicSitemapByRegion,
+  getPublicSitemapByType,
+} from "../../read-models/seo/sitemap-public.service.js";
 
 function clampLimit(limit) {
   const n = Number(limit);
@@ -31,80 +70,39 @@ function buildChangefreq(clusterType) {
   return "weekly";
 }
 
-function mapEntry(row) {
-  const clusterType = row.cluster_type || "unknown";
-  const moneyPage = Boolean(row.money_page);
+/**
+ * Entrada do estoque → shape histórico deste endpoint.
+ *
+ * `stage`/`moneyPage` não existem no pipeline de estoque. Emitimos os defaults
+ * que os consumidores já recebiam quando a coluna era nula, em vez de sumir
+ * com os campos.
+ */
+function mapEntry(entry) {
+  const clusterType = entry.clusterType || "unknown";
 
   return {
-    loc: row.loc,
-    lastmod: row.lastmod,
+    loc: entry.loc,
+    lastmod: entry.lastmod,
     changefreq: buildChangefreq(clusterType),
-    priority: buildPriority(clusterType, moneyPage),
+    priority: buildPriority(clusterType, false),
     clusterType,
-    stage: row.stage || "discovery",
-    moneyPage,
-    state: row.state || null,
+    stage: entry.stage || "discovery",
+    moneyPage: false,
+    state: entry.state || null,
   };
 }
 
-async function listEntries({ limit = 10000, type = null, state = null } = {}) {
-  const safeLimit = clampLimit(limit);
-  const conditions = [
-    `scp.path IS NOT NULL`,
-    `scp.status ${SCP_STATUS_FILTER}`,
-    `(sp.id IS NULL OR sp.is_indexable = TRUE)`,
-    `(sp.id IS NULL OR sp.status ${SP_STATUS_FILTER})`,
-  ];
-
-  const params = [];
-  let index = 1;
-
-  if (type) {
-    conditions.push(`scp.cluster_type = $${index++}`);
-    params.push(type);
-  }
-
-  if (state) {
-    conditions.push(`c.state = $${index++}`);
-    params.push(String(state).trim().toUpperCase());
-  }
-
-  params.push(safeLimit);
-
-  const result = await query(
-    `
-    SELECT
-      scp.path AS loc,
-      COALESCE(sp.updated_at, sp.published_at, scp.last_generated_at, scp.updated_at, scp.created_at) AS lastmod,
-      scp.cluster_type,
-      scp.stage,
-      scp.money_page,
-      c.state
-    FROM seo_cluster_plans scp
-    LEFT JOIN seo_publications sp
-      ON sp.cluster_plan_id = scp.id
-    LEFT JOIN cities c
-      ON c.id = scp.city_id
-    WHERE ${conditions.join(" AND ")}
-    ORDER BY
-      COALESCE(sp.updated_at, sp.published_at, scp.last_generated_at, scp.updated_at, scp.created_at) DESC,
-      scp.path ASC
-    LIMIT $${index}
-    `,
-    params
-  );
-
-  return result.rows.map(mapEntry);
-}
-
 export async function listPublicSitemapEntries({ limit = 10000 } = {}) {
-  return listEntries({ limit });
+  const entries = await getPublicSitemapAllTypes(clampLimit(limit));
+  return entries.map(mapEntry);
 }
 
 export async function listPublicSitemapEntriesByType(type, { limit = 10000 } = {}) {
-  return listEntries({ type, limit });
+  const entries = await getPublicSitemapByType(type, clampLimit(limit));
+  return entries.map(mapEntry);
 }
 
 export async function listPublicSitemapEntriesByRegion(state, { limit = 10000 } = {}) {
-  return listEntries({ state, limit });
+  const entries = await getPublicSitemapByRegion(state, clampLimit(limit));
+  return entries.map(mapEntry);
 }

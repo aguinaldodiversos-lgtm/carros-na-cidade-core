@@ -13,7 +13,6 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { extractCitySlugFromPathname } from "@/lib/city/city-from-pathname";
-import { DEFAULT_CITY } from "@/lib/city/city-default";
 import type { CityRef, CitySource } from "@/lib/city/city-types";
 import {
   discardStoredCityIfAbsent,
@@ -27,7 +26,18 @@ import { usePublicCitySet } from "@/lib/city/use-public-city-set";
 import { getCanonicalCityPath } from "@/lib/seo/canonical-city-path";
 
 type CityContextValue = {
-  city: CityRef;
+  /**
+   * Cidade ativa, ou `null` quando NÃO HÁ cidade.
+   *
+   * `null` deixou de ser impossível na SEO Fase 4.1A (achado P1-2). Antes, a
+   * ausência de cidade era representada por `DEFAULT_CITY` — o literal
+   * `sao-paulo-sp`, que tem zero anúncios ativos e responde 404. Um valor
+   * inventado para "não sei" produzia links mortos no chrome de todo o site.
+   *
+   * Consumidor que monta link territorial deve tratar `null` como "não emita
+   * link de cidade"; consumidor que só exibe rótulo deve omitir o rótulo.
+   */
+  city: CityRef | null;
   /** `cities.id` quando conhecido (API / cookie). */
   cityId: number | null;
   /** Origem do território ativo no cliente. */
@@ -62,17 +72,36 @@ async function fetchCityBySlug(slug: string): Promise<CityRef | null> {
   }
 }
 
+/**
+ * `CityRef` mínimo a partir de um slug, quando a API não resolveu a cidade.
+ *
+ * Era `{ ...DEFAULT_CITY, slug }` — o que herdava o NOME e a UF de São Paulo e
+ * colava neles um slug de outra cidade. O header podia acabar exibindo
+ * "São Paulo (SP)" para `/carros-em/atibaia-sp`. Derivar do próprio slug é
+ * aproximado, mas nunca atribui a identidade errada.
+ */
+function cityRefFromSlug(slug: string): CityRef {
+  const parts = slug.split("-").filter(Boolean);
+  const maybeUf = parts.length > 1 ? parts[parts.length - 1] : "";
+  const uf = /^[a-z]{2}$/.test(maybeUf) ? maybeUf.toUpperCase() : "";
+  const nameParts = uf ? parts.slice(0, -1) : parts;
+  const name =
+    nameParts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ") || slug;
+
+  return { slug, name, state: uf, label: uf ? `${name} (${uf})` : name };
+}
+
 function CityProviderInner({
   children,
   initialCity,
 }: {
   children: ReactNode;
-  initialCity: CityRef;
+  initialCity: CityRef | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [city, setCityState] = useState<CityRef>(initialCity);
+  const [city, setCityState] = useState<CityRef | null>(initialCity);
   const [citySource, setCitySource] = useState<CitySource>("fallback");
   const [ready, setReady] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -96,7 +125,7 @@ function CityProviderInner({
     const ck = readCityFromCookie();
 
     void (async () => {
-      let next: CityRef = initialCity;
+      let next: CityRef | null = initialCity;
       let nextSource: CitySource = "fallback";
       // Ativos contextuais (path) NÃO sobrescrevem a cidade que o
       // visitante já escolheu/salvou. Só `url` (query explícita) e
@@ -114,7 +143,7 @@ function CityProviderInner({
         } else if (ck?.slug === qSlug) {
           next = ck;
         } else {
-          next = { ...DEFAULT_CITY, slug: qSlug };
+          next = cityRefFromSlug(qSlug);
         }
         nextSource = "url";
       } else if (pathSlug) {
@@ -135,7 +164,7 @@ function CityProviderInner({
         } else if (ck?.slug === pathSlug) {
           next = ck;
         } else {
-          next = { ...DEFAULT_CITY, slug: pathSlug };
+          next = cityRefFromSlug(pathSlug);
         }
         nextSource = "path";
         shouldPersist = false;
@@ -149,13 +178,16 @@ function CityProviderInner({
         next = ls;
         nextSource = "cookie";
       } else {
+        // Sem query, sem path territorial, sem cookie e sem localStorage: o que
+        // sobra é o piso resolvido no servidor (cidade pública primária) — ou
+        // `null`, quando o portal não tem cidade nenhuma.
         next = initialCity;
-        nextSource = initialCity.slug === DEFAULT_CITY.slug ? "fallback" : "cookie";
+        nextSource = "fallback";
       }
 
       setCityState(next);
       setCitySource(nextSource);
-      if (shouldPersist) {
+      if (shouldPersist && next) {
         writeCityToLocalStorage(next, { userConfirmed: false });
         writeCityCookie(next);
       }
@@ -205,7 +237,7 @@ function CityProviderInner({
   useEffect(() => {
     if (!ready) return;
     const qSlug = searchParams.get("city_slug")?.trim();
-    if (!qSlug || qSlug === city.slug) return;
+    if (!qSlug || qSlug === city?.slug) return;
 
     void fetchCityBySlug(qSlug).then((resolved) => {
       if (resolved) {
@@ -215,7 +247,7 @@ function CityProviderInner({
         writeCityCookie(resolved);
       }
     });
-  }, [ready, searchParams, city.slug]);
+  }, [ready, searchParams, city?.slug]);
 
   // Sync `city` quando o usuário navega entre rotas territoriais
   // client-side (ex.: /carros-em/sao-paulo-sp → /carros-usados/regiao/
@@ -240,10 +272,10 @@ function CityProviderInner({
     if (citySource === "manual" || citySource === "url") return;
 
     const pathSlug = extractCitySlugFromPathname(pathname);
-    if (!pathSlug || pathSlug === city.slug) return;
+    if (!pathSlug || pathSlug === city?.slug) return;
 
     void fetchCityBySlug(pathSlug).then((resolved) => {
-      const next: CityRef = resolved ?? { ...DEFAULT_CITY, slug: pathSlug };
+      const next: CityRef = resolved ?? cityRefFromSlug(pathSlug);
       setCityState(next);
       setCitySource("path");
       // Importante: NÃO persistir. Path-derived é display-only —
@@ -252,7 +284,7 @@ function CityProviderInner({
       // consentimento, e a próxima visita pela home apareceria
       // Atibaia em vez da preferência prévia.
     });
-  }, [ready, pathname, city.slug, citySource, searchParams]);
+  }, [ready, pathname, city?.slug, citySource, searchParams]);
 
   // ── Cidade guardada que saiu do conjunto público ────────────────────────
   //
@@ -273,19 +305,25 @@ function CityProviderInner({
     if (!ready) return;
     if (citySource === "path") return;
 
+    if (!city) return;
     const isPublic = publicCitySet.isPublicCity(city.slug);
     if (isPublic !== false) return;
 
     // `discardStoredCityIfAbsent` mexe SÓ nas duas chaves de cidade — o
     // rascunho do wizard e o resto do localStorage ficam intactos.
     discardStoredCityIfAbsent(() => false);
-    setCityState(DEFAULT_CITY);
+    // Sem substituto: a cidade guardada saiu do conjunto público e NÃO existe
+    // "cidade padrão" para pôr no lugar. Antes voltava para `DEFAULT_CITY`
+    // (`sao-paulo-sp`), trocando uma cidade 404 por outra cidade 404.
+    setCityState(null);
     setCitySource("fallback");
-  }, [ready, citySource, city.slug, publicCitySet]);
+  }, [ready, citySource, city, publicCitySet]);
 
-  const cityId = city.id ?? null;
+  const cityId = city?.id ?? null;
 
-  const isCityPublic = publicCitySet.isPublicCity(city.slug);
+  // Sem cidade não há o que ser público: `false` autoriza o consumidor a
+  // degradar para rota não-territorial, que é exatamente o certo aqui.
+  const isCityPublic = city ? publicCitySet.isPublicCity(city.slug) : false;
 
   const value = useMemo<CityContextValue>(
     () => ({
@@ -310,7 +348,7 @@ export function CityProvider({
   initialCity,
 }: {
   children: ReactNode;
-  initialCity: CityRef;
+  initialCity: CityRef | null;
 }) {
   return <CityProviderInner initialCity={initialCity}>{children}</CityProviderInner>;
 }

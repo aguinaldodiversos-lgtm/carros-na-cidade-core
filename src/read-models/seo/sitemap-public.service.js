@@ -50,6 +50,35 @@ export async function getPublicSitemapByType(type, limit = 50000) {
 }
 
 /**
+ * TODAS as entradas territoriais, sem recorte de UF.
+ *
+ * É a composição das quatro famílias que nascem do ESTOQUE ATIVO. Existe para
+ * ter UM dono da pergunta "quais URLs territoriais existem hoje?" — antes essa
+ * resposta estava duplicada dentro de `getPublicSitemapByRegion`, e o sitemap
+ * canônico (`/api/public/seo/sitemap.{json,xml}`) tinha uma TERCEIRA resposta
+ * própria, lida de `seo_cluster_plans` (tabela de PLANEJAMENTO, sem validação
+ * de estoque). Foi por isso que o endpoint canônico publicava
+ * `/carros-em/braganca-paulista-sp` com Bragança em zero anúncios — URL que o
+ * gate territorial responde 404 (auditoria SEO Fase 4, 2026-08-31).
+ *
+ * Quem precisar de um recorte (por UF, por tipo) deve FILTRAR o resultado
+ * desta função, nunca escrever uma consulta nova: uma segunda implementação de
+ * "esta URL existe?" é exatamente o que produziu a divergência.
+ */
+export async function getPublicSitemapAllTypes(limit = 50000) {
+  const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
+
+  const [cities, belowFipe, brands, models] = await Promise.all([
+    listActiveCityEntries(safeLimit),
+    listActiveCityBelowFipeEntries(safeLimit),
+    listActiveCityBrandEntries(safeLimit),
+    listActiveCityBrandModelEntries(safeLimit),
+  ]);
+
+  return [...cities, ...belowFipe, ...brands, ...models].slice(0, safeLimit);
+}
+
+/**
  * Sitemap REGIONAL: o recorte por UF das MESMAS entradas territoriais.
  *
  * ── O bug que isto corrige (auditoria 2026-08-07) ────────────────────────────
@@ -85,14 +114,9 @@ export async function getPublicSitemapByRegion(state, limit = 50000) {
 
   const safeLimit = Math.min(100000, Math.max(1, Number(limit) || 50000));
 
-  const [cities, belowFipe, brands, models] = await Promise.all([
-    listActiveCityEntries(safeLimit),
-    listActiveCityBelowFipeEntries(safeLimit),
-    listActiveCityBrandEntries(safeLimit),
-    listActiveCityBrandModelEntries(safeLimit),
-  ]);
+  const entries = await getPublicSitemapAllTypes(safeLimit);
 
-  return [...cities, ...belowFipe, ...brands, ...models]
+  return entries
     .filter((entry) => String(entry.state || "").toUpperCase() === uf)
     .slice(0, safeLimit);
 }

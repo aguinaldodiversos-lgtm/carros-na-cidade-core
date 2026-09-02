@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 
 import { useCityOptional } from "@/lib/city/CityContext";
-import { DEFAULT_PUBLIC_CITY_SLUG, getPublicSocialLinks } from "@/lib/site/public-config";
+import { getPublicSocialLinks } from "@/lib/site/public-config";
 import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import {
   buildFooterNavSections,
@@ -228,14 +228,20 @@ export function PublicFooter({
     [pathname, cityCtx?.city]
   );
 
+  // SEO Fase 4.1A (achado P1-2): aqui havia
+  // `cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG` — sem cidade no contexto,
+  // o rodapé de TODA página montava links territoriais para `sao-paulo-sp`,
+  // cidade com zero anúncios ativos. Cinco deles respondem 404, e o Googlebot,
+  // que nunca tem cookie, recebia sempre essa variante.
+  //
+  // Agora: sem cidade, sem link de cidade — e `isCityPublic` propaga o MESMO
+  // sinal que o cabeçalho já usava, em vez de uma segunda regra própria.
   const footerSections = useMemo(
     () =>
-      buildFooterNavSections(
-        cityCtx?.city.slug ?? DEFAULT_PUBLIC_CITY_SLUG,
-        territorial,
-        inventory
-      ),
-    [cityCtx?.city.slug, territorial, inventory]
+      buildFooterNavSections(cityCtx?.city?.slug ?? null, territorial, inventory, {
+        isPublicCity: cityCtx?.isCityPublic,
+      }),
+    [cityCtx?.city?.slug, cityCtx?.isCityPublic, territorial, inventory]
   );
 
   return (

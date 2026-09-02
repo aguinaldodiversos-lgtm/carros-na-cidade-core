@@ -12,11 +12,8 @@
 
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { BlogPageClient } from "@/components/blog/BlogPageClient";
-import {
-  cmsPostToBlogPost,
-  fetchPublishedBlogPosts,
-} from "@/lib/blog/blog-cms";
-import { applyCmsPostsToHubContent } from "@/lib/blog/blog-hub";
+import { cmsPostToBlogPost, fetchPublishedBlogPosts } from "@/lib/blog/blog-cms";
+import { applyCmsPostsToHubContent, buildBlogPostHref } from "@/lib/blog/blog-hub";
 import { fetchBlogPageContent, prettifyCitySlug } from "@/lib/blog/blog-page";
 
 function resolveSiteUrl(): string {
@@ -24,7 +21,9 @@ function resolveSiteUrl(): string {
 }
 
 /**
- * @param citySlug  slug da cidade (URL ou cookie/padrão).
+ * @param citySlug  slug da cidade PÚBLICA (URL ou cookie/primária), ou `null`
+ *                  quando o portal não tem cidade — os links caem na canônica
+ *                  global do post (`/blog/<slug>`) em vez de inventar cidade.
  * @param pagePath  path desta página para canonical/JSON-LD ("/blog" ou
  *                  "/blog/<cidade>").
  */
@@ -32,20 +31,26 @@ export async function BlogHubServer({
   citySlug,
   pagePath,
 }: {
-  citySlug: string;
+  citySlug: string | null;
   pagePath: string;
 }) {
   const siteUrl = resolveSiteUrl();
-  const city = prettifyCitySlug(citySlug);
+  // `prettifyCitySlug("")` devolve "São Paulo / SP" como default histórico — o
+  // que, sem cidade pública, seria NOMEAR uma cidade que o portal não atende.
+  // Só usamos o prettify quando há slug de verdade.
+  const city = citySlug ? prettifyCitySlug(citySlug) : null;
+  const cityName = city?.name ?? null;
+  /** Sufixo territorial da copy: some quando não há cidade. */
+  const inCity = cityName ? ` em ${cityName}` : "";
 
   // Fallback hardcoded + CMS em paralelo. O CMS, havendo posts, é canônico.
   // limit=24 garante que todos os posts adotados (13) sejam servidos.
   const [content, cms] = await Promise.all([
-    fetchBlogPageContent(citySlug),
+    fetchBlogPageContent(citySlug ?? ""),
     fetchPublishedBlogPosts({ limit: 24 }),
   ]);
 
-  const cmsCards = cms.posts.map((post) => cmsPostToBlogPost(post, city.label));
+  const cmsCards = cms.posts.map((post) => cmsPostToBlogPost(post, city?.label ?? ""));
   const hubContent = applyCmsPostsToHubContent(content, cmsCards, citySlug);
 
   const pageUrl = `${siteUrl}${pagePath}`;
@@ -54,8 +59,8 @@ export async function BlogHubServer({
   const blogLd = {
     "@context": "https://schema.org",
     "@type": "Blog",
-    name: `Blog automotivo em ${city.name}`,
-    description: `Guias, dicas e notícias sobre carros em ${city.name}: compra, venda, manutenção, financiamento e mercado local.`,
+    name: `Blog automotivo${inCity}`,
+    description: `Guias, dicas e notícias sobre carros${inCity}: compra, venda, manutenção, financiamento e mercado local.`,
     url: pageUrl,
     inLanguage: "pt-BR",
     publisher: {
@@ -66,14 +71,12 @@ export async function BlogHubServer({
         url: `${siteUrl}/images/logo-carros-na-cidade.png`,
       },
     },
-    about: {
-      "@type": "Place",
-      name: city.label,
-    },
+    // `about` só quando há cidade: um Place sem lugar real é ruído no schema.
+    ...(city ? { about: { "@type": "Place", name: city.label } } : {}),
     blogPost: (hubContent.featuredPosts || []).slice(0, 6).map((post) => ({
       "@type": "BlogPosting",
       headline: post.title,
-      url: `${siteUrl}/blog/${encodeURIComponent(citySlug)}/${post.slug}`,
+      url: `${siteUrl}${buildBlogPostHref(citySlug, post.slug)}`,
       datePublished: post.publishedAt,
       image: post.coverImage?.startsWith("http") ? post.coverImage : `${siteUrl}${post.coverImage}`,
       articleSection: post.category,
@@ -102,8 +105,8 @@ export async function BlogHubServer({
       <AnalyticsPageView
         event="blog_view"
         entityType="blog_hub"
-        entityId={citySlug}
-        citySlug={citySlug}
+        entityId={citySlug ?? "blog"}
+        citySlug={citySlug ?? undefined}
       />
       {/*
         O H1 + frase do hub NÃO ficam mais aqui. Este componente é ASYNC

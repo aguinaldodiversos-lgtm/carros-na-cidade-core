@@ -9,14 +9,16 @@ import type {
   BlogPost,
   BlogTrendingItem,
 } from "@/lib/blog/blog-page";
+import { buildBlogPostHref } from "@/lib/blog/blog-hub";
 import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
-import { DEFAULT_PUBLIC_CITY_SLUG } from "@/lib/site/public-config";
 
 interface BlogPageClientProps {
   content: BlogPageContent;
 }
 
-const FALLBACK_BLOG_CITY_HREF = `/blog/${DEFAULT_PUBLIC_CITY_SLUG}`;
+// Hub sem cidade: a rota-índice do blog, que existe e é 200 (antes apontava
+// para `/blog/sao-paulo-sp`, cidade sem estoque → 404).
+const FALLBACK_BLOG_CITY_HREF = "/blog";
 const FALLBACK_HERO_IMAGE = "/images/imagem_banner_blog.png";
 const FALLBACK_POST_IMAGE = "/images/blog/banner-blog.jpg";
 
@@ -33,12 +35,14 @@ function normalizeHref(value: unknown, fallback: string) {
   return href.startsWith("/") || href.startsWith("http") ? href : fallback;
 }
 
-function normalizePostHref(post: BlogPost, citySlug?: string) {
+function normalizePostHref(post: BlogPost, citySlug?: string | null) {
   const slug = toText(post.slug, "");
   if (!slug) {
     return citySlug ? `/blog/${citySlug}` : FALLBACK_BLOG_CITY_HREF;
   }
-  return citySlug ? `/blog/${citySlug}/${slug}` : `/blog/post/${slug}`;
+  // `/blog/post/<slug>` NÃO é rota do App Router (verificado) — era 404. Sem
+  // cidade, o destino certo é a canônica global do post.
+  return buildBlogPostHref(citySlug, slug);
 }
 
 const CATEGORY_STYLES: Record<
@@ -319,13 +323,13 @@ export function BlogPostCard({
   featured: _featured,
 }: {
   post: BlogPost;
-  citySlug?: string;
+  citySlug?: string | null;
   featured?: boolean;
 }) {
-  return <FeaturedPostCard post={post} citySlug={citySlug ?? DEFAULT_PUBLIC_CITY_SLUG} />;
+  return <FeaturedPostCard post={post} citySlug={citySlug ?? null} />;
 }
 
-function FeaturedPostCard({ post, citySlug }: { post: BlogPost; citySlug: string }) {
+function FeaturedPostCard({ post, citySlug }: { post: BlogPost; citySlug: string | null }) {
   const href = normalizePostHref(post, citySlug);
   const title = toText(post.title, "Artigo automotivo");
   const coverImage = toSafeImage(post.coverImage, FALLBACK_POST_IMAGE);
@@ -417,7 +421,7 @@ function TrendingCard({ item }: { item: BlogTrendingItem }) {
   );
 }
 
-function PopularPostRow({ post, citySlug }: { post: BlogPost; citySlug: string }) {
+function PopularPostRow({ post, citySlug }: { post: BlogPost; citySlug: string | null }) {
   const href = normalizePostHref(post, citySlug);
   const title = toText(post.title, "Artigo automotivo");
   const excerpt = toText(post.excerpt, "");
@@ -464,7 +468,12 @@ function PopularPostRow({ post, citySlug }: { post: BlogPost; citySlug: string }
 }
 
 export function BlogPageClient({ content }: BlogPageClientProps) {
-  const citySlug = toText(content.citySlug, DEFAULT_PUBLIC_CITY_SLUG);
+  // `null` = sem cidade pública. Antes caía em `DEFAULT_PUBLIC_CITY_SLUG`
+  // (`sao-paulo-sp`) e o hub emitia 20 links sob um prefixo 404 — medido em
+  // produção 2026-08-31 (SEO Fase 4.1A, achado P1-2).
+  const citySlug = toText(content.citySlug, "") || null;
+  /** Categoria só existe dentro de cidade; sem cidade, volta ao hub. */
+  const categoryHref = (id: string) => (citySlug ? `/blog/${citySlug}/categoria/${id}` : "/blog");
   const cityName = toText(content.cityName, "São Paulo");
 
   const heroBadge = toText(content.heroBanner?.badge, "DICA");
@@ -475,7 +484,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
   );
   const heroImage = toSafeImage(content.heroBanner?.image, FALLBACK_HERO_IMAGE);
   const heroReadTime = toText(content.heroBanner?.readTime, "6 min de leitura");
-  const heroHref = `/blog/${citySlug}/categoria/mercado`;
+  const heroHref = categoryHref("mercado");
 
   const bottomBannerTitle = toText(
     content.bottomBanner?.title,
@@ -549,7 +558,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
             Destaques do blog
           </h2>
           <Link
-            href={`/blog/${citySlug}/categoria/compra`}
+            href={categoryHref("compra")}
             className="inline-flex items-center gap-1 text-[14px] font-semibold text-[#2F67F6] transition hover:text-[#234EC1] md:text-[15px]"
           >
             Ver todos
@@ -593,7 +602,7 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
               Tendências da semana
             </h2>
             <Link
-              href={`/blog/${citySlug}/categoria/mercado`}
+              href={categoryHref("mercado")}
               className="inline-flex items-center gap-1 text-[14px] font-semibold text-[#2F67F6] transition hover:text-[#234EC1] md:text-[15px]"
             >
               Ver mais
