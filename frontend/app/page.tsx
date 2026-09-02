@@ -8,6 +8,7 @@ import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { fetchPublishedBlogPosts } from "@/lib/blog/blog-cms";
+import { resolveCookieOrPrimaryCity } from "@/lib/city/public-default-city";
 import { fetchHomeDiscovery } from "@/lib/home/home-discovery";
 import { buildHomeContentCards, HOME_CONTENT_CARD_LIMIT } from "@/lib/home/home-content-cards";
 import { fetchHomeAboveFold, fetchHomeHero } from "@/lib/home/public-home";
@@ -82,8 +83,19 @@ async function HomeAsyncContent({ searchParams }: { searchParams: SearchParams }
     query: { city_slug: queryCitySlug, state: queryState },
   });
 
-  const detectedCity =
-    fromCookie?.slug && fromCookie?.name ? { slug: fromCookie.slug, name: fromCookie.name } : null;
+  // Cidade de contexto do hero e da busca — conferida contra o conjunto público,
+  // igual ao cabeçalho (validação 4.1A, 2026-09-02).
+  //
+  // Era o cookie CRU. `HomeHero` faz
+  // `offersHref = overrideCtaUrl ?? buildCanonicalCityHref(defaultCitySlug, "/comprar")`,
+  // então um cookie de cidade que saiu do conjunto virava `/carros-em/<morta>`
+  // — 404 — sempre que o banner ativo não tivesse um `cta_url` válido. O
+  // defeito ficava escondido atrás de um dado do admin.
+  //
+  // `resolveCookieOrPrimaryCity` é a MESMA função do layout, então header e
+  // hero nunca discordam sobre qual é a cidade.
+  const resolvedCity = await resolveCookieOrPrimaryCity(fromCookie);
+  const detectedCity = resolvedCity ? { slug: resolvedCity.slug, name: resolvedCity.name } : null;
 
   // Flag regional — usada pelo LocationRegionalPrompt (seção Localização).
   // O antigo bloco "Explore por região" foi removido na reestruturação

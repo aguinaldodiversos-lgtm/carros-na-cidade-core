@@ -24,7 +24,7 @@
 // Portal sem nenhuma cidade pública devolve `null`, e quem consome tem de
 // degradar para rota não-territorial. Inventar slug aqui recriaria o bug.
 
-import { fetchPublicCitySet } from "@/lib/city/public-city-set";
+import { fetchPublicCitySet, isPublicCity, type PublicCitySet } from "@/lib/city/public-city-set";
 import { buildCityLabel } from "@/lib/city/city-types";
 import type { CityRef } from "@/lib/city/city-types";
 
@@ -46,7 +46,11 @@ function cityNameFromSlug(slug: string): string {
  * perguntas diferentes sobre o mesmo conjunto.
  */
 export async function resolvePublicDefaultCity(): Promise<CityRef | null> {
-  const set = await fetchPublicCitySet();
+  return primaryCityRef(await fetchPublicCitySet());
+}
+
+/** `primaryCity` do conjunto → `CityRef`, ou `null` se não houver. */
+function primaryCityRef(set: PublicCitySet | null): CityRef | null {
   const primary = set?.primaryCity;
   if (!primary?.slug) return null;
 
@@ -61,4 +65,44 @@ export async function resolvePublicDefaultCity(): Promise<CityRef | null> {
     state,
     label: state ? buildCityLabel(name, state) : name,
   };
+}
+
+/**
+ * Cidade do COOKIE — mas só se ela ainda for pública.
+ *
+ * ── O defeito que isto fecha (validação 4.1A, 2026-09-02) ────────────────────
+ * `app/layout.tsx` confiava no cookie sem conferir o conjunto público. Medido no
+ * build local com `cnc_city = altaneira-ce` (cidade fora do conjunto): o HTML de
+ * SSR saía com quatro links mortos —
+ *
+ *     /carros-em/altaneira-ce        404
+ *     /carros-baratos-em/altaneira-ce 404
+ *     /tabela-fipe/altaneira-ce      404
+ *     /blog/altaneira-ce             404
+ *
+ * O `CityContext` corrige isso DEPOIS da hidratação (descarta cidade que saiu do
+ * conjunto), mas quem não executa JS — o crawler — só vê o HTML. E é a mesma
+ * classe do achado P1-2: uma cidade assumida sem conferir estoque, só que pela
+ * via do cookie em vez da via do literal.
+ *
+ * As rotas-índice já faziam essa checagem
+ * (`territorial-index-redirect.ts`) — por isso `/tabela-fipe` ia para a cidade
+ * certa enquanto o cabeçalho ia para a morta. Agora a regra é a mesma nos dois.
+ *
+ * ── Fail-open preservado ─────────────────────────────────────────────────────
+ * Conjunto indisponível (`set === null`) MANTÉM o cookie. "Não consegui saber"
+ * nunca pode descartar a preferência de todo mundo — é a mesma política do gate
+ * e do `usePublicCitySet` (só `false` autoriza degradar).
+ */
+export async function resolveCookieOrPrimaryCity(
+  cookieCity: CityRef | null
+): Promise<CityRef | null> {
+  const set = await fetchPublicCitySet();
+
+  // Backend fora: não sabemos, então não degradamos.
+  if (!set) return cookieCity;
+
+  if (cookieCity && isPublicCity(set, cookieCity.slug)) return cookieCity;
+
+  return primaryCityRef(set);
 }

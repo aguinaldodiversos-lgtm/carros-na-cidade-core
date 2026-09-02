@@ -7,7 +7,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/AppProviders";
 import { cityContextFromSlug } from "@/lib/buy/territory-variant";
 import { extractCitySlugFromPathname } from "@/lib/city/city-from-pathname";
-import { resolvePublicDefaultCity } from "@/lib/city/public-default-city";
+import { resolveCookieOrPrimaryCity } from "@/lib/city/public-default-city";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import type { CityRef } from "@/lib/city/city-types";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
@@ -174,6 +174,13 @@ type RootLayoutProps = Readonly<{
  * Agora o piso é o estoque real, e a ausência de estoque é representada por
  * `null` — não por uma cidade inventada. `getTerritorialRoutesForCity(null)`
  * já degrada para as rotas-índice, que existem e respondem 200.
+ *
+ * ── O cookie também é conferido (validação 4.1A, 2026-09-02) ────────────
+ * O passo 2 confiava no cookie sem olhar o conjunto público. Com
+ * `cnc_city = altaneira-ce` (cidade que saiu do conjunto), o HTML de SSR
+ * saía com quatro links 404 — o `CityContext` só conserta isso depois da
+ * hidratação, e o crawler não hidrata. `resolveCookieOrPrimaryCity` aplica
+ * ao cookie a MESMA checagem que as rotas-índice já faziam.
  */
 async function resolveSsrInitialCity(
   pathname: string | null,
@@ -192,12 +199,10 @@ async function resolveSsrInitialCity(
     }
   }
 
-  const fromCookie = parseCityCookieValue(cookieValue);
-  if (fromCookie) return fromCookie;
-
-  // Backend fora devolve `null` aqui também: sem saber qual cidade existe, o
-  // chrome sai sem links territoriais em vez de sair com links quebrados.
-  return resolvePublicDefaultCity();
+  // Cookie SE ainda for público; senão, a cidade primária; senão, `null`.
+  // Backend fora mantém o cookie (fail-open) — "não sei" não descarta a
+  // preferência de ninguém.
+  return resolveCookieOrPrimaryCity(parseCityCookieValue(cookieValue));
 }
 
 export default async function RootLayout({ children }: RootLayoutProps) {
