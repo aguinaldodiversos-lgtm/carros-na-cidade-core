@@ -197,19 +197,33 @@ test.describe("@fase-5-0b conteúdo removido do render", () => {
       await openCatalog(page);
       const html = await page.content();
 
-      // Títulos exclusivos de cada bloco removido (auditoria Fase 5.0, §§8-12).
-      // Usamos texto que NÃO aparece em nenhum outro lugar da página para que a
-      // ausência signifique "o bloco não foi montado", e não "mudou a copy".
+      // Os SEIS <h2> que o build da `main` emitia depois do grid, contados no
+      // HTML servido por ela: cada string aqui apareceu 2 ou 4 vezes no baseline.
+      //
+      // Esse detalhe é o teste em si. A primeira versão desta lista usava rótulos
+      // plausíveis tirados do NOME dos componentes ("Panorama do mercado",
+      // "Também na região de", "Lojas e vendedores em") — e QUATRO das cinco
+      // nunca tinham existido no HTML. Passavam por vacuidade: `not.toContain`
+      // de algo que jamais esteve lá é verde com ou sem a mudança. As strings
+      // abaixo foram extraídas do baseline real, não do nome do componente.
       const ausentes = [
-        "Também na região de", // NearbyRadiusSection
-        "Perguntas frequentes", // FaqBlock
-        "Quantos carros usados estão à venda", // pergunta da FAQ
-        "Panorama do mercado", // CityAuthoritySection / MarketOverview
-        "Lojas e vendedores em", // DealerDiscovery
+        "O mercado de carros usados em", // CityAuthoritySection → MarketOverview
+        "Marcas com carros à venda em", // CityAuthoritySection → BrandDiscovery
+        "Modelos mais anunciados em", // CityAuthoritySection → ModelDiscovery
+        "Quem está anunciando em", // CityAuthoritySection → DealerDiscovery
+        "Sobre carros usados em", // CompactCitySeoBlock
+        "Perguntas frequentes sobre comprar carro usado em", // FaqBlock
       ];
       for (const texto of ausentes) {
         expect(html, `"${texto}" deveria ter saído do render`).not.toContain(texto);
       }
+
+      // Contraprova de que a lista acima não é vacuosa: o H1 e o cabeçalho de
+      // resultados, que NÃO foram removidos, continuam presentes. Se um dia o
+      // seletor de conteúdo mudar a ponto de `page.content()` vir vazio, esta
+      // asserção falha antes de as seis acima passarem por engano.
+      expect(html).toContain("Carros usados em");
+      expect(html).toContain("ofertas encontradas");
 
       // FAQPage sai junto com a FAQ visível; os outros três schemas ficam.
       expect(html).not.toContain('"@type":"FAQPage"');
@@ -226,6 +240,11 @@ test.describe("@fase-5-0b conteúdo removido do render", () => {
   }) => {
     // `NearbyRadiusSection` era o ÚNICO consumidor de `?raio=`. Mantê-lo no
     // sidebar deixaria um controle que muda a URL e não muda nada na tela.
+    //
+    // Em Atibaia o slider já era inerte ANTES desta fase: o bloco "Próximos" só
+    // aparece quando a cidade tem poucos anúncios, e com 27 ele nunca era
+    // montado — mas o slider aparecia assim mesmo (1 ocorrência de
+    // "Distância (km)" no HTML da `main`).
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await ctx.newPage();
     try {
