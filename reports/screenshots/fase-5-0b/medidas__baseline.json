@@ -1,0 +1,58 @@
+{
+  "1280x900": {
+    "status": 200,
+    "cards": 27,
+    "perRow": 3,
+    "cardWidth": 275,
+    "cardHeight": 485,
+    "gridBottom": 4931,
+    "navTop": null,
+    "navBottom": null,
+    "footerTop": 6683,
+    "docHeight": 7189,
+    "gridWidth": 864,
+    "containerWidth": 1280
+  },
+  "1280x900-full": {
+    "status": 200,
+    "cards": 27,
+    "perRow": 3,
+    "cardWidth": 275,
+    "cardHeight": 485,
+    "gridBottom": 4931,
+    "navTop": null,
+    "navBottom": null,
+    "footerTop": 6683,
+    "docHeight": 7189,
+    "gridWidth": 864,
+    "containerWidth": 1280
+  },
+  "390x844": {
+    "status": 200,
+    "cards": 27,
+    "perRow": 1,
+    "cardWidth": 366,
+    "cardHeight": 178,
+    "gridBottom": 5448,
+    "navTop": null,
+    "navBottom": null,
+    "footerTop": 7957,
+    "docHeight": 9545,
+    "gridWidth": 366,
+    "containerWidth": 390
+  },
+  "390x844-full": {
+    "status": 200,
+    "cards": 27,
+    "perRow": 1,
+    "cardWidth": 366,
+    "cardHeight": 178,
+    "gridBottom": 5448,
+    "navTop": null,
+    "navBottom": null,
+    "footerTop": 7957,
+    "docHeight": 9545,
+    "gridWidth": 366,
+    "containerWidth": 390
+  }
+}
