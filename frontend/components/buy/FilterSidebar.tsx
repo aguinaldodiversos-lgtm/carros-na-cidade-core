@@ -491,7 +491,13 @@ export function FilterSidebar({
           <button
             type="button"
             onClick={handleClear}
-            className="ml-auto inline-flex items-center gap-2 rounded-lg px-1 py-1.5 text-[15px] font-semibold text-primary transition hover:text-primary-strong motion-reduce:transition-none"
+            /* whitespace-nowrap: a sidebar de /carros-em/[slug] passou a 296px na
+               Fase 5.0B (o shell largo tirou 24px daqui para dar a quarta coluna
+               ao grid). Sem isto "Limpar filtros" quebra em duas linhas e o
+               cabeçalho vai de 37px para 62px de altura. Nas outras quatro rotas
+               a sidebar continua em 320px, onde o rótulo já cabia numa linha —
+               medido: para elas este utilitário não muda nada. */
+            className="ml-auto inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-1 py-1.5 text-[15px] font-semibold text-primary transition hover:text-primary-strong motion-reduce:transition-none"
           >
             Limpar filtros
             <RefreshIcon

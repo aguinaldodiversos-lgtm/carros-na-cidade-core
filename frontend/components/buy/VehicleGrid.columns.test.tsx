@@ -15,9 +15,10 @@ afterEach(cleanup);
  * — é exatamente esse acidente que estes testes tornam impossível de passar
  * despercebido.
  *
- * A geometria por trás do breakpoint está documentada em `VehicleGrid.tsx`:
- * com o container de 1280px o card tem 275px; espremer 4 colunas ali dá 201px.
- * A quarta coluna só cabe quando o container cresce para 1600px (281px/card).
+ * A geometria por trás do breakpoint está documentada em `VehicleGrid.tsx`: a
+ * quarta coluna é CONSEQUÊNCIA do shell mais largo da variante `cidade` (teto
+ * 1600px, padding 24px, sidebar 296px, gap 20px), não uma troca de classe. No
+ * shell histórico, 4 colunas dariam 201px por card.
  */
 
 const ITEMS = Array.from({ length: 8 }, (_, i) => ({
@@ -56,13 +57,13 @@ describe("VehicleGrid — densidade de colunas por variante", () => {
     expect(gridClass(comProp)).toBe(a);
   });
 
-  it('"wide": acrescenta a quarta coluna SÓ a partir de 1600px', () => {
+  it('"wide": acrescenta a quarta coluna a partir de 1392px', () => {
     const { container } = render(
       <VehicleGrid items={ITEMS} inferWeight={inferWeight} columns="wide" />
     );
     const cls = gridClass(container);
 
-    expect(cls).toContain("min-[1600px]:grid-cols-4");
+    expect(cls).toContain("min-[1392px]:grid-cols-4");
   });
 
   it('"wide" preserva mobile e tablet INTOCADOS', () => {
@@ -76,12 +77,25 @@ describe("VehicleGrid — densidade de colunas por variante", () => {
     expect(cls).toContain("grid-cols-1");
     expect(cls).toContain("sm:grid-cols-2");
     expect(cls).toContain("lg:grid-cols-3");
+    // `gap-3` (mobile) e `sm:gap-4` (tablet) são os que a fase protege — e são
+    // idênticos nas duas variantes. O `lg:gap-5` some na "wide": o shell largo
+    // usa 16px entre cards a partir de `lg`, o que é parte do orçamento que faz
+    // a quarta coluna caber em 1440. Mobile e tablet não enxergam essa mudança.
     expect(cls).toContain("gap-3");
     expect(cls).toContain("sm:gap-4");
-    expect(cls).toContain("lg:gap-5");
+    expect(cls).not.toContain("lg:gap-5");
   });
 
-  it('a única diferença entre "default" e "wide" é a quarta coluna', () => {
+  it("mobile e tablet são byte a byte iguais entre as duas variantes", () => {
+    // Recorta de cada classe só os utilitários que valem abaixo de `lg`. Se um
+    // dia a variante "wide" mexer em qualquer coisa de mobile ou tablet, este
+    // teste falha — é ele que sustenta a promessa "mobile INALTERADO".
+    const abaixoDeLg = (cls: string) =>
+      cls
+        .split(" ")
+        .filter((c) => !c.startsWith("lg:") && !c.startsWith("min-["))
+        .join(" ");
+
     const { container: def } = render(
       <VehicleGrid items={ITEMS} inferWeight={inferWeight} columns="default" />
     );
@@ -90,19 +104,20 @@ describe("VehicleGrid — densidade de colunas por variante", () => {
     const { container: wide } = render(
       <VehicleGrid items={ITEMS} inferWeight={inferWeight} columns="wide" />
     );
-    const clsWide = gridClass(wide);
 
-    expect(clsWide.replace(" min-[1600px]:grid-cols-4", "")).toBe(clsDefault);
+    expect(abaixoDeLg(gridClass(wide))).toBe(abaixoDeLg(clsDefault));
   });
 
-  it("nenhuma variante emite breakpoint de 4 colunas abaixo de 1600px", () => {
+  it("nenhuma variante emite 4 colunas em breakpoint nomeado do Tailwind", () => {
     for (const columns of ["default", "wide"] as const) {
       cleanup();
       const { container } = render(
         <VehicleGrid items={ITEMS} inferWeight={inferWeight} columns={columns} />
       );
       const cls = gridClass(container);
-      // Nem `lg:` (1024), nem `xl:` (1280), nem `2xl:` (1536) podem virar 4.
+      // A quarta coluna tem de vir do breakpoint arbitrário medido (1392), e não
+      // de `lg:` (1024), `xl:` (1280) ou `2xl:` (1536) — nenhum deles coincide
+      // com a largura em que a conta do shell fecha.
       expect(cls).not.toContain("lg:grid-cols-4");
       expect(cls).not.toContain("xl:grid-cols-4");
       expect(cls).not.toContain("2xl:grid-cols-4");

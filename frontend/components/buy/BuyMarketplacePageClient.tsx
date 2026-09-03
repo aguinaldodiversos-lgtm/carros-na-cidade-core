@@ -382,23 +382,57 @@ export default function BuyMarketplacePageClient({
 
       <main>
         {/*
-          Container do catálogo.
+          Container do catálogo — DOIS shells de desktop.
 
-          `max-w-7xl` (1280px) continua sendo o container de TODAS as rotas. A
-          página de cidade ganha um teto maior a partir de 1600px — e SÓ ela —
-          porque é a única que recebe a quarta coluna (`columns="wide"` no
-          `VehicleGrid`). Sem alargar o container, a quarta coluna espremeria o
-          card de 275px para 201px; com 1600px, ele fica em 281px.
+          As quatro rotas irmãs seguem no shell histórico: `max-w-7xl` (1280px),
+          `lg:px-8` (32px), sidebar de até 320px e `lg:gap-8` (32px) até o grid.
 
-          Abaixo de 1600px nada muda em rota nenhuma: mesmo container, mesmo
-          grid, mesmo card. Ver a nota de geometria em `VehicleGrid.tsx`.
+          A página de CIDADE recebe o shell largo. A referência é a página de
+          resultados da Webmotors, e o que se copiou dela foi o PRINCÍPIO, não o
+          desenho: a listagem usa a largura útil da viewport em vez de ficar
+          presa a uma coluna central de 1280px.
+
+          O ganho vem de quatro folgas, não de uma:
+
+            teto      1280 → 1600px   (acima disso a linha ficaria longa demais)
+            padding     32 → 24px
+            sidebar    320 → 296px
+            gap         32 → 20px
+
+          Juntas devolvem ~80px de área de cards em qualquer largura, e é isso
+          que faz a quarta coluna caber em 1440 sem espremer nada:
+
+            1440 → (1440 − 48 − 296 − 20 − 48) / 4 = 257px por card
+            1536 → (1536 − 48 − 296 − 20 − 48) / 4 = 281px por card
+            1600 → (1600 − 48 − 296 − 20 − 48) / 4 = 297px por card
+
+          ── Por que a sidebar parou em 296px, e não em 264 ──────────────────
+          A primeira tentativa usou 264px e ganhava 32px a mais para os cards —
+          o suficiente para 4 colunas já em 1366. Medido no navegador, 264px
+          ESTOURA o botão "Particulares (0)" do filtro de vendedor: caixa de
+          103px para 111px de conteúdo, com a borda direita cortada. Varrendo a
+          largura de 264 a 320, o transbordo só zera em **296px**.
+
+          Nessa faixa o rótulo "Limpar filtros" também quebrava em duas linhas;
+          resolvido com `whitespace-nowrap` no próprio botão (ver `FilterSidebar`),
+          que não tem efeito nenhum nos 320px das rotas irmãs.
+
+          Tentar a quarta coluna sem mexer no shell dava 201px por card (medido
+          em runtime). O shell é a mudança; a coluna é a consequência. Ver a nota
+          de geometria em `VehicleGrid.tsx`.
         */}
         <div
-          className={`mx-auto w-full max-w-7xl px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12 ${
-            isCityVariant ? "min-[1600px]:max-w-[1600px]" : ""
+          className={`mx-auto w-full px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:pb-12 ${
+            isCityVariant ? "max-w-[1600px] lg:px-6" : "max-w-7xl lg:px-8"
           }`}
         >
-          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:items-start lg:gap-8">
+          <div
+            className={`flex flex-col gap-4 lg:grid lg:items-start ${
+              isCityVariant
+                ? "lg:grid-cols-[296px_minmax(0,1fr)] lg:gap-5"
+                : "lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:gap-8"
+            }`}
+          >
             <aside className="hidden lg:sticky lg:top-[76px] lg:block lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pb-8 lg:pr-1">
               <FilterSidebar {...sidebarProps} />
             </aside>

@@ -61,22 +61,40 @@ async function openCatalog(page: Page) {
 
 test.describe("@fase-5-0b grid do catálogo territorial", () => {
   /**
-   * A tabela abaixo é o contrato de colunas por largura. As três primeiras
-   * linhas são REGRESSÃO (comportamento histórico que a fase proibiu mudar);
-   * as três do meio provam que 1280/1366/1440 continuam em 3 colunas — ou
-   * seja, que a quarta coluna NÃO desceu de breakpoint; a última é o alvo.
+   * Contrato de colunas por largura.
+   *
+   * As quatro primeiras linhas são REGRESSÃO — mobile e tablet, que a fase
+   * proibiu mexer. Da 1280 em diante é o alvo do shell largo: 3 colunas até
+   * 1391px e 4 colunas de 1392 em diante.
+   *
+   * 1392 é a largura em que o card de 4 colunas alcança os 245px de piso; abaixo
+   * dela a quarta coluna só existiria comprimindo o card. As linhas de 1366 e
+   * 1391 estão aqui de propósito: elas travam o limite INFERIOR do breakpoint,
+   * que nenhum teste de classe consegue provar.
+   *
+   * `minCard` é o piso de largura aceito em cada viewport. Sem ele o teste
+   * aceitaria "4 colunas" de qualquer tamanho — inclusive as 4 colunas de 201px
+   * que a fase rejeitou explicitamente.
    */
-  const CASES: { label: string; width: number; height: number; expected: number }[] = [
+  const CASES: {
+    label: string;
+    width: number;
+    height: number;
+    expected: number;
+    minCard?: number;
+  }[] = [
     { label: "mobile 390 (INALTERADO)", width: 390, height: 844, expected: 1 },
     { label: "mobile 412 (INALTERADO)", width: 412, height: 915, expected: 1 },
-    { label: "tablet 768", width: 768, height: 1024, expected: 2 },
+    { label: "tablet 768 (INALTERADO)", width: 768, height: 1024, expected: 2 },
     { label: "desktop 1024", width: 1024, height: 768, expected: 3 },
-    { label: "desktop 1280", width: 1280, height: 800, expected: 3 },
-    { label: "desktop 1366", width: 1366, height: 768, expected: 3 },
-    { label: "desktop 1440", width: 1440, height: 900, expected: 3 },
-    { label: "desktop 1536", width: 1536, height: 864, expected: 3 },
-    { label: "desktop amplo 1680", width: 1680, height: 1050, expected: 4 },
-    { label: "desktop amplo 1920", width: 1920, height: 1080, expected: 4 },
+    { label: "desktop 1280", width: 1280, height: 800, expected: 3, minCard: 285 },
+    { label: "desktop 1366", width: 1366, height: 768, expected: 3, minCard: 315 },
+    { label: "desktop 1391 (véspera do corte)", width: 1391, height: 800, expected: 3 },
+    { label: "desktop 1392 (o corte)", width: 1392, height: 800, expected: 4, minCard: 245 },
+    { label: "desktop 1440", width: 1440, height: 900, expected: 4, minCard: 255 },
+    { label: "desktop 1536", width: 1536, height: 864, expected: 4, minCard: 275 },
+    { label: "desktop 1600", width: 1600, height: 900, expected: 4, minCard: 290 },
+    { label: "desktop 1920", width: 1920, height: 1080, expected: 4, minCard: 290 },
   ];
 
   for (const c of CASES) {
@@ -96,15 +114,72 @@ test.describe("@fase-5-0b grid do catálogo territorial", () => {
           `[fase-5-0b] ${c.width}px → ${perRow} col · card ${largura}px × ${Math.round(boxes[0].height)}px`
         );
         expect(perRow, `${c.width}px deve exibir ${c.expected} card(s) por linha`).toBe(c.expected);
+
+        if (c.minCard !== undefined) {
+          expect(
+            largura,
+            `${c.width}px: card de ${largura}px está abaixo do piso de ${c.minCard}px — ` +
+              `${c.expected} colunas espremidas não atendem à fase`
+          ).toBeGreaterThanOrEqual(c.minCard);
+        }
       } finally {
         await ctx.close();
       }
     });
   }
 
-  test("desktop amplo: a quarta coluna NÃO comprime o card", async ({ browser }) => {
+  test("a sidebar estreitada não estoura nenhum controle", async ({ browser }) => {
+    /**
+     * O shell largo tirou 24px da sidebar (320 → 296) para dar à área de cards.
+     * Estreitar demais quebra o filtro de vendedor: com 264px o botão
+     * "Particulares (0)" tinha caixa de 103px para 111px de conteúdo e a borda
+     * direita saía cortada. Foi assim que 296 virou o piso.
+     *
+     * A checagem é `scrollWidth > clientWidth` em TODO descendente da sidebar —
+     * é o que um humano vê como texto cortado, e não depende de conhecer os
+     * rótulos. Roda nas larguras em que a sidebar é mais apertada em relação ao
+     * conteúdo.
+     */
+    for (const width of [1280, 1392, 1440, 1920]) {
+      const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await ctx.newPage();
+      try {
+        await openCatalog(page);
+        const problemas = await page.evaluate(() => {
+          const aside = document.querySelector("main aside");
+          if (!aside) return ["sidebar não encontrada"];
+          const fora: string[] = [];
+          for (const el of Array.from(aside.querySelectorAll("*"))) {
+            const box = el.getBoundingClientRect();
+            if (box.width > 0 && el.scrollWidth > Math.ceil(box.width) + 1) {
+              fora.push(
+                `${el.tagName} "${(el.textContent || "").trim().slice(0, 28)}" ` +
+                  `caixa=${Math.round(box.width)}px conteúdo=${el.scrollWidth}px`
+              );
+            }
+          }
+          return fora;
+        });
+
+        expect(
+          problemas,
+          `${width}px: controle(s) transbordando a sidebar → ${problemas.join(" ; ")}`
+        ).toEqual([]);
+
+        // O rótulo "Limpar filtros" tem de caber em UMA linha (é o outro sintoma
+        // da sidebar estreita — vira duas linhas e o cabeçalho dobra de altura).
+        const limpar = page.getByRole("button", { name: /limpar filtros/i }).first();
+        const box = await limpar.boundingBox();
+        expect(box!.height, `${width}px: "Limpar filtros" quebrou em duas linhas`).toBeLessThan(48);
+      } finally {
+        await ctx.close();
+      }
+    }
+  });
+
+  test("a quarta coluna NÃO comprime o card", async ({ browser }) => {
     // A regra da fase: 4 colunas não podem custar largura de card. Medimos a
-    // MESMA página em 1280 (3 colunas, referência histórica) e em 1920 (4).
+    // MESMA página em 1280 (3 colunas) e em 1920 (4).
     const medir = async (width: number, height: number) => {
       const ctx = await browser.newContext({ viewport: { width, height } });
       const page = await ctx.newPage();

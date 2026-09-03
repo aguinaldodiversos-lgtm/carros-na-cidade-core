@@ -1,46 +1,158 @@
-# Fase 5.0B — Catálogo territorial limpo
+# Fase 5.0B — Catálogo territorial limpo e largo
 
 **Rota alterada:** `/carros-em/[slug]`
 **Branch:** `codex/catalog-city-clean-desktop-grid`
 **Base:** `main` @ `190df7a5`
 **Data:** 2026-09-03
-**Origem:** decisões tomadas sobre a auditoria `reports/fase-5-0-auditoria-estrutura-catalogo-2026-09-02.md`
+**Origem:** auditoria `reports/fase-5-0-auditoria-estrutura-catalogo-2026-09-02.md`, mais a
+correção final de layout que trocou o alvo de "quarta coluna" por "shell largo".
 
 ---
 
-## 1. O que mudou, em uma frase
+## 1. O que mudou
 
-`/carros-em/[slug]` passa a terminar em **cards → paginação → rodapé**, e ganha
-uma quarta coluna de cards em telas de 1600px ou mais — sem que nenhuma outra
-rota, nem o mobile, mude um pixel.
+`/carros-em/[slug]` termina em **cards → paginação → rodapé** e passou a usar um
+**shell de desktop próprio, mais largo**, em vez da coluna central de 1280px que
+as outras rotas usam. A quarta coluna de cards é consequência desse shell, não
+uma troca de classe.
 
----
-
-## 2. Escopo — o que foi tocado e o que não foi
-
-**Alterado (10 arquivos, todos no frontend):**
-
-| Arquivo | Natureza |
-|---|---|
-| `app/carros-em/[slug]/page.tsx` | remoção de 4 blocos do render + 2 loaders |
-| `components/buy/BuyMarketplacePageClient.tsx` | flag `isCityVariant` |
-| `components/buy/VehicleGrid.tsx` | variante de colunas |
-| `components/buy/CatalogPagination.tsx` | prop `showSinglePage` |
-| `lib/seo/local-seo-data.ts` | opção `onServiceFailure` |
-| + 5 arquivos de teste/instrumentação | novos |
-
-**Não tocado:** backend, schema, migrations, matching, Produto 1, Produto 2,
-middleware, `limit`, paginação de servidor, sitemaps, SEO copy, admin UI.
-
-Nenhum componente foi apagado do projeto. `NearbyRadiusSection`,
-`CityAuthoritySection`, `CompactCitySeoBlock` e `FaqBlock` continuam existindo,
-com seus testes; esta rota apenas deixou de montá-los.
+Nenhuma outra rota mudou. Mobile e tablet não mudaram.
 
 ---
 
-## 3. Limits — inalterados (verificação explícita)
+## 2. A correção de rumo, registrada
 
-A fase marcou isso como CRÍTICO. Os três valores continuam em 50:
+A primeira versão desta fase colocou a quarta coluna em `min-[1600px]` mantendo o
+container em `max-w-7xl` abaixo disso. Estava errado para o objetivo: em 1440 —
+a largura de notebook mais comum — a página continuava com 3 cards de 275px,
+presa à mesma coluna central de sempre.
+
+A referência passada na revisão foi a página de resultados da Webmotors, e o que
+se copiou dela foi o **princípio de largura**, não o desenho: a listagem usa a
+largura útil da viewport. Refeito nesses termos, o alvo deixou de ser "em que
+breakpoint cabe a quarta coluna" e passou a ser "quanto espaço a listagem pode
+ocupar" — e a coluna caiu por consequência.
+
+---
+
+## 3. Os dois shells
+
+| | histórico (4 rotas) | cidade (esta fase) |
+|---|---|---|
+| teto do container | `max-w-7xl` = 1280px | **1600px** |
+| padding lateral (lg) | `px-8` = 32px | **`px-6` = 24px** |
+| sidebar | `minmax(280px,320px)` | **296px** |
+| gap sidebar → grid | `gap-8` = 32px | **`gap-5` = 20px** |
+| gap entre cards (lg) | 20px | **16px** |
+
+Toda diferença passa por uma única flag no componente compartilhado:
+
+```tsx
+const isCityVariant = variant === "cidade";
+```
+
+É o único ponto a inspecionar para saber o que muda e onde.
+
+---
+
+## 4. Geometria medida — a tabela pedida
+
+`next start` de build de produção, Chromium, Atibaia-SP com 27 anúncios, todas as
+medidas por `getBoundingClientRect` no navegador:
+
+| viewport | container | sidebar | área do grid | colunas | card | margem externa |
+|---|---|---|---|---|---|---|
+| 390 (mobile) | 390 | — | 366 | 1 | **366 × 178** | 0 |
+| 412 (mobile) | 412 | — | 388 | 1 | 388 × 178 | 0 |
+| 768 (tablet) | 768 | — | 720 | 2 | **352 × 542** | 0 |
+| 1024 | 1024 | 296 | 660 | 3 | 209 × 436 | 0 |
+| **1280** | 1280 | 296 | 916 | **3** | **295 × 500** | 0 |
+| **1366** | 1366 | 296 | 1002 | **3** | **323 × 521** | 0 |
+| 1391 | 1391 | 296 | 1027 | 3 | 332 × 528 | 0 |
+| **1392** | 1392 | 296 | 1028 | **4** | **245 × 463** | 0 |
+| **1440** | 1440 | 296 | 1076 | **4** | **257 × 472** | 0 |
+| **1536** | 1536 | 296 | 1172 | **4** | **281 × 490** | 0 |
+| **1600** | 1600 | 296 | 1236 | **4** | **297 × 502** | 0 |
+| **1920** | 1600 | 296 | 1236 | **4** | **297 × 502** | 160 |
+
+Gap sidebar→grid: **20px** em todas. Gap entre cards: **16px** em todas.
+
+Comparação com o shell histórico, na mesma cidade: o card era **275 × 485 em
+qualquer desktop**, de 1280 a 1920, porque o container nunca crescia. Agora ele
+varia de 245 a 332 conforme a largura realmente disponível.
+
+---
+
+## 5. De onde saiu 1392 — um número que ninguém escolheria
+
+O breakpoint não foi escolhido, foi resolvido. É a largura em que o card de 4
+colunas alcança os 245px de piso que a fase fixou:
+
+```
+(V − 48 padding − 296 sidebar − 20 gap − 48 gaps de card) / 4 ≥ 245
+V ≥ 1392
+```
+
+Medido: em 1392 o card dá exatamente **245px**; em 1391 a página fica em 3
+colunas com card de 332px. Os dois casos estão travados por teste E2E, um de cada
+lado do corte — é o limite inferior do breakpoint, que nenhum teste de classe
+CSS consegue provar.
+
+---
+
+## 6. 1366 foi testado de verdade — e não passou
+
+A fase pediu para testar 4 cards em 1366. Testei, e a resposta é não, pelo motivo
+que a própria fase estabeleceu ("não aceitar card visualmente comprimido").
+
+Em 1366 com a sidebar em 296px, a conta dá **238px por card** — 7px abaixo do
+piso. Para chegar aos 245px a sidebar teria de cair para **270px ou menos**. E é
+aí que a coisa quebra.
+
+**A medição que decidiu.** Varri a largura da sidebar de 264 a 320 contando
+elementos cujo conteúdo transborda a caixa (`scrollWidth > clientWidth`):
+
+| sidebar | controles transbordando | "Limpar filtros" |
+|---|---|---|
+| 264 – 288px | **3** | 2 linhas |
+| 292px | 2 | 2 linhas |
+| **296px** | **0** | 2 linhas → 1 com `nowrap` |
+| 320px (histórico) | 0 | 1 linha |
+
+O que estoura é o botão **"Particulares (0)"** do filtro de vendedor: caixa de
+103px para 111px de conteúdo, com a borda direita saindo cortada. Não é
+subjetivo — dá para ver na captura, e o gate desta fase proíbe quebra de CTA.
+
+**Conclusão:** 296px é o piso da sidebar, e com ele 1366 fica em 3 colunas. A
+alternativa seria entregar 4 cards em 1366 com um filtro visivelmente quebrado.
+Escolhi a sidebar íntegra e estou registrando a troca, não escondendo.
+
+Se a decisão de produto for outra — 4 colunas em 1366 valem mais que o filtro de
+vendedor inteiro — o caminho não é estreitar a sidebar e aceitar o estrago: é
+mudar aquele controle (empilhar "Lojas"/"Particulares" em vez de lado a lado),
+que é trabalho de outra fase porque o componente é compartilhado pelas 5 rotas.
+
+---
+
+## 7. `whitespace-nowrap` — a única linha tocada no componente compartilhado
+
+Na faixa dos 296px o rótulo "Limpar filtros" quebrava em duas linhas e o
+cabeçalho da sidebar ia de 37px para 62px de altura. Resolvido com
+`whitespace-nowrap` no próprio botão, em `FilterSidebar`.
+
+O diff nesse arquivo é **1 classe + comentário**. E o utilitário é
+comprovadamente inerte para as outras quatro rotas: a varredura acima mostra que
+em 320px o rótulo **já cabia em uma linha** (altura 37px) antes da mudança — e a
+medição pós-mudança confirma 37px nas quatro. Nada a renderizar de diferente.
+
+> Nota de processo: rodar o Prettier nesse arquivo reformatou 307 linhas, porque
+> ele é um dos legados fora do padrão. Revertido — um componente compartilhado
+> por 5 rotas não deve chegar à revisão com 300 linhas de ruído em volta de uma
+> mudança de uma linha.
+
+---
+
+## 8. Limits — inalterados
 
 ```
 frontend/lib/search/ads-search-url.ts:4   PUBLIC_ADS_SEARCH_LIMIT_MAX = 50
@@ -48,457 +160,304 @@ frontend/lib/search/ads-search-url.ts:7   DEFAULT_COMPRAR_CATALOG_LIMIT = PUBLIC
 frontend/lib/seo/query-policy.ts:60       DEFAULT_CATALOG_LIMIT = 50
 ```
 
-O diff inteiro (989 inserções, 152 remoções) contém **uma única** linha com a
-palavra `limit`: um comentário dentro de um teste. Nenhuma constante foi tocada.
+Nenhuma constante de `limit` aparece no diff.
 
 ---
 
-## 4. O breakpoint saiu de medição, não de gosto
+## 9. Fim da página
 
-A fase proibiu trocar `lg:grid-cols-3` por `lg:grid-cols-4`. O motivo ficou
-evidente na medição.
+| | main | branch (1440) |
+|---|---|---|
+| vão grid → rodapé (desktop) | **1752px** | 116px |
+| vão grid → rodapé (mobile 390) | **2509px** | 180px |
+| vão paginação → rodapé | — | **48px** |
 
-O card do catálogo tem **275px em qualquer desktop** — 1280, 1366, 1440, 1536 ou
-1920 — porque o container é `max-w-7xl` (1280px) e não cresce. A largura
-disponível para cards é sempre a mesma:
+Saíram do render (não do projeto) `NearbyRadiusSection`, `CityAuthoritySection`,
+`CompactCitySeoBlock` e `FaqBlock` — seis `<h2>` no total:
 
-```
-1280 − 64 (px-8) − 320 (sidebar) − 32 (gap-8) = 864px
-```
-
-Espremer 4 colunas nesses 864px dá **201px por card**. Não é estimativa: forcei
-o container de volta a 1280px em runtime, com a quarta coluna ativa, e medi.
-
-```
-como está      : {"perRow":4,"card":281,"container":1600}
-container 1280 : {"perRow":4,"card":201,"container":1600→1280}   ← 4 colunas espremidas
-```
-
-−27% de largura de card, com foto e título comprimidos. Rejeitado pela regra da
-própria fase ("4 cards não podem virar 4 cards espremidos").
-
-A quarta coluna só cabe se o **container crescer junto**:
-
-```
-≥1600px → container 1600 → (1600 − 64 − 320 − 32 − 60) / 4 = 281px por card
-```
-
-**281 > 275**: os cards ficam ligeiramente MAIORES do que hoje, não menores. Em
-1440 e 1536 a conta não fecha (241px e 265px), e é por isso que essas larguras
-continuam em 3 colunas.
-
-O experimento acima é o que torna o alargamento do container **estrutural**: se
-alguém remover `min-[1600px]:max-w-[1600px]` e mantiver a quarta coluna, o card
-cai para 201px silenciosamente.
-
----
-
-## 5. Geometria medida no navegador (bounding box real)
-
-Medições sobre `next start` (build de produção), cidade Atibaia-SP, 27 anúncios:
-
-| Viewport | Colunas | Card | Container |
-|---|---|---|---|
-| 390 × 844 (mobile) | 1 | 366 × 178 | 390 |
-| 412 × 915 (mobile) | 1 | 388 × 178 | 412 |
-| 768 × 1024 (tablet) | 2 | 352 × 542 | 768 |
-| 1024 × 768 | 3 | 189 × 421 | 1024 |
-| **1280 × 800** | **3** | **275 × 485** | 1280 |
-| 1366 × 768 | 3 | 275 × 485 | 1280 |
-| 1440 × 900 | 3 | 275 × 485 | 1280 |
-| 1536 × 864 | 3 | 275 × 485 | 1280 |
-| **1680 × 1050** | **4** | **281 × 490** | 1600 |
-| **1920 × 1080** | **4** | **281 × 490** | 1600 |
-
-A classe Tailwind no atributo `class` não prova nada sozinha — ela pode não ter
-sido emitida no CSS. Verifiquei também o CSS gerado:
-
-```css
-@media (min-width:1600px){
-  .min-\[1600px\]\:max-w-\[1600px\]{max-width:1600px}
-  .min-\[1600px\]\:grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
-}
-```
-
-**Observação fora do escopo desta fase:** em 1024px o card cai para 189px, porque
-`lg:` (1024) já pede 3 colunas num container de 1024. É comportamento anterior à
-fase, não regressão — mas é a largura mais apertada da tabela e merece decisão de
-produto em algum momento.
-
----
-
-## 6. Fim da página: o que havia entre a listagem e o rodapé
-
-Comparação entre a `main` e a branch, mesmo build local, mesma máquina, mesma
-cidade. `gridBottom` é o pixel onde o grid de cards termina.
-
-| | main | branch | Δ |
-|---|---|---|---|
-| **Desktop 1280** | | | |
-| fim do grid | 4931px | **4931px** | **0** |
-| topo do rodapé | 6683px | 5047px | −1636px |
-| vão grid→rodapé | **1752px** | 116px | −1636px |
-| altura da página | 7189px | 5553px | −1636px |
-| **Mobile 390** | | | |
-| fim do grid | 5448px | **5448px** | **0** |
-| topo do rodapé | 7957px | 5628px | −2329px |
-| vão grid→rodapé | **2509px** | 180px | −2329px |
-| altura da página | 9545px | 7215px | −2329px |
-
-O `gridBottom` idêntico nos dois builds é o dado central: **o catálogo não se
-moveu um pixel**. Tudo que mudou está abaixo dele.
-
-Os 2509px do mobile batem exatamente com a medição da auditoria da Fase 5.0.
-No desktop a auditoria registrou 1704px e este build mediu 1752px — 48px de
-diferença, que é a margem do próprio paginador que agora ocupa parte do vão.
-
-Vão restante entre paginação e rodapé, medido no E2E: **48px**.
-
----
-
-## 7. O que saiu do render — verificado no HTML servido
-
-Contagem de ocorrências no HTML SSR das duas versões:
-
-| Marcador | main | branch | |
-|---|---|---|---|
-| `"@type":"FAQPage"` | 2 | **0** | removido |
-| `areaServed` | 2 | **0** | removido |
-| `Distância (km)` | 1 | **0** | removido |
-| `"@type":"CollectionPage"` | 2 | 2 | preservado |
-| `"@type":"BreadcrumbList"` | 2 | 2 | preservado |
-| `"@type":"ItemList"` | 4 | 4 | preservado |
-| `Paginação do catálogo` | 0 | 1 | novo |
-| links `/veiculo/` únicos | 27 | 27 | preservado |
-
-Os seis `<h2>` que a `main` emitia depois do grid, e que saíram:
-
-1. `O mercado de carros usados em Atibaia` — CityAuthoritySection → MarketOverview
-2. `Marcas com carros à venda em Atibaia` — CityAuthoritySection → BrandDiscovery
-3. `Modelos mais anunciados em Atibaia` — CityAuthoritySection → ModelDiscovery
-4. `Quem está anunciando em Atibaia` — CityAuthoritySection → DealerDiscovery
+1. `O mercado de carros usados em Atibaia` — MarketOverview
+2. `Marcas com carros à venda em Atibaia` — BrandDiscovery
+3. `Modelos mais anunciados em Atibaia` — ModelDiscovery
+4. `Quem está anunciando em Atibaia` — DealerDiscovery
 5. `Sobre carros usados em Atibaia` — CompactCitySeoBlock
 6. `Perguntas frequentes sobre comprar carro usado em Atibaia` — FaqBlock
 
-O único `<h2>` que resta na página é `Filtros`, da sidebar.
+`FAQPage` e `areaServed` saíram junto com o conteúdo que descreviam — schema sem
+conteúdo correspondente é spam estrutural. `CollectionPage`, `ItemList` e
+`BreadcrumbList` continuam intactos, com as mesmas contagens.
 
-**Ressalva honesta sobre o `NearbyRadiusSection`:** ele foi removido do código da
-rota, mas em Atibaia **já não renderizava** — o bloco só aparece quando a cidade
-tem poucos anúncios, e com 27 ele nunca era montado. O slider "Distância (km)",
-no entanto, **aparecia** (1 ocorrência no HTML da `main`), controlando um bloco
-que não existia naquela tela. Ou seja: nesta cidade o slider já era inerte antes
-da fase; a mudança tornou isso explícito em vez de acidental.
+HTML SSR: **305.592 → 248.955 bytes (−18,5%)**. Os 27 links `/veiculo/`
+permanecem.
 
-HTML SSR: **305.592 → 248.955 bytes (−18,5%)**. Links internos únicos: 54 → 50.
-
----
-
-## 8. FAQPage saiu junto com a FAQ — e por quê
-
-O `FAQPage` só existia porque as mesmas perguntas eram renderizadas de forma
-visível. Sem a FAQ na página, mantê-lo seria schema sem conteúdo correspondente,
-que o Google trata como spam estrutural. Os dois saem juntos, sempre.
-
-`areaServed` saiu pelo mesmo raciocínio: era montado de
-`nearbyResult.coverageCities`, e declarar cobertura de vizinhança num schema cuja
-página não mostra mais nenhuma cidade vizinha é afirmar o que a página não
-sustenta.
-
-`CollectionPage`, `ItemList` e `BreadcrumbList` ficam intactos — descrevem
-exatamente o que continua na tela.
+**Ressalva:** o `NearbyRadiusSection` foi removido do código, mas em Atibaia já
+não renderizava — ele só aparece em cidade com poucos anúncios. O slider
+"Distância (km)", porém, **aparecia**, controlando um bloco que não existia
+naquela tela. A mudança tornou explícito o que já era inerte.
 
 ---
 
-## 9. Mobile inalterado — prova por pixel
-
-A fase foi categórica: mobile não muda. A prova é a comparação das capturas
-`main` × branch, mesmo build local, mesmo navegador, mesmo viewport.
+## 10. Mobile inalterado — prova por pixel
 
 | Comparação | Pixels diferentes |
 |---|---|
-| Desktop 1280 × 900 (primeira dobra) | **0** — SHA-256 idêntico |
-| Mobile 390 × 844 (primeira dobra) | 6 de 329.160 (0,0018%) |
-| Mobile 390 página inteira | idênticas até a linha **5479**; diferem só abaixo |
+| Mobile 390 — primeira dobra | 6 de 329.160 (0,0018%), delta máx **4/255** |
+| Mobile 390 — página inteira | **idênticas até a linha 5479**; diferem só abaixo |
+| Tablet 768 — card | 352 × 542 nos dois builds |
 
-O desktop em 1280 tem o **mesmo hash SHA-256** nos dois builds:
-`bffb5285a37a31568f84949a94dc3b05a8287c21b96d13d0e40b87967f97d6dd`.
-
-Os 6 pixels do mobile estão em `x=19` e `x=21` — a borda arredondada do card —
-com delta máximo de 4 em 255, num tom já quase branco (227→231). É jitter de
-antialiasing na renderização da foto, não deslocamento de layout: as linhas
-(`y=517`, `y=707`) são as mesmas nas duas versões.
+Os 6 pixels estão em `x=19` e `x=21` — a borda arredondada do card — nas mesmas
+linhas (`y=517`, `y=707`) das duas versões. É antialiasing de foto, não
+deslocamento.
 
 Na página inteira do mobile, a primeira linha com qualquer diferença é a **5480**
 — exatamente onde o grid termina (5448) e começava o conteúdo removido. Acima
-disso: zero diferenças. É literalmente o critério que o §22 da fase pediu.
+disso, zero diferenças.
 
-Card mobile: **366 × 178 nos dois builds**. Card desktop: **275 × 485 nos dois
-builds**.
+O teste unitário `VehicleGrid.columns.test.tsx` reforça isso por construção:
+recorta de cada variante os utilitários que valem abaixo de `lg` e exige que
+sejam **byte a byte iguais** entre `"default"` e `"wide"`.
 
 ---
 
-## 10. Rotas irmãs — não-regressão medida
+## 11. Desktop 1280 MUDOU — e isso é intencional
 
-`BuyMarketplacePageClient` serve cinco rotas. Toda diferença desta fase passa por
-uma única flag, `isCityVariant = variant === "cidade"`. Medição no mesmo
-servidor, nas duas larguras críticas:
+Diferente da versão anterior desta branch, o desktop de 1280 **não é mais
+pixel-idêntico** ao baseline. O shell largo vale de `lg:` para cima, então em
+1280 a sidebar encolhe (320 → 296), o padding encolhe (32 → 24) e os cards
+crescem: **275 → 295px**, ainda em 3 colunas.
 
-| Largura | Variante | Rota | Colunas | Card | Container |
-|---|---|---|---|---|---|
-| 1280 | cidade | `/carros-em/atibaia-sp` | 3 | 275 | 1280 |
-| **1920** | **cidade** | `/carros-em/atibaia-sp` | **4** | **281** | **1600** |
-| 1280 | nacional | `/comprar` | 3 | 275 | 1280 |
-| 1920 | nacional | `/comprar` | **3** | **275** | **1280** |
-| 1280 | estadual | `/carros-usados/sp` | 3 | 275 | 1280 |
-| 1920 | estadual | `/carros-usados/sp` | **3** | **275** | **1280** |
-| 1280 | estadual | `/comprar/estado/sp` | 3 | 275 | 1280 |
-| 1920 | estadual | `/comprar/estado/sp` | **3** | **275** | **1280** |
+Medido: a primeira linha com diferença é a **359** — o topo da faixa do catálogo.
+Cabeçalho, breadcrumb, H1 e busca continuam idênticos.
 
-Só a cidade muda. As três irmãs mantêm 3 colunas, 275px e container 1280 em
-1920px de viewport — o comportamento histórico.
+Isso atende ao que a fase pediu para 1280 ("3 cards aceitável se 4 comprometerem
+o card": 4 ali dariam 217px) e é coerente com o princípio — em 1280 a listagem
+já ocupa a viewport inteira, e o ganho aparece como card maior em vez de coluna
+extra.
 
-**`/carros-usados/regiao/atibaia-sp` respondeu 503 nas duas larguras.** Não é
-regressão: o próprio middleware nomeia a causa no header de resposta.
+---
+
+## 12. Rotas irmãs — não-regressão medida
+
+| largura | rota | container | sidebar | col | card | "Limpar filtros" |
+|---|---|---|---|---|---|---|
+| 1280 | `/carros-em/atibaia-sp` | **1280** | **296** | **3** | **295** | 37px |
+| 1440 | `/carros-em/atibaia-sp` | **1440** | **296** | **4** | **257** | 37px |
+| 1920 | `/carros-em/atibaia-sp` | **1600** | **296** | **4** | **297** | 37px |
+| 1280 | `/comprar` | 1280 | 320 | 3 | 275 | 37px |
+| 1440 | `/comprar` | 1280 | 320 | 3 | 275 | 37px |
+| 1920 | `/comprar` | 1280 | 320 | 3 | 275 | 37px |
+| 1280 / 1440 / 1920 | `/carros-usados/sp` | 1280 | 320 | 3 | 275 | 37px |
+| 1280 / 1440 / 1920 | `/comprar/estado/sp` | 1280 | 320 | 3 | 275 | 37px |
+
+As três irmãs mantêm container 1280, sidebar 320, 3 colunas e card de 275px em
+**1920px de viewport** — o comportamento histórico, sem um pixel de diferença. E
+a altura de 37px do "Limpar filtros" nas quatro rotas confirma que o
+`whitespace-nowrap` não mudou nada para elas.
+
+O script que produz essa tabela está versionado em
+`frontend/scripts/fase-5-0b-rotas-irmas.mjs`.
+
+**`/carros-usados/regiao/[slug]` respondeu 503** nas três larguras. Não é
+regressão — o middleware nomeia a causa no header:
 
 ```
-HTTP/1.1 503 Service Unavailable
-x-middleware-regional: blocked-unavailable
 x-middleware-regional-reason: missing-internal-api-token
 ```
 
-É o gate fechando por falta de `INTERNAL_API_TOKEN` no meu `.env.local`. O 503
-vem de `middleware.ts` — que roda **antes** do componente de página, e que este
-diff não toca (o diff tem 10 arquivos, nenhum em `lib/middleware/` nem
-`middleware.ts`). O arquivo da rota regional é byte a byte igual ao da `main`.
+É o gate fechando por falta de `INTERNAL_API_TOKEN` no `.env.local` local. Roda
+**antes** do componente de página, e este diff não toca `middleware.ts` nem
+`lib/middleware/`.
 
 ---
 
-## 11. Paginação visível com uma página só
+## 13. Um efeito colateral que inspecionei e não é regressão
 
-Com os blocos SEO fora, a listagem emendava direto no rodapé sem nenhum sinal de
-fim. O paginador de página única é esse encerramento.
+Com a sidebar em 296px, o seletor de ESTADO passou a mostrar `São` em vez de
+`São Pa`. Recortei os dois builds no mesmo viewport para comparar: **os dois
+truncam** — o de 320px cortava no meio da letra (`São Pa`), o de 296px corta no
+limite da palavra (`São`). Nenhum dos dois mostra "São Paulo" inteiro.
 
-Com 27 anúncios e `limit` 50 há exatamente 1 página. Nesse estado o paginador é
-**inerte**, verificado no HTML servido:
+A truncagem é anterior a esta fase e fica fora do escopo dela. Registrada aqui
+para que não seja lida como estrago do shell novo.
+
+---
+
+## 14. Paginação visível com uma página só
+
+Com 27 anúncios e `limit` 50 há exatamente 1 página, e o paginador é **inerte**:
 
 - **0** elementos `<a>` dentro do `<nav>`
 - **nenhuma** ocorrência de `page=1`
-- as duas setas renderizam como `<span>` desabilitado (`opacity-40`)
+- as duas setas são `<span>` desabilitado
 - o número atual é `<span aria-current="page">1</span>`
 
-Não há URL paginada nova para o SEO tratar, nem link que leve a lugar nenhum.
-O comportamento com 2+ páginas é o de sempre — coberto pelos 23 testes de
-`CatalogPagination.test.tsx`, dos quais 17 já existiam e continuam verdes.
+Ele existe porque, sem os blocos SEO, nada mais marcava o fim da listagem. O
+comportamento com 2+ páginas é o de sempre.
 
 ---
 
-## 12. Resiliência: serviço de conteúdo fora ≠ cidade inexistente
+## 15. Resiliência: serviço de conteúdo fora ≠ cidade inexistente
 
-`loadLocalSeoLanding` terminava em `catch { notFound(); }`. Esse loader alimenta
-apenas metadata e JSON-LD — mas a falha dele derrubava a **página inteira**,
-inclusive o catálogo transacional, que vem de outro loader e estava disponível.
-Um blip de rede virava 404 numa cidade com 27 anúncios no ar.
-
-A opção `onServiceFailure: "degrade"` separa as duas perguntas:
+`loadLocalSeoLanding` terminava em `catch { notFound(); }` — e esse loader
+alimenta só metadata e JSON-LD, mas derrubava a página inteira, inclusive o
+catálogo, que vem de outro loader e estava no ar.
 
 | Situação | Comportamento |
 |---|---|
-| cidade não existe | **404**, sempre, nos dois modos |
-| serviço caiu + `"degrade"` | modelo mínimo, página **200** com `noindex` |
-| serviço caiu + padrão | **404** (histórico, mantido para as landings irmãs) |
-
-Só `/carros-em/[slug]` passa a opção. `/carros-baratos-em/` e
-`/carros-automaticos-em/` seguem no comportamento anterior, porque não têm
-catálogo próprio para servir — degradá-las serviria uma casca vazia.
-
-O modo degradado devolve `totalAds: 0`, o que faz `shouldIndexLocalSeo` produzir
-`noindex`: a página nunca afirma indexabilidade sem ter confirmado estoque.
+| cidade não existe | **404**, sempre |
+| serviço caiu + `"degrade"` | modelo mínimo, **200** com `noindex` |
+| serviço caiu + padrão | **404** (histórico, mantido nas landings irmãs) |
 
 Verificado em runtime: `/carros-em/cidade-fantasma-zz` → **404**.
 
 ---
 
-## 13. Rede: 4 cargas paralelas viraram 2
+## 16. Rede e performance
 
-Saíram do `Promise.all` da rota, junto com os blocos que alimentavam:
-
-- `loadNearbyRadiusAds` — alimentava `NearbyRadiusSection`
-- `loadCitySeoOverview` — alimentava `CityAuthoritySection`
-
-Restam `loadSeoModel` (metadata + JSON-LD) e `loadCityCatalogData` (o catálogo).
-`?raio=` deixou de ser lido na rota porque seu único consumidor era o bloco
-"Próximos"; o parâmetro continua **preservado** nos hrefs de paginação e filtro,
-então uma URL antiga com `?raio=` não perde o parâmetro ao navegar.
-
----
-
-## 14. Performance
-
-Mesma máquina, `next start` de build de produção, backend de produção, 6
-requisições seguidas por versão (a primeira, fria, descartada).
+Saíram do `Promise.all` da rota `loadNearbyRadiusAds` e `loadCitySeoOverview`:
+4 cargas paralelas viraram 2.
 
 | Métrica | main | branch |
 |---|---|---|
 | HTML SSR | 305.592 B | **248.955 B (−18,5%)** |
 | TTFB (mediana de 5 quentes) | 0,292 s | 0,317 s |
-| TTFB (faixa) | 0,265–0,365 s | 0,278–0,509 s |
-| Route size (build) | 212 B | 211 B |
 | First Load JS | 136 kB | 136 kB |
 
-**O TTFB não melhorou de forma mensurável** — as duas faixas se sobrepõem e a
-diferença está dentro do ruído de medição desta máquina. Isso é esperado: as duas
-chamadas de rede removidas batiam num backend com cache próprio e não dominavam o
-tempo de resposta. Afirmar ganho de latência aqui seria ler ruído como sinal.
-
-O ganho medido e real é de **bytes transferidos**: 56,6 KB a menos por
-visualização de página.
-
-**O ganho é de HTML/SSR, não de JavaScript de cliente.** Os quatro blocos
-removidos eram Server Components — não havia bundle deles para economizar. Dizer
-que a página "ficou mais leve no JS" seria falso; ela ficou mais leve no HTML
-transferido e faz duas chamadas de rede a menos por request.
-
-Depois da mudança, `/carros-em/[slug]` tem exatamente o mesmo First Load JS das
-rotas irmãs (136 kB), o que é coerente: passou a montar o mesmo conjunto de
-componentes de cliente que elas.
+**O TTFB não melhorou de forma mensurável** e as faixas se sobrepõem; as chamadas
+removidas batiam em backend com cache e não dominavam o tempo. O ganho real é de
+**56,6 KB por pageview**. O JS de cliente não mudou porque os blocos removidos
+eram Server Components — dizer que "a página ficou mais leve no JS" seria falso.
 
 ---
 
-## 15. Testes
+## 17. Testes
 
 | Suíte | Arquivo | Testes |
 |---|---|---|
-| Variante de colunas | `components/buy/VehicleGrid.columns.test.tsx` | 6 (novo) |
+| Variante de colunas | `components/buy/VehicleGrid.columns.test.tsx` | 6 |
 | Paginação página única | `components/buy/CatalogPagination.test.tsx` | 23 (6 novos) |
-| Resiliência SEO | `lib/seo/local-seo-data.resilience.test.ts` | 6 (novo) |
-| Geometria E2E | `e2e/catalog-city-clean-grid.spec.ts` | 15 (novo) |
+| Resiliência SEO | `lib/seo/local-seo-data.resilience.test.ts` | 6 |
+| Geometria + sidebar E2E | `e2e/catalog-city-clean-grid.spec.ts` | **18** |
 
-### Suíte completa do frontend
+O E2E mede bounding box real, com **piso de largura por viewport**: sem isso, um
+teste de "4 colunas" aceitaria 4 colunas de qualquer tamanho — inclusive as de
+201px que a fase rejeitou. E travou o defeito da sidebar: um teste percorre todos
+os descendentes procurando `scrollWidth > clientWidth`, que é o que um humano vê
+como texto cortado, sem depender de conhecer os rótulos.
+
+**Suíte completa do frontend:**
 
 ```
 Test Files  2 failed | 225 passed (227)
      Tests  5 failed | 3549 passed (3554)
 ```
 
-**As 5 falhas são anteriores a esta fase.** Rodei os dois arquivos com a `main`
-em checkout e obtive exatamente o mesmo resultado:
+As 5 falhas são anteriores a esta fase — rodei os mesmos dois arquivos com a
+`main` em checkout e obtive exatamente o mesmo resultado (`2 failed`,
+`5 failed | 12 passed`). São `app/seguranca/page.copy.test.ts` e
+`app/carros-usados/regiao/[slug]/page.config.test.ts`; nenhum está no diff.
 
-```
-main:   Test Files  2 failed (2)   Tests  5 failed | 12 passed (17)
-branch: (mesmos 2 arquivos, mesmas 5 falhas)
-```
-
-São `app/seguranca/page.copy.test.ts` (2 falhas de copy ausente na página) e
-`app/carros-usados/regiao/[slug]/page.config.test.ts` (3 falhas das flags
-`REGIONAL_PAGE_INDEXABLE` / `CANONICAL_SELF`). Nenhum dos dois está no diff.
-
-Verificações de tipo e estilo: `tsc --noEmit` limpo, `next lint --max-warnings 0`
-limpo, `prettier --check` limpo nos 10 arquivos tocados.
-
-Os testes de coluna existem por um motivo específico: eles falham se alguém
-trocar a classe global e a quarta coluna vazar para as outras quatro rotas.
-Asseguram que a diferença entre `"default"` e `"wide"` é *exatamente* a string
-`min-[1600px]:grid-cols-4`, e que nenhuma variante emite `lg:`, `xl:` ou `2xl:`
-com 4 colunas.
-
-O E2E mede bounding box real porque a classe no atributo `class` não prova que o
-navegador aplica a coluna — a regra pode não ter sido emitida no CSS, o container
-pode não crescer, outra regra pode vencer.
+`tsc --noEmit`, `next lint --max-warnings 0` e `prettier --check` limpos.
+Playwright: **18 passed**.
 
 ---
 
-## 16. Um erro que os testes quase esconderam
+## 18. Dois erros meus, registrados
 
-A primeira versão do teste "os blocos pós-catálogo não são mais montados" usava
-strings plausíveis, deduzidas do **nome dos componentes**:
+**Asserções de ausência vacuosas.** A lista de "blocos removidos" usava strings
+deduzidas do *nome* dos componentes ("Panorama do mercado", "Também na região
+de"…). Quatro das cinco **nunca existiram no HTML**: `not.toContain` de algo que
+jamais esteve lá é verde com ou sem a mudança. Descoberto ao comparar os `<h2>`
+dos dois builds; a lista foi refeita a partir do HTML medido e o teste ganhou uma
+contraprova (exige que H1 e cabeçalho de resultados continuem presentes).
 
-```
-"Também na região de"                  (NearbyRadiusSection)
-"Panorama do mercado"                  (CityAuthoritySection)
-"Lojas e vendedores em"                (DealerDiscovery)
-"Quantos carros usados estão à venda"  (FaqBlock)
-```
-
-Quatro dessas cinco strings **nunca existiram no HTML** — nem antes nem depois.
-`not.toContain` de algo que jamais esteve lá é verde com ou sem a mudança: o
-teste passava por vacuidade e não teria detectado se os blocos continuassem na
-página.
-
-Só percebi ao comparar os `<h2>` reais dos dois builds. Os títulos verdadeiros
-são outros ("O mercado de carros usados em Atibaia", "Sobre carros usados em
-Atibaia", …), e cada um aparecia 2 a 4 vezes no baseline. A lista foi refeita a
-partir do HTML medido, e o teste ganhou uma contraprova: ele exige que o H1 e o
-cabeçalho de resultados **continuem presentes**, para que uma página vazia não
-faça as seis ausências passarem por engano.
+**Seletor certo no elemento errado.** `main .grid` casava o grid de *layout*
+(sidebar + conteúdo): media "2 cards por linha" em qualquer largura, com card de
+624px. Não falhava — media outra coisa. O sinal foi o número absurdo. Corrigido
+ancorando em `[data-variant="grid"]`, que aparece 27 vezes (= 27 anúncios) e só
+como wrapper de card.
 
 ---
 
-## 17. Decisões de produto registradas
+## 19. Decisões de produto registradas
 
-- **Nenhum bloco substituto foi criado.** Sem chips, sem "Explore em Atibaia",
-  sem "conteúdo relacionado". A fase foi explícita: catálogo limpo > conteúdo SEO
-  visual pós-listagem.
-- **Os 5 links internos perdidos** (marcas/modelos daquela cidade) continuam
-  publicados em `brands.xml` e `models.xml`. A malha para o crawler não depende
-  do bloco visual.
-- **1024px continua em 3 colunas** com card de 189px. Comportamento anterior à
-  fase, mantido por estar fora do escopo.
+- **Nenhum bloco substituto** foi criado: sem chips, sem "Explore em Atibaia".
+  Os 5 links internos perdidos continuam publicados em `brands.xml`/`models.xml`.
+- **1366 fica em 3 colunas** enquanto o filtro de vendedor precisar de 296px de
+  sidebar (§6).
+- **Teto de 1600px:** em 1920 sobram 160px de margem de cada lado. É o que a fase
+  pediu ("max-width ~1560–1600px"); acima disso a linha de leitura ficaria longa
+  demais.
+- **1024px continua em 3 colunas** com card de 209px — comportamento anterior à
+  fase, fora de escopo, mas é a largura mais apertada da tabela.
 
 ---
 
-## 18. Evidências visuais
+## 20. Evidências visuais
 
-Em `reports/screenshots/fase-5-0b/` — 10 capturas da branch, 4 do baseline
-(`main`), e os JSON com todas as medidas de bounding box das duas versões.
+`reports/screenshots/fase-5-0b/` — 15 capturas da branch, 4 do baseline (`main`)
+e os JSON com todas as medidas.
 
 | Arquivo | O que mostra |
 |---|---|
-| `01-city-desktop-1280__branch` / `__baseline` | primeira dobra em 1280 — **hash SHA-256 idêntico** |
-| `02-city-desktop-1440__branch` | 3 colunas em 1440 |
-| `03-city-desktop-1920-4-colunas__branch` | as 4 colunas, cards de 281px |
-| `04-city-desktop-1280-fullpage__branch` / `__baseline` | página inteira, antes e depois |
-| `05-city-desktop-1920-fullpage__branch` | página inteira em 4 colunas |
-| `06-city-mobile-390__branch` / `__baseline` | mobile, primeira dobra |
-| `07-city-mobile-390-fullpage__branch` / `__baseline` | mobile inteiro — base da comparação por pixel |
-| `08-city-tablet-768__branch` | 2 colunas no tablet |
-| `09-city-paginacao-desktop__branch` | recorte do paginador `‹ 1 ›` |
-| `10-city-footer-transition__branch` | **cards → paginação → rodapé**, o objeto da fase |
-| `medidas__branch.json` / `medidas__baseline.json` | medidas cruas de cada viewport |
-
-O script que produz tudo isso está versionado em
-`frontend/scripts/fase-5-0b-capture.mjs` e roda contra qualquer `next start`
-(`node scripts/fase-5-0b-capture.mjs <porta> <rótulo> <saída>`), então a
-comparação pode ser refeita a qualquer momento.
+| `01-city-desktop-1280` (branch + baseline) | o antes e o depois em 1280 |
+| `02-city-desktop-1366` | 3 colunas, card de 323px |
+| `12-city-desktop-1392` | **o corte** — 4 colunas de 245px |
+| `03-city-desktop-1440` | **o obrigatório** — 4 colunas de 257px |
+| `04-city-desktop-1536` · `05-city-desktop-1600` · `06-city-desktop-1920` | 4 colunas |
+| `07-…-1440-fullpage` · `08-…-1920-fullpage` | página inteira |
+| `09/10-city-mobile-390` (branch + baseline) | base da comparação por pixel |
+| `11-city-tablet-768` | 2 colunas, inalterado |
+| `13-city-paginacao-desktop` · `14-city-footer-transition` | o fim da página |
+| `15-…-1280-fullpage` (branch + baseline) | o antes/depois com os blocos SEO |
 
 ---
 
-## 19. Como reproduzir a verificação
+## 21. Como reproduzir
 
 ```bash
 cd frontend && npm run build && npx next start -p 3000
 ```
 
 ```bash
-cd frontend && npx playwright test e2e/catalog-city-clean-grid.spec.ts --reporter=list
+cd frontend && node scripts/fase-5-0b-capture.mjs 3000 branch ../reports/screenshots/fase-5-0b
 ```
 
 ```bash
-cd frontend && npx vitest run components/buy/VehicleGrid.columns.test.tsx components/buy/CatalogPagination.test.tsx lib/seo/local-seo-data.resilience.test.ts
+cd frontend && node scripts/fase-5-0b-rotas-irmas.mjs 3000
 ```
 
-Para refazer a comparação com o baseline: `git checkout main`, rebuild, subir na
-mesma porta e rodar o script de captura com o rótulo `baseline`.
+```bash
+cd frontend && npx playwright test e2e/catalog-city-clean-grid.spec.ts --reporter=list
+```
 
 ---
 
-## 20. Estado da entrega
+## 22. Gate
 
-Dois commits na branch `codex/catalog-city-clean-desktop-grid`, à frente de
-`origin/main` em `190df7a5`:
-
-| Commit | Assunto |
+| | |
 |---|---|
-| `1aea9584` | `feat(catalogo)` — a mudança |
-| `ee9b0d57` | `test(catalogo)` — correção das asserções vacuosas (§16) |
+| 1440 mostra 4 cards | ✅ card 257px |
+| cards com largura saudável | ✅ 245px no piso (1392), 257 em 1440, 297 em 1600+ |
+| sidebar legível | ✅ zero transbordos em 296px; rótulo em 1 linha |
+| sem compressão de título/preço | ✅ verificado nas capturas de 1392 a 1920 |
+| sem quebra de CTA | ✅ travado por teste E2E de `scrollWidth` |
+| 1366 testado de verdade | ✅ testado e **reprovado** — 3 colunas, com o porquê no §6 |
+| 1536 e 1920 mostram 4 | ✅ 281px e 297px |
+| mobile intacto | ✅ 6 pixels de antialiasing; idêntico até a linha 5479 |
+| outras rotas intactas | ✅ 1280/320/3col/275px em 1920 |
+| paginação intacta | ✅ inerte com 1 página, 0 links |
+| limit 50 intacto | ✅ três constantes fora do diff |
+| rodapé imediato após paginação | ✅ vão de 48px |
+
+**Uma linha do gate não foi cumprida como pedida**: 1366 ficou em 3 colunas. O
+§6 traz a medição que levou a isso e a alternativa, caso a decisão de produto
+seja outra.
+
+---
+
+## 23. Estado da entrega
+
+Branch `codex/catalog-city-clean-desktop-grid`, à frente de `origin/main`
+(`190df7a5`).
 
 **Não foi feito push, PR, merge nem deploy.** Aguardando revisão.

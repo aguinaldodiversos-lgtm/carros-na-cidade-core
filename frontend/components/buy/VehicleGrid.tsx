@@ -46,7 +46,7 @@ type EmptyStateContext = {
  * Densidade de colunas do grid.
  *
  *   "default"  1 / 2 / 3 — o comportamento histórico, usado por TODAS as rotas.
- *   "wide"     1 / 2 / 3 / 4 — a quarta coluna entra só em telas ≥ 1600px.
+ *   "wide"     1 / 2 / 3 / 4 — a quarta coluna entra a partir de 1392px.
  *
  * ── Por que uma variante em vez de trocar `lg:grid-cols-3` por 4 ────────────
  * `VehicleGrid` é montado por `BuyMarketplacePageClient`, que serve CINCO rotas
@@ -54,26 +54,48 @@ type EmptyStateContext = {
  * `/carros-usados/regiao/[slug]` e `/carros-em/[slug]`). Trocar a classe global
  * mudaria as cinco de uma vez. Só a página de cidade pediu 4 colunas.
  *
- * ── Por que 1600px, e não 1440 ou 1536 ──────────────────────────────────────
- * Medido em produção: o card tem 275px em QUALQUER desktop, porque o container
- * é `max-w-7xl` (1280px) e não cresce. A largura disponível para cards é
+ * ── A coluna é consequência do shell, não a mudança em si ───────────────────
+ * No shell histórico o card tem 275px em QUALQUER desktop, porque o container é
+ * `max-w-7xl` (1280px) e não cresce:
  *
- *     1280 − 64 (px-8) − 320 (sidebar) − 32 (gap-8) = 864px
+ *     1280 − 64 (px-8) − 320 (sidebar) − 32 (gap-8) = 864px de área de cards
  *
- * Espremer 4 colunas nesses 864px dá **201px por card** (−27%) — foto e título
- * comprimidos. A quarta coluna só cabe sem perda se o CONTAINER crescer junto:
+ * Espremer 4 colunas nesses 864px dá **201px por card** — medido em runtime,
+ * não estimado. Foi por isso que a primeira versão desta variante colocou a
+ * quarta coluna só em 1600px: era a única largura em que o shell antigo
+ * comportava, e mesmo assim com card de 281px.
  *
- *     ≥1600px → container 1600 → (1600−64−320−32−60)/4 = 281px por card
+ * A variante `cidade` passou a usar um shell próprio e mais largo (teto 1600px,
+ * padding 24px, sidebar 296px, gap 20px — ver `BuyMarketplacePageClient`). Com
+ * ele a área de cards cresce ~80px em qualquer viewport:
  *
- * 281 > 275: os cards ficam ligeiramente MAIORES que hoje, não menores. Em
- * 1440 e 1536 a conta não fecha (241px e 265px), por isso essas larguras
- * continuam em 3 colunas.
+ *     1440 → 257px por card       1600  → 297px por card
+ *     1536 → 281px por card       1920  → 297px por card (container trava em 1600)
+ *
+ * ── De onde sai 1392, um número que ninguém escolheria ──────────────────────
+ * É a largura em que o card de 4 colunas atinge 245px, o piso que a fase fixou:
+ *
+ *     (V − 48 padding − 296 sidebar − 20 gap − 48 gaps de card) / 4 ≥ 245
+ *     V ≥ 1392
+ *
+ * Não é um breakpoint "redondo" porque não foi escolhido: foi resolvido. Abaixo
+ * dele a quarta coluna existiria comprimindo o card, que é exatamente o que a
+ * fase proibiu.
+ *
+ * Em 1366 — testado a pedido — a conta dá 238px. Só passaria de 245 com a
+ * sidebar em 270px ou menos, e aí o botão "Particulares (0)" do filtro de
+ * vendedor estoura a própria caixa (medido: 296px é o mínimo em que nada
+ * transborda). Preferiu-se a sidebar íntegra à quarta coluna nessa largura.
+ *
+ * Abaixo de 1392, 3 colunas — e o shell largo aparece como card MAIOR, não como
+ * coluna extra: 295px em 1280 e 323px em 1366, contra os 275px do shell
+ * histórico.
  */
 export type VehicleGridColumns = "default" | "wide";
 
 const GRID_COLUMNS: Record<VehicleGridColumns, string> = {
   default: "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5",
-  wide: "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5 min-[1600px]:grid-cols-4",
+  wide: "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 min-[1392px]:grid-cols-4",
 };
 
 type VehicleGridProps = {
