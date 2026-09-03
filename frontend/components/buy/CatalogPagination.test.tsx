@@ -129,9 +129,7 @@ describe("CatalogPagination — URLs inválidas nunca viram link", () => {
 describe("CatalogPagination — filtros preservados no href", () => {
   it("o href sai do builder do caller, com os filtros ativos", () => {
     const comFiltro = (page: number) =>
-      page >= 2
-        ? `${CIDADE}?brand=Honda&page=${page}`
-        : `${CIDADE}?brand=Honda`;
+      page >= 2 ? `${CIDADE}?brand=Honda&page=${page}` : `${CIDADE}?brand=Honda`;
 
     render(<CatalogPagination page={1} totalPages={3} buildHref={comFiltro} onPatch={vi.fn()} />);
 
@@ -146,9 +144,7 @@ describe("CatalogPagination — filtros preservados no href", () => {
         ? `/carros-em/braganca-paulista-sp?page=${page}`
         : "/carros-em/braganca-paulista-sp";
 
-    render(
-      <CatalogPagination page={1} totalPages={3} buildHref={outraCidade} onPatch={vi.fn()} />
-    );
+    render(<CatalogPagination page={1} totalPages={3} buildHref={outraCidade} onPatch={vi.fn()} />);
 
     for (const href of links().map((a) => a.getAttribute("href") ?? "")) {
       expect(href).toContain("braganca-paulista-sp");
@@ -174,5 +170,107 @@ describe("CatalogPagination — navegação client-side continua", () => {
     expect(link.getAttribute("href")).toBe(buildHref(4));
     link.click();
     expect(onPatch).toHaveBeenCalledWith({ page: 4 });
+  });
+});
+
+/**
+ * Fase 5.0B — o paginador como ENCERRAMENTO VISUAL.
+ *
+ * `/carros-em/[slug]` perdeu os blocos pós-catálogo. Sem eles, o último card
+ * emendava direto no rodapé, sem nenhum sinal de que a lista tinha acabado. O
+ * paginador de uma página passa a ser esse sinal — mas continua sendo apenas
+ * isso: não navega, não vira link, e acima de tudo NÃO emite `?page=1`, que
+ * seria uma segunda grafia da vitrine.
+ */
+describe("CatalogPagination — página única (showSinglePage)", () => {
+  it("por padrão continua invisível com uma página só", () => {
+    const { container } = render(
+      <CatalogPagination page={1} totalPages={1} buildHref={buildHref} onPatch={vi.fn()} />
+    );
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("com showSinglePage, renderiza ‹ 1 ›", () => {
+    render(
+      <CatalogPagination
+        page={1}
+        totalPages={1}
+        buildHref={buildHref}
+        onPatch={vi.fn()}
+        showSinglePage
+      />
+    );
+
+    expect(screen.getByRole("navigation", { name: /pagina|paginação/i })).toBeTruthy();
+    expect(screen.getByText("1")).toBeTruthy();
+  });
+
+  it("com uma página, NENHUM href é emitido — nem `?page=1`", () => {
+    render(
+      <CatalogPagination
+        page={1}
+        totalPages={1}
+        buildHref={buildHref}
+        onPatch={vi.fn()}
+        showSinglePage
+      />
+    );
+
+    expect(links()).toHaveLength(0);
+    expect(document.body.innerHTML).not.toContain("page=1");
+  });
+
+  it("a página atual é aria-current e não é link", () => {
+    render(
+      <CatalogPagination
+        page={1}
+        totalPages={1}
+        buildHref={buildHref}
+        onPatch={vi.fn()}
+        showSinglePage
+      />
+    );
+
+    const atual = document.querySelector('[aria-current="page"]');
+    expect(atual?.textContent).toBe("1");
+    expect(atual?.tagName).toBe("SPAN");
+  });
+
+  it("as duas setas ficam desabilitadas (span, não <a>)", () => {
+    const { container } = render(
+      <CatalogPagination
+        page={1}
+        totalPages={1}
+        buildHref={buildHref}
+        onPatch={vi.fn()}
+        showSinglePage
+      />
+    );
+
+    // 2 setas + o número, todos como <span>; zero <a> e zero <button>.
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(container.querySelectorAll('[rel="prev"], [rel="next"]')).toHaveLength(0);
+  });
+
+  it("showSinglePage NÃO altera o comportamento com várias páginas", () => {
+    render(
+      <CatalogPagination
+        page={2}
+        totalPages={3}
+        buildHref={buildHref}
+        onPatch={vi.fn()}
+        showSinglePage
+      />
+    );
+
+    const hrefs = links().map((a) => a.getAttribute("href"));
+    // Página 1 continua limpa; 2 é a atual (sem link); 3 recebe `?page=3`.
+    expect(hrefs).toContain(CIDADE);
+    expect(hrefs).toContain(`${CIDADE}?page=3`);
+    expect(hrefs).not.toContain(`${CIDADE}?page=1`);
+    expect(document.querySelector('[rel="prev"]')?.getAttribute("href")).toBe(CIDADE);
+    expect(document.querySelector('[rel="next"]')?.getAttribute("href")).toBe(`${CIDADE}?page=3`);
+    expect(document.querySelector('[aria-current="page"]')?.textContent).toBe("2");
   });
 });

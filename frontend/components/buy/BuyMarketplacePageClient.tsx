@@ -223,21 +223,11 @@ export default function BuyMarketplacePageClient({
     [initialFilters, pathname, radiusKm]
   );
 
-  // Muda SÓ o raio de vizinhança: preserva os filtros de veículo atuais e seta o
-  // novo `?raio=` (padrão 50 → sem parâmetro). É ação do usuário descartada pelo
-  // canonical — não gera URL indexável (generateMetadata ignora searchParams).
-  const changeRadius = useCallback(
-    (km: number) => {
-      const queryString = buildSearchQueryString(initialFilters);
-      const parts: string[] = [];
-      if (queryString) parts.push(queryString);
-      if (km && km !== DEFAULT_RADIUS_KM) parts.push(`raio=${km}`);
-      const qs = parts.join("&");
-      router.push(qs ? `${pathname}?${qs}` : pathname);
-      setMobileFiltersOpen(false);
-    },
-    [initialFilters, pathname, router]
-  );
+  // `changeRadius` foi removido na Fase 5.0B junto com o seletor de distância:
+  // sem `onRadiusChange`, nenhuma variante monta o slider, e o handler ficaria
+  // inalcançável. `radiusKm` continua sendo PRESERVADO nos hrefs de paginação e
+  // filtro logo acima — uma URL antiga com `?raio=` não perde o parâmetro ao
+  // paginar.
 
   const clearFilters = useCallback(() => {
     // Limpar zera TUDO (chips, selects e o raio) → cidade limpa (padrão 50).
@@ -278,6 +268,18 @@ export default function BuyMarketplacePageClient({
       initialFilters.priority_tier === 4
   );
 
+  /**
+   * A vitrine de CIDADE (`/carros-em/[slug]`) é a única que recebe o tratamento
+   * "catálogo limpo" da Fase 5.0B: container mais largo e quarta coluna em telas
+   * ≥1600px, e paginador visível mesmo com uma página só.
+   *
+   * As outras quatro rotas servidas por este componente (`/comprar`,
+   * `/comprar/estado/[uf]`, `/carros-usados/[uf]`, `/carros-usados/regiao/[slug]`)
+   * seguem exatamente como estavam. Toda diferença desta fase passa por esta
+   * flag — é o único ponto a inspecionar para saber o que muda e onde.
+   */
+  const isCityVariant = variant === "cidade";
+
   const emptyContext = {
     variant,
     citySlug: variant === "cidade" || variant === "regional" ? city.slug : undefined,
@@ -301,11 +303,17 @@ export default function BuyMarketplacePageClient({
     onClear: clearFilters,
     regionalEnabled,
     controlTotals,
-    // Seletor "Distância (km)" só é útil na página de cidade (raio da
-    // vizinhança). Passamos o handler apenas nessa variante — nas outras a
-    // sidebar esconde o seletor (sem onRadiusChange).
+    // Seletor "Distância (km)" — a sidebar só o mostra quando recebe
+    // `onRadiusChange` (ver `showDistance` em FilterSidebar).
+    //
+    // Fase 5.0B: a página de cidade DEIXOU de mostrá-lo. O raio controlava
+    // exclusivamente o bloco "Próximos, até X km" (`NearbyRadiusSection`), que
+    // saiu desta rota. Manter o slider seria oferecer um controle que muda a URL
+    // (`?raio=`) e não muda nada na tela — pior que não ter controle nenhum.
+    //
+    // As outras variantes nunca receberam o handler, então nada muda para elas.
     radiusKm,
-    onRadiusChange: variant === "cidade" ? changeRadius : undefined,
+    onRadiusChange: undefined,
   };
 
   return (
@@ -373,7 +381,23 @@ export default function BuyMarketplacePageClient({
       />
 
       <main>
-        <div className="mx-auto w-full max-w-7xl px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12">
+        {/*
+          Container do catálogo.
+
+          `max-w-7xl` (1280px) continua sendo o container de TODAS as rotas. A
+          página de cidade ganha um teto maior a partir de 1600px — e SÓ ela —
+          porque é a única que recebe a quarta coluna (`columns="wide"` no
+          `VehicleGrid`). Sem alargar o container, a quarta coluna espremeria o
+          card de 275px para 201px; com 1600px, ele fica em 281px.
+
+          Abaixo de 1600px nada muda em rota nenhuma: mesmo container, mesmo
+          grid, mesmo card. Ver a nota de geometria em `VehicleGrid.tsx`.
+        */}
+        <div
+          className={`mx-auto w-full max-w-7xl px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-8 lg:pb-12 ${
+            isCityVariant ? "min-[1600px]:max-w-[1600px]" : ""
+          }`}
+        >
           <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:items-start lg:gap-8">
             <aside className="hidden lg:sticky lg:top-[76px] lg:block lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pb-8 lg:pr-1">
               <FilterSidebar {...sidebarProps} />
@@ -424,12 +448,24 @@ export default function BuyMarketplacePageClient({
                 hideSort={false}
               />
 
-              <VehicleGrid items={items} inferWeight={inferWeight} emptyContext={emptyContext} />
+              <VehicleGrid
+                items={items}
+                inferWeight={inferWeight}
+                emptyContext={emptyContext}
+                columns={isCityVariant ? "wide" : "default"}
+              />
+              {/*
+                `showSinglePage` só na cidade: a página perdeu os blocos SEO que
+                antes marcavam o fim da listagem, e sem eles o catálogo emendava
+                direto no rodapé. O paginador de uma página é o encerramento
+                visual — não muda URL nem emite `?page=1`.
+              */}
               <CatalogPagination
                 page={currentPage}
                 totalPages={totalPages}
                 buildHref={buildPageHref}
                 onPatch={(patch) => pushPage(patch)}
+                showSinglePage={isCityVariant}
               />
             </div>
           </div>

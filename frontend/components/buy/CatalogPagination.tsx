@@ -38,6 +38,19 @@ type CatalogPaginationProps = {
    */
   buildHref: (page: number) => string;
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
+  /**
+   * Renderizar o paginador mesmo quando existe UMA página só.
+   *
+   * Por padrão `false` — um paginador de página única não acrescenta navegação
+   * e polui as vitrines que já têm conteúdo depois da listagem.
+   *
+   * `/carros-em/[slug]` liga isto (Fase 5.0B) porque a página perdeu os blocos
+   * pós-catálogo: sem o paginador, o último card emendava direto no rodapé, sem
+   * nenhum sinal de "a lista acabou". Aqui o paginador é encerramento visual,
+   * não navegação — e continua sem emitir `?page=1`: com uma página só, as duas
+   * setas ficam desabilitadas (`<span>`) e o "1" é `aria-current`, sem `href`.
+   */
+  showSinglePage?: boolean;
 };
 
 function buildPageSequence(page: number, totalPages: number): number[] {
@@ -102,16 +115,20 @@ export function CatalogPagination({
   totalPages,
   buildHref,
   onPatch,
+  showSinglePage = false,
 }: CatalogPaginationProps) {
   const safeTotalPages = Math.max(1, Math.trunc(Number(totalPages) || 1));
   const currentPage = clampPage(Number(page), safeTotalPages);
 
+  // `buildPageSequence` devolve `[]` para uma página — o comportamento que a
+  // guarda abaixo espera. Quando o paginador é encerramento visual, a sequência
+  // é o próprio "1", que sai como `aria-current` sem `href`.
   const pages = useMemo(
-    () => buildPageSequence(currentPage, safeTotalPages),
+    () => (safeTotalPages <= 1 ? [1] : buildPageSequence(currentPage, safeTotalPages)),
     [currentPage, safeTotalPages]
   );
 
-  if (safeTotalPages <= 1) return null;
+  if (safeTotalPages <= 1 && !showSinglePage) return null;
 
   const go = (target: number) => {
     if (target < 1 || target > safeTotalPages || target === currentPage) return;

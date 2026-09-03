@@ -7,10 +7,7 @@ import { Card } from "@/components/ui/Card";
 import type { CatalogItem } from "@/components/buy/CatalogVehicleCard";
 import CatalogVehicleCard from "@/components/buy/CatalogVehicleCard";
 import { stateNameFromUf } from "@/lib/buy/territory-variant";
-import {
-  buildEmptyStateCopy,
-  type EmptyStateVariant,
-} from "@/lib/public-contracts";
+import { buildEmptyStateCopy, type EmptyStateVariant } from "@/lib/public-contracts";
 
 /**
  * VehicleGrid + Empty State.
@@ -45,10 +42,46 @@ type EmptyStateContext = {
   hasFilters?: boolean;
 };
 
+/**
+ * Densidade de colunas do grid.
+ *
+ *   "default"  1 / 2 / 3 — o comportamento histórico, usado por TODAS as rotas.
+ *   "wide"     1 / 2 / 3 / 4 — a quarta coluna entra só em telas ≥ 1600px.
+ *
+ * ── Por que uma variante em vez de trocar `lg:grid-cols-3` por 4 ────────────
+ * `VehicleGrid` é montado por `BuyMarketplacePageClient`, que serve CINCO rotas
+ * (`/comprar`, `/comprar/estado/[uf]`, `/carros-usados/[uf]`,
+ * `/carros-usados/regiao/[slug]` e `/carros-em/[slug]`). Trocar a classe global
+ * mudaria as cinco de uma vez. Só a página de cidade pediu 4 colunas.
+ *
+ * ── Por que 1600px, e não 1440 ou 1536 ──────────────────────────────────────
+ * Medido em produção: o card tem 275px em QUALQUER desktop, porque o container
+ * é `max-w-7xl` (1280px) e não cresce. A largura disponível para cards é
+ *
+ *     1280 − 64 (px-8) − 320 (sidebar) − 32 (gap-8) = 864px
+ *
+ * Espremer 4 colunas nesses 864px dá **201px por card** (−27%) — foto e título
+ * comprimidos. A quarta coluna só cabe sem perda se o CONTAINER crescer junto:
+ *
+ *     ≥1600px → container 1600 → (1600−64−320−32−60)/4 = 281px por card
+ *
+ * 281 > 275: os cards ficam ligeiramente MAIORES que hoje, não menores. Em
+ * 1440 e 1536 a conta não fecha (241px e 265px), por isso essas larguras
+ * continuam em 3 colunas.
+ */
+export type VehicleGridColumns = "default" | "wide";
+
+const GRID_COLUMNS: Record<VehicleGridColumns, string> = {
+  default: "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5",
+  wide: "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5 min-[1600px]:grid-cols-4",
+};
+
 type VehicleGridProps = {
   items: CatalogItem[];
   inferWeight: (item: CatalogItem) => 1 | 2 | 3 | 4;
   emptyContext?: EmptyStateContext;
+  /** Densidade de colunas. Omitido = comportamento histórico (1/2/3). */
+  columns?: VehicleGridColumns;
 };
 
 function resolveEmptyVariant(ctx: EmptyStateContext): EmptyStateVariant {
@@ -173,14 +206,19 @@ function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
   );
 }
 
-export function VehicleGrid({ items, inferWeight, emptyContext }: VehicleGridProps) {
+export function VehicleGrid({
+  items,
+  inferWeight,
+  emptyContext,
+  columns = "default",
+}: VehicleGridProps) {
   if (items.length === 0) {
     const ctx: EmptyStateContext = emptyContext ?? { variant: "nacional" };
     return <EmptyState ctx={ctx} />;
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5">
+    <div className={GRID_COLUMNS[columns]}>
       {items.map((item, index) => (
         <CatalogVehicleCard
           key={`card-${item.id ?? item.slug ?? item.title ?? index}`}

@@ -3,20 +3,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import BuyMarketplacePageClient from "@/components/buy/BuyMarketplacePageClient";
-import { NearbyRadiusSection } from "@/components/buy/NearbyRadiusSection";
-import { CityAuthoritySection } from "@/components/seo/CityAuthoritySection";
-import { CompactCitySeoBlock } from "@/components/seo/CompactCitySeoBlock";
-import { FaqBlock } from "@/components/seo/FaqBlock";
-import { loadCitySeoOverview } from "@/lib/seo/city-seo-overview";
-import {
-  buildCityFaqEntries,
-  buildCityInventoryFaqEntries,
-  buildFaqPageJsonLd,
-} from "@/lib/seo/faq";
 import { isRegionalPageEnabled } from "@/lib/env/feature-flags";
 import { loadCityCatalogData } from "@/lib/buy/city-catalog-loader";
-import { loadNearbyRadiusAds } from "@/lib/buy/city-radius-catalog";
-import { parseRadiusParam } from "@/lib/buy/regional-radius-config";
 import { isValidBrazilianCitySlug, type SearchParams } from "@/lib/buy/territory-variant";
 import { normalizePublicAd } from "@/lib/public-contracts";
 import {
@@ -75,7 +63,18 @@ interface PageProps {
 export const dynamic = "force-dynamic";
 void LOCAL_SEO_REVALIDATE; // import preservado por compat (ver doc acima)
 
-const loadSeoModel = cache((slug: string) => loadLocalSeoLanding(slug, "em"));
+/**
+ * Modelo de conteúdo local — usado por `generateMetadata` e pelos JSON-LD.
+ *
+ * `onServiceFailure: "degrade"` (Fase 5.0B, §6): esta rota tem catálogo
+ * transacional próprio, vindo de outro loader. Uma queda do serviço de conteúdo
+ * não pode devolver 404 numa cidade com estoque no ar — degrada para
+ * `noindex, follow` e o catálogo continua servindo. Cidade que de fato não
+ * existe continua 404: o `notFound()` interno é re-lançado.
+ */
+const loadSeoModel = cache((slug: string) =>
+  loadLocalSeoLanding(slug, "em", { onServiceFailure: "degrade" })
+);
 
 export async function generateMetadata({
   params,
@@ -100,32 +99,22 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   const slug = String(params.slug || "").trim();
   if (!isValidBrazilianCitySlug(slug)) notFound();
 
-  // SEO model carrega em paralelo com o catálogo. Falha aqui chama
-  // notFound() internamente, então usamos try/catch no caller.
   const regionalEnabled = isRegionalPageEnabled();
 
-  // Filtro "Distância (km)" = AÇÃO DO USUÁRIO via `?raio=` (25/50/75/100, padrão
-  // 50). Controla SÓ o raio do bloco "Próximos"; o catálogo próprio (0 km) não
-  // muda. Não afeta canonical/robots (generateMetadata ignora searchParams → a
-  // URL com `?raio=` é sempre deduplicada para a cidade limpa). Ver parseRadiusParam.
-  const radiusKm = parseRadiusParam(searchParams?.raio);
-
-  const [model, catalog, nearbyResult, overviewResult] = await Promise.all([
+  // Fase 5.0B — catálogo limpo. Caíram daqui, junto com os blocos que
+  // alimentavam, `loadNearbyRadiusAds` e `loadCitySeoOverview`: eram duas
+  // chamadas de rede por request servindo conteúdo que a página não renderiza
+  // mais. `?raio=` deixa de ser lido porque o único consumidor era o bloco
+  // "Próximos".
+  //
+  // Sobram DUAS cargas: o conteúdo local (metadata + JSON-LD) e o catálogo.
+  const [model, catalog] = await Promise.all([
     loadSeoModel(slug),
-    // applyTerritoryFallback=false: o catálogo PRINCIPAL é o bloco "Em [cidade]"
-    // — só anúncios da própria cidade (0 km). A vizinhança (raio) vem no bloco
-    // separado <NearbyRadiusSection>, com procedência+distância por card. Isso
-    // substitui o antigo <AlsoInRegionBlock> (âncora regional — Onda 2 Fase 2a).
+    // applyTerritoryFallback=false: o catálogo é só a própria cidade (0 km).
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
-    loadNearbyRadiusAds(slug, { radiusKm }),
-    // Camada de autoridade local (Fase 3). Falha do backend devolve
-    // `unavailable`, NÃO um overview vazio — os módulos somem em vez de
-    // afirmar "0 veículos" numa cidade que tem estoque.
-    loadCitySeoOverview(slug),
   ]);
 
   const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
-  const overview = overviewResult.status === "ok" ? overviewResult.overview : null;
 
   // Defesa em profundidade — briefing P2-B 2026-05-25:
   // backend já filtra DIRTY + price>0; `normalizePublicAd` é o último
@@ -136,51 +125,21 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
     data: (rawResults.data || []).filter((ad) => normalizePublicAd(ad) !== null),
   };
 
-  // areaServed (âncora regional — Onda 2 Fase 2a): cidade da página + cidades
-  // de COBERTURA dentro do raio. Só NOMES de cidade — nunca bairro (respeita a
-  // trava PF). Sinaliza ao Google a geografia atendida sem criar entidade
-  // concorrente (a identidade segue na própria cidade, self-canonical).
-  const areaServed = [
-    { "@type": "City", name: ctx.name, ...(ctx.state ? { addressRegion: ctx.state } : {}) },
-    ...nearbyResult.coverageCities.map((c) => ({
-      "@type": "City",
-      name: c.name,
-      ...(c.state ? { addressRegion: c.state } : {}),
-    })),
-  ];
-
   // CollectionPage canônico. O `mainEntity` (ItemList) é sobrescrito mais
-  // abaixo pelos anúncios realmente renderizados. `areaServed` só entra quando
-  // há cobertura real de vizinhança (>1 = base + pelo menos uma cidade no raio).
-  const jsonLd: Record<string, unknown> = {
-    ...buildLocalSeoJsonLd(model),
-    ...(areaServed.length > 1 ? { areaServed } : {}),
-  };
+  // abaixo pelos anúncios realmente renderizados.
+  //
+  // `areaServed` saiu junto com o bloco "Próximos" (Fase 5.0B): ele era montado
+  // de `nearbyResult.coverageCities`, e declarar cobertura de vizinhança num
+  // schema cuja página não mostra mais nenhuma cidade vizinha seria afirmar o
+  // que a página não sustenta.
+  const jsonLd: Record<string, unknown> = { ...buildLocalSeoJsonLd(model) };
   const breadcrumbJsonLd = buildLocalSeoBreadcrumbJsonLd(model);
 
-  // Fase 4.3 (§7) — FAQ útil e específico da cidade. O FAQPage JSON-LD só é
-  // emitido porque o FaqBlock abaixo renderiza as MESMAS perguntas (visível).
-  //
-  // Fase 3: as perguntas de INVENTÁRIO vêm primeiro (são as que só esta
-  // cidade responde) e são geradas do mesmo `overview` que alimenta os
-  // módulos acima — se o número muda na página, muda no FAQ e no schema
-  // junto. Sem overview (backend indisponível ou cidade vazia) restam as
-  // perguntas de processo, que continuam verdadeiras.
-  const faqEntries = [
-    ...(overview
-      ? buildCityInventoryFaqEntries({
-          cityName: overview.city.name,
-          activeAds: overview.inventory.activeAds,
-          activeDealers: overview.inventory.activeDealers,
-          automaticCount: overview.inventory.automaticCount,
-          belowFipeCount: overview.inventory.belowFipeCount,
-          brandLabels: overview.brands.map((b) => b.label),
-          medianPrice: overview.priceStats.publishable ? overview.priceStats.medianPrice : null,
-        })
-      : []),
-    ...buildCityFaqEntries({ cityName: ctx.name, stateUf: ctx.state }),
-  ];
-  const faqJsonLd = buildFaqPageJsonLd(faqEntries);
+  // O FAQPage saiu com o `FaqBlock` (Fase 5.0B, §4). A regra é a que a Fase 4.3
+  // escreveu ao criá-lo: o schema só existia porque as MESMAS perguntas eram
+  // renderizadas de forma visível. Sem a FAQ na página, manter o `FAQPage` seria
+  // schema sem conteúdo correspondente — o que o Google trata como spam
+  // estrutural. Os dois saem juntos, sempre.
 
   // ItemList ÚNICO (Fase 3, Etapa 44).
   //
@@ -225,13 +184,21 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       ) : null}
-      {faqJsonLd ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-        />
-      ) : null}
+      {/*
+        Fase 5.0B — a página termina no catálogo.
 
+        O `BuyMarketplacePageClient` é o ÚLTIMO elemento antes do rodapé. Com
+        `variant="cidade"` ele entrega o grid de 4 colunas em telas ≥1600px e o
+        paginador visível mesmo com uma página só — que é o que marca o fim da
+        listagem agora que não há mais nada entre ela e o `PublicFooter`.
+
+        Saíram daqui: `NearbyRadiusSection`, `CityAuthoritySection`,
+        `CompactCitySeoBlock` e `FaqBlock`. Os componentes continuam no projeto e
+        intactos; esta rota só deixou de montá-los. A auditoria da Fase 5.0
+        mediu o que eles ocupavam: 1704px no desktop (1,9 viewport) e 2509px no
+        mobile (3 rolagens), para produzir 5 links internos — links que os
+        sitemaps `brands.xml`/`models.xml` já publicam.
+      */}
       <BuyMarketplacePageClient
         initialResults={initialResults}
         initialFacets={initialFacets}
@@ -240,41 +207,7 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
         variant="cidade"
         stateUf={ctx.state}
         regionalEnabled={regionalEnabled}
-        radiusKm={radiusKm}
       />
-
-      {/* Wrapper com pb-20 md:pb-0 — o `BuyPageShell` reserva esse
-          espaço internamente porque o `SiteBottomNav` mobile é fixed,
-          mas tudo que renderiza DEPOIS do shell precisa replicar o
-          mesmo padding para não ficar coberto pela bottom nav. */}
-      <div className="bg-cnc-bg pb-20 md:pb-0">
-        {/* Bloco "Próximos, até X km" — vizinhança por raio (âncora regional,
-            Onda 2 Fase 2a): anúncios de cidades vizinhas ordenados por
-            distância, cada card com procedência + "~X km". Marco 0 km = a
-            própria cidade (bloco principal acima). Renderiza null quando não há
-            vizinhas com estoque. Substitui o antigo AlsoInRegionBlock. */}
-        <NearbyRadiusSection result={nearbyResult} cityName={ctx.name} />
-
-        {/* Camada de autoridade local (Fase 3) — Server Component puro:
-            mercado, marcas, modelos comerciais, lojas e cidades próximas,
-            tudo derivado do inventário ativo DESTA cidade. Ausente quando o
-            backend está indisponível (nunca renderiza "0 veículos" por falha)
-            e quando a cidade não tem estoque (nada a dizer). */}
-        {overview ? <CityAuthoritySection overview={overview} /> : null}
-
-        {/* Bloco SEO mínimo pós-paginação. Sem stats grandes, sem
-            "Continue explorando", sem CTAs grandes — o briefing
-            2026-05-22 vetou expressamente o "segundo rodapé".
-            Renderiza apenas h2 + parágrafo curto + marcas frequentes. */}
-        <CompactCitySeoBlock model={model} />
-
-        {/* FAQ visível — perguntas reais e específicas (compra segura, FIPE,
-            documentação) com contexto da cidade. Alimenta o FAQPage acima. */}
-        <FaqBlock
-          title={`Perguntas frequentes sobre comprar carro usado em ${ctx.name}`}
-          entries={faqEntries}
-        />
-      </div>
     </>
   );
 }

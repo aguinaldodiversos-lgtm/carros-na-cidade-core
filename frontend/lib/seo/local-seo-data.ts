@@ -204,9 +204,90 @@ async function ensureAvgPrice(
   return averagePriceFromAds(res.data);
 }
 
+/**
+ * Opções de carga do modelo de landing local.
+ *
+ * `onServiceFailure` separa duas coisas que o `catch` genérico confundia:
+ *
+ *   "esta cidade não existe"        → 404 é a resposta certa
+ *   "o serviço de conteúdo caiu"    → 404 é a resposta ERRADA
+ *
+ * Auditoria da Fase 5.0 (§25): este loader alimenta só metadata e JSON-LD, mas
+ * a falha dele derrubava a PÁGINA INTEIRA — inclusive o catálogo transacional,
+ * que vem de outro loader e estava perfeitamente disponível. Um blip de rede no
+ * endpoint territorial virava 404 numa cidade com 27 anúncios no ar.
+ *
+ * `"degrade"` é opt-in por rota: as landings irmãs (`/carros-baratos-em`,
+ * `/carros-automaticos-em`) seguem com `"not-found"`, o comportamento
+ * histórico, porque nelas o conteúdo SEO É a página — sem ele não há o que
+ * mostrar. Em `/carros-em/[slug]` há.
+ */
+export type LocalSeoLoadOptions = {
+  onServiceFailure?: "not-found" | "degrade";
+};
+
+/**
+ * `notFound()` sinaliza lançando um erro com `digest === "NEXT_NOT_FOUND"`.
+ * Sem esta checagem, o `catch` do loader engoliria o 404 legítimo lançado lá
+ * dentro e o transformaria em página degradada — exatamente o oposto do que a
+ * separação existe para garantir.
+ */
+function isNextNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    (error as { digest?: unknown }).digest === "NEXT_NOT_FOUND"
+  );
+}
+
+/**
+ * Modelo mínimo derivado só do slug, para quando o serviço de conteúdo cai.
+ *
+ * `totalAds: 0` faz `shouldIndexLocalSeo` devolver `noindex, follow` — de
+ * propósito: sem conseguir confirmar o estoque, o certo é não afirmar
+ * indexabilidade. É uma degradação temporária e reversível; um 404 não é.
+ */
+function buildDegradedLandingModel(
+  slug: string,
+  variant: LocalSeoVariant,
+  paths: LocalSeoLandingModel["paths"]
+): LocalSeoLandingModel {
+  const parts = slug.split("-").filter(Boolean);
+  const maybeUf = parts.length > 1 ? parts[parts.length - 1] : "";
+  const state = /^[a-z]{2}$/i.test(maybeUf) ? maybeUf.toUpperCase() : "";
+  const nameParts = state ? parts.slice(0, -1) : parts;
+  const cityName = nameParts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ") || slug;
+
+  const base: Omit<LocalSeoLandingModel, "paragraphs" | "h1"> = {
+    variant,
+    slug,
+    cityName,
+    state,
+    region: null,
+    totalAds: 0,
+    catalogTotalAds: 0,
+    avgPrice: null,
+    minPrice: null,
+    maxPrice: null,
+    belowFipeCount: 0,
+    topBrands: [],
+    sampleAds: [],
+    isEmptyVariant: true,
+    isEmptyCity: true,
+    comprarHref: "/comprar",
+    hubHref: `/cidade/${encodeURIComponent(slug)}`,
+    paths,
+  };
+
+  const h1 = `Carros em ${cityName}${state ? ` — ${state}` : ""}`;
+  return { ...base, h1, paragraphs: buildParagraphs({ ...base, h1 }) };
+}
+
 export async function loadLocalSeoLanding(
   slug: string,
-  variant: LocalSeoVariant
+  variant: LocalSeoVariant,
+  options: LocalSeoLoadOptions = {}
 ): Promise<LocalSeoLandingModel> {
   const safeSlug = String(slug || "").trim();
   if (!safeSlug) notFound();
@@ -402,7 +483,23 @@ export async function loadLocalSeoLanding(
       h1,
       paragraphs: buildParagraphs({ ...base, h1 }),
     };
-  } catch {
+  } catch (error) {
+    // `notFound()` funciona lançando NEXT_NOT_FOUND — este catch veria esse
+    // throw e o converteria em outra coisa. Re-lançar preserva o 404 legítimo
+    // ("cidade não existe") mesmo no modo degradado.
+    if (isNextNotFoundError(error)) throw error;
+
+    if (options.onServiceFailure === "degrade") {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[local-seo-data] ${safeSlug}/${variant} → conteúdo indisponível; ` +
+          `servindo modelo degradado (noindex) em vez de 404: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+      );
+      return buildDegradedLandingModel(safeSlug, variant, paths);
+    }
+
     notFound();
   }
 }
