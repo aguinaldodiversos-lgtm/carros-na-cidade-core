@@ -171,6 +171,11 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
           fuel_type: "flex",
           transmission: "manual",
           below_fipe: false,
+          // `images` virou obrigatório no validador (min 1): "Anúncio precisa de pelo
+          // menos 1 foto válida." O fixture ficou para trás e derrubava 6 dos 14
+          // casos deste arquivo com `fieldErrors: { images: ["Required"] }`.
+          // A regra é de produto e continua valendo — quem estava errado era o payload.
+          images: ["https://img.carrosnacidade.com/integration/foto-1.webp"],
         };
 
         const row = await createAdNormalized(
@@ -295,6 +300,8 @@ describe.skipIf(!shouldRunAdsIntegrationTests())(
           fuel_type: "flex",
           transmission: "automatico",
           below_fipe: false,
+          // Mesma exigência de foto do payload acima.
+          images: ["https://img.carrosnacidade.com/integration/foto-2.webp"],
         };
 
         const row = await createAdNormalized(
