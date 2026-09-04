@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import SaleRequestDetail from "./SaleRequestDetail";
 import DealerSaleOpportunityDetail from "./DealerSaleOpportunityDetail";
@@ -63,6 +63,38 @@ vi.mock("@/lib/sale-requests/api", async (importOriginal) => {
     confirmInspectionSlot: (...args: unknown[]) => confirmInspectionSlot(...args),
     requestNewInspectionSlots: (...args: unknown[]) => requestNewInspectionSlots(...args),
   };
+});
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * FUSO DECLARADO — este arquivo afirma HORÁRIOS DE PAREDE
+ * ════════════════════════════════════════════════════════════════════════════
+ * As fixtures trazem instantes com offset explícito (`2026-08-25T10:00:00-03:00`)
+ * e as asserções são literais: `"25/08 às 10:00"`. Um literal desses não é
+ * propriedade do instante — é propriedade do instante MAIS o fuso de quem lê.
+ *
+ * E ler no fuso de quem lê é o contrato deliberado de `formatSlot`, documentado
+ * em `lib/sale-requests/inspection.ts`: o proprietário em Manaus e a loja em
+ * Atibaia veem o mesmo instante, cada um no relógio da parede dele. A produção
+ * está certa; o que faltava era o teste dizer de qual parede está falando.
+ *
+ * Sem esta linha o arquivo passava na máquina de quem escreveu (UTC−3) e
+ * falhava no runner do CI (UTC) por exatamente 3 horas — quatro testes vermelhos
+ * que não descreviam defeito nenhum. Ver
+ * `lib/sale-requests/inspection.formatSlot.test.ts`, que prova o contrato
+ * rodando a MESMA entrada nos dois fusos.
+ *
+ * Efeito colateral que vale registrar: sob UTC, as asserções de AUSÊNCIA deste
+ * arquivo (`queryByText(/25\/08 às 14:00/)).not.toBeInTheDocument()`) passavam
+ * por vacuidade — a tela mostrava "17:00", então "14:00" estava ausente com ou
+ * sem o defeito que elas existem para pegar. Fixar o fuso as torna verdadeiras
+ * de novo.
+ */
+const TZ_ORIGINAL = process.env.TZ;
+process.env.TZ = "America/Sao_Paulo";
+afterAll(() => {
+  if (TZ_ORIGINAL === undefined) delete process.env.TZ;
+  else process.env.TZ = TZ_ORIGINAL;
 });
 
 const fetchHandoffWhatsapp = vi.fn();
@@ -262,12 +294,8 @@ describe("§29-A — oferta aceita e a loja ainda não ofereceu horários", () =
     const card = await screen.findByTestId("owner-handoff");
 
     // Os dados da loja continuam onde estavam na 4.7.
-    expect(within(card).getByTestId("handoff-store-name")).toHaveTextContent(
-      "Auto Center Atibaia"
-    );
-    expect(within(card).getByTestId("handoff-address")).toHaveTextContent(
-      "Rua das Lojas, 120"
-    );
+    expect(within(card).getByTestId("handoff-store-name")).toHaveTextContent("Auto Center Atibaia");
+    expect(within(card).getByTestId("handoff-address")).toHaveTextContent("Rua das Lojas, 120");
 
     // §9 — o portal diz de quem é a vez, e não inventa horário nenhum.
     expect(within(card).getByTestId("owner-scheduling-waiting-text")).toHaveTextContent(
@@ -411,9 +439,9 @@ describe("§29-B — a loja ofereceu horários", () => {
     });
     render(<SaleRequestDetail id="42" />);
 
-    expect(
-      await screen.findByTestId("owner-scheduling-waiting-text")
-    ).toHaveTextContent("Aguardando novos horários da loja");
+    expect(await screen.findByTestId("owner-scheduling-waiting-text")).toHaveTextContent(
+      "Aguardando novos horários da loja"
+    );
   });
 });
 
@@ -609,9 +637,7 @@ describe("§17 — a agenda da loja A não atravessa para a loja B", () => {
 
     // O handoff passa a ser o da loja B...
     const card = await screen.findByTestId("owner-handoff");
-    expect(within(card).getByTestId("handoff-store-name")).toHaveTextContent(
-      "Prime Veículos"
-    );
+    expect(within(card).getByTestId("handoff-store-name")).toHaveTextContent("Prime Veículos");
 
     // ...e a agenda da loja A não sobreviveu ao estado local do React.
     expect(screen.queryByTestId("owner-scheduling-confirmed")).not.toBeInTheDocument();
@@ -869,10 +895,7 @@ describe("§30-A — a loja teve a oferta aceita e ainda não propôs horários"
     render(<DealerSaleOpportunityDetail id="42" />);
 
     const form = await screen.findByTestId("dealer-scheduling-form");
-    await user.type(
-      within(form).getByTestId("dealer-scheduling-input"),
-      "2026-08-25T10:00"
-    );
+    await user.type(within(form).getByTestId("dealer-scheduling-input"), "2026-08-25T10:00");
     await user.click(within(form).getByTestId("dealer-scheduling-submit"));
 
     expect(await screen.findByTestId("dealer-scheduling-error")).toHaveTextContent(
@@ -946,9 +969,7 @@ describe("§30-C — horário confirmado, na tela do lojista", () => {
 
     const panel = await screen.findByTestId("dealer-scheduling-confirmed");
     expect(panel).toHaveTextContent("Avaliação agendada");
-    expect(within(panel).getByTestId("dealer-scheduling-when")).toHaveTextContent(
-      "25/08 às 14:00"
-    );
+    expect(within(panel).getByTestId("dealer-scheduling-when")).toHaveTextContent("25/08 às 14:00");
     expect(panel).toHaveTextContent("O proprietário confirmou este horário");
 
     // Read-only de verdade: nenhum controle dentro do painel.
@@ -1050,10 +1071,7 @@ describe("§22 — a UI da 4.9B não alcança os writers aposentados", () => {
 
   it("os componentes novos só chamam os três writers da AGENDA", () => {
     const owner = readFileSync(raiz("components/account/OwnerSchedulingPanel.tsx"), "utf8");
-    const dealer = readFileSync(
-      raiz("components/account/DealerSchedulingPanel.tsx"),
-      "utf8"
-    );
+    const dealer = readFileSync(raiz("components/account/DealerSchedulingPanel.tsx"), "utf8");
 
     // A prova POSITIVA, que faz a negativa acima valer alguma coisa: se um
     // refactor renomear estes writers e as asserções negativas continuarem

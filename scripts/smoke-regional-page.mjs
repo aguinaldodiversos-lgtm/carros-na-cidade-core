@@ -176,7 +176,10 @@ async function fetchJson(url, options = {}) {
     let body = null;
     try {
       body = await response.json();
-    } catch {}
+    } catch {
+      // Resposta sem JSON (HTML de erro, corpo vazio): o smoke só precisa do
+      // status nesse caso, e `body` fica null de propósito.
+    }
     return { status: response.status, body };
   } catch (err) {
     return { status: 0, body: null, error: err?.message || String(err) };

@@ -268,7 +268,7 @@ export function checkRegionChips(html, baseSlug) {
     };
   }
   // Conta links /carros-em/[slug] que NÃO sejam a base.
-  const linkRegex = /href=["']\/carros-em\/([^"'\/]+)["']/gi;
+  const linkRegex = /href=["']\/carros-em\/([^"'/]+)["']/gi;
   const slugs = new Set();
   let m;
   while ((m = linkRegex.exec(html)) !== null) {

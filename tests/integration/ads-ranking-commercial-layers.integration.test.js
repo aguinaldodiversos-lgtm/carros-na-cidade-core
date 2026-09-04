@@ -152,10 +152,20 @@ async function seedRankingFixtures(db) {
     return rows[0].id;
   }
 
+  /**
+   * `advertisers` exige `city_id` e `slug` (ambos NOT NULL, e `slug` sem
+   * default). O fixture antigo inseria só `user_id` e `name` e derrubava os 6
+   * casos deste arquivo com
+   * `null value in column "city_id" of relation "advertisers"`.
+   *
+   * A correção é do fixture, não do schema: um anunciante sem cidade não é
+   * estado que o produto deva permitir. `plan` e `status` seguem nos defaults
+   * do banco ('free' / 'active'), que é o que o teste quer exercitar.
+   */
   async function makeAdvertiser(userId, name) {
     const { rows } = await db.query(
-      `INSERT INTO advertisers (user_id, name) VALUES ($1, $2) RETURNING id`,
-      [userId, name]
+      `INSERT INTO advertisers (user_id, city_id, name, slug) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [userId, cityId, name, `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${userId}`]
     );
     return rows[0].id;
   }
@@ -186,6 +196,9 @@ async function seedRankingFixtures(db) {
       `,
       [
         advertiserId,
+        // O `$2` da query é `city_id` e não estava sendo passado — a lista tinha
+        // 5 valores para 6 placeholders ("bind message supplies 5 parameters").
+        cityId,
         title,
         `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${advertiserId}`,
         highlightUntil,

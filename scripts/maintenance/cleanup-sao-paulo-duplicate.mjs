@@ -233,7 +233,10 @@ async function tableHasColumn(pg, tableName, columnName) {
  * @param {object} [opts.args] — flags já parseadas (usadas pelo
  *   confirmed-test-data-cleanup para validar `--confirm-*`).
  */
-export async function validatePreconditions({ pg, scenario, args = {}, log = defaultLog }) {
+// `log` saiu da desestruturação: a função só acumula `reasons` e quem
+// imprime é o chamador. O parâmetro continua aceito (e ignorado) por quem
+// passar o objeto inteiro.
+export async function validatePreconditions({ pg, scenario, args = {} }) {
   const reasons = [];
 
   // 1. id=1 ainda tem slug='sæo-paulo'
