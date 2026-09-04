@@ -37,7 +37,8 @@ const LAYER_2_MAX_KM = 60;
 // 60). É lida SÓ pela query System A (`getRadiusMembers`, `distance_km <= km`).
 // A Página Regional (System B) filtra `layer <= 2` e permanece intocada em
 // ≤60 km. Teto e cap configuráveis por env (não cravar no código).
-const LAYER_3_MAX_KM = Number.parseInt(String(process.env.REGIONAL_LAYER3_MAX_KM ?? "100"), 10) || 100;
+const LAYER_3_MAX_KM =
+  Number.parseInt(String(process.env.REGIONAL_LAYER3_MAX_KM ?? "100"), 10) || 100;
 
 /**
  * Limites de cidades por região, configuráveis via env vars.
@@ -257,7 +258,11 @@ async function processStateWithRetry(state, citiesInState, { maxAttempts = 3 } =
         try {
           client.release(err);
           released = true;
-        } catch {}
+        } catch {
+          // Devolver ao pool uma conexão já derrubada pode lançar. Não há o que
+          // fazer aqui: o objetivo era só marcá-la como corrompida, e a falha
+          // original (`err`) é a que interessa e segue sendo tratada abaixo.
+        }
       }
 
       if (!isConnectionDrop(err)) throw err;

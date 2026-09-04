@@ -97,9 +97,11 @@ async function main() {
   const testFindings = [];
   const slugFindings = [];
 
+  // `highSev` alimenta "high+critical total" no resumo. Os contadores de
+  // medium/low saíram: o relatório já deriva essas faixas com
+  // `.filter((f) => f.severity === ...)`, e os acumuladores eram apenas
+  // incrementados — ninguém os lia.
   let highSev = 0;
-  let mediumSev = 0;
-  let lowSev = 0;
 
   for (const ad of ads) {
     const testResult = detectTestAd(ad);
@@ -120,8 +122,6 @@ async function main() {
         created_at: ad.created_at,
       });
       if (testResult.confidence === "high") highSev++;
-      else if (testResult.confidence === "medium") mediumSev++;
-      else if (testResult.confidence === "low") lowSev++;
     }
 
     const slugResult = detectBadSlug(ad);
@@ -137,8 +137,6 @@ async function main() {
         title: truncate(ad.title, 80),
       });
       if (slugResult.severity === "critical" || slugResult.severity === "high") highSev++;
-      else if (slugResult.severity === "medium") mediumSev++;
-      else if (slugResult.severity === "low") lowSev++;
     }
   }
 

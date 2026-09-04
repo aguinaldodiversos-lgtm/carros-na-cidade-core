@@ -2,6 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { hasNestedTag, looksLikeJsx, tagWrapsComponent } from "./audit/lib/jsx-structure.mjs";
+
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, "project-audit.config.json");
 
@@ -587,13 +589,10 @@ function auditJsxInTs(findings) {
     if (path.extname(file) !== ".ts") continue;
     const content = readFileSafe(file);
 
-    const likelyJsx =
-      /return\s*\(\s*</m.test(content) ||
-      /<svg\b/m.test(content) ||
-      /<div\b/m.test(content) ||
-      /<Link\b/m.test(content);
-
-    if (likelyJsx) {
+    // `looksLikeJsx` procura os MESMOS sinais de antes, mas depois de remover
+    // comentários e literais. Era exatamente isso que faltava: uma menção a
+    // `<Link>` num bloco de documentação acusava JSX num utilitário puro.
+    if (looksLikeJsx(content)) {
       addFinding(findings, {
         severity: "error",
         code: "jsx-in-ts",
@@ -685,76 +684,6 @@ function auditFrontendRoutes(findings) {
   }
 }
 
-/** `<Link>` do Next aninhado noutro `<Link>` (estrutura real, não só dois Links no mesmo ficheiro). */
-function hasNestedNextLink(content) {
-  let i = 0;
-  while (i < content.length) {
-    const start = content.indexOf("<Link", i);
-    if (start === -1) return false;
-    const gt = content.indexOf(">", start);
-    if (gt === -1) {
-      i = start + 1;
-      continue;
-    }
-    let depth = 1;
-    let j = gt + 1;
-    while (j < content.length && depth > 0) {
-      const nextOpen = content.indexOf("<Link", j);
-      const nextClose = content.indexOf("</Link>", j);
-      if (nextClose === -1) break;
-      if (nextOpen !== -1 && nextOpen < nextClose) {
-        depth += 1;
-        if (depth > 1) return true;
-        j = nextOpen + 5;
-        const gt2 = content.indexOf(">", j);
-        j = gt2 === -1 ? nextOpen + 1 : gt2 + 1;
-      } else {
-        depth -= 1;
-        j = nextClose + 7;
-      }
-    }
-    i = start + 1;
-  }
-  return false;
-}
-
-/** `componentName` aparece dentro do primeiro segmento `<Link>...</Link>` que o contém (embrulho real). */
-function nextLinkWrapsComponent(content, componentName) {
-  const tag = `<${componentName}`;
-  let i = 0;
-  while (i < content.length) {
-    const start = content.indexOf("<Link", i);
-    if (start === -1) return false;
-    const gt = content.indexOf(">", start);
-    if (gt === -1) {
-      i = start + 1;
-      continue;
-    }
-    let depth = 1;
-    let j = gt + 1;
-    while (j < content.length && depth > 0) {
-      const nextOpen = content.indexOf("<Link", j);
-      const nextClose = content.indexOf("</Link>", j);
-      if (nextClose === -1) break;
-      const compIdx = content.indexOf(tag, j);
-      if (compIdx !== -1 && compIdx < nextClose && (nextOpen === -1 || compIdx < nextOpen)) {
-        return true;
-      }
-      if (nextOpen !== -1 && nextOpen < nextClose) {
-        depth += 1;
-        j = nextOpen + 5;
-        const gt2 = content.indexOf(">", j);
-        j = gt2 === -1 ? nextOpen + 1 : gt2 + 1;
-      } else {
-        depth -= 1;
-        j = nextClose + 7;
-      }
-    }
-    i = start + 1;
-  }
-  return false;
-}
-
 function auditNestedLinks(findings) {
   const registry = new Map();
 
@@ -773,7 +702,7 @@ function auditNestedLinks(findings) {
   for (const file of frontendFiles) {
     const content = readFileSafe(file);
 
-    if (hasNestedNextLink(content)) {
+    if (hasNestedTag(content, "Link")) {
       addFinding(findings, {
         severity: "error",
         code: "direct-nested-link",
@@ -813,7 +742,7 @@ function auditNestedLinks(findings) {
     }
 
     for (const localName of localSelfLinkingNames) {
-      if (nextLinkWrapsComponent(content, localName)) {
+      if (tagWrapsComponent(content, localName, "Link")) {
         addFinding(findings, {
           severity: "error",
           code: "wrapped-self-linking-component",
