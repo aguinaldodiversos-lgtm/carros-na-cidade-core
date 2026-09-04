@@ -98,7 +98,9 @@ function printPlan(plan, counts, { dryRun, force }) {
 }
 
 async function main() {
-  const { apply, force, dryRun } = parseArgs(process.argv);
+  // `apply` não é lido aqui: o corpo decide por `dryRun`, que é o seu
+  // complemento (`dryRun: !apply` em parseArgs).
+  const { force, dryRun } = parseArgs(process.argv);
 
   const datasetProblems = validateLegacyDataset();
   if (datasetProblems.length > 0) {

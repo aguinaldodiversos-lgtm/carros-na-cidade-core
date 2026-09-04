@@ -9,7 +9,7 @@
 
 import "dotenv/config";
 
-import { pool, closeDatabasePool } from "../src/infrastructure/database/db.js";
+import { closeDatabasePool } from "../src/infrastructure/database/db.js";
 import {
   getRadiusMembers,
   getOwnActiveCount,
@@ -31,15 +31,21 @@ async function stockFor(citySlug) {
 }
 
 async function main() {
-  console.log(`${C.bold}Cobertura por raio — ${slug}${C.reset} ${C.dim}(Haversine, region_memberships)${C.reset}`);
+  console.log(
+    `${C.bold}Cobertura por raio — ${slug}${C.reset} ${C.dim}(Haversine, region_memberships)${C.reset}`
+  );
 
   const ownStock = await getOwnActiveCount(slug);
-  console.log(`\n${C.cyan}Cidade-base:${C.reset} ${slug} — ${C.green}${ownStock}${C.reset} anúncios ativos`);
+  console.log(
+    `\n${C.cyan}Cidade-base:${C.reset} ${slug} — ${C.green}${ownStock}${C.reset} anúncios ativos`
+  );
 
   // Membros até o maior bucket; depois filtramos por bucket em JS.
   const members = await getRadiusMembers(slug, Math.max(...BUCKETS));
   if (members.length === 0) {
-    console.log(`${C.dim}Sem membros no region_memberships (região não populada? rode regions:build).${C.reset}`);
+    console.log(
+      `${C.dim}Sem membros no region_memberships (região não populada? rode regions:build).${C.reset}`
+    );
     await closeDatabasePool();
     return;
   }
@@ -58,7 +64,9 @@ async function main() {
     for (const m of inRadius) {
       const n = stock.get(m.slug) || 0;
       const flag = n > 0 ? `${C.green}${n}${C.reset}` : `${C.dim}0${C.reset}`;
-      console.log(`    ${String(Math.round(Number(m.distance_km))).padStart(3)} km  ${m.slug.padEnd(30)} ${flag} anúncios`);
+      console.log(
+        `    ${String(Math.round(Number(m.distance_km))).padStart(3)} km  ${m.slug.padEnd(30)} ${flag} anúncios`
+      );
     }
   }
 

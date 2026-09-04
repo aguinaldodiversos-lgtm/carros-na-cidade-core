@@ -17,9 +17,6 @@
  *   `[a-z0-9-]+`, sem underscore, sem acentos, lowercase.
  */
 
-// Estritamente o que o slug deve ter: lowercase alfanumérico + hífen.
-// Usado para sugestões e validações finais.
-const SLUG_VALID_CHARS = /^[a-z0-9-]+$/;
 // Permissivo: aceita uppercase e underscore. Slug que falha AQUI tem
 // caracteres realmente inválidos (espaço, acento, !). underscore/uppercase
 // caem em LOW severity dedicada.

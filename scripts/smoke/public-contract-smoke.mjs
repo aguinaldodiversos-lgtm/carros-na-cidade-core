@@ -269,23 +269,11 @@ async function fetchRoute(base, path, { followRedirects = true } = {}) {
 // Extractors / Matchers
 // ---------------------------------------------------------------------------
 
-function extractAdsCount(html) {
-  if (typeof html !== "string" || !html) return null;
-  const visibleCount = html.match(
-    /<strong[^>]*tabular-nums[^>]*>\s*([0-9.,]+)\s*<\/strong>\s*ofertas encontradas/i
-  );
-  if (visibleCount?.[1]) {
-    const n = Number(visibleCount[1].replace(/[.,]/g, ""));
-    if (Number.isFinite(n)) return n;
-  }
-  const jsonLdCount = html.match(/"numberOfItems"\s*:\s*([0-9]+)/);
-  if (jsonLdCount?.[1]) {
-    const n = Number(jsonLdCount[1]);
-    if (Number.isFinite(n)) return n;
-  }
-  if (/Ainda não há veículos|Ainda não há anúncios/.test(html)) return 0;
-  return null;
-}
+// `extractAdsCount` foi removido aqui (CI-0, 2026-09-03): estava declarado e
+// não tinha NENHUM consumidor neste arquivo — nenhuma asserção do smoke chegava
+// a contar anúncios. Se contar passar a ser desejado, o helper está no histórico
+// e volta junto com a asserção que o usa; manter função morta só para o lint
+// aceitar seria o pior dos dois mundos.
 
 function extractVehicleHrefs(html, limit = 5) {
   if (typeof html !== "string" || !html) return [];
@@ -527,11 +515,7 @@ async function main() {
     // 1.e — cidade indevida no <title> (ex.: title de /carros-em/atibaia
     //       mencionando "São Paulo" antes de "Atibaia")
     if (route.forbidCityInTitle) {
-      const wrong = titleHasWrongCity(
-        fetched.html,
-        route.expectCityName,
-        route.forbidCityInTitle
-      );
+      const wrong = titleHasWrongCity(fetched.html, route.expectCityName, route.forbidCityInTitle);
       checks.push({
         id: `route-city-title:${route.path}`,
         label: `${route.path} — <title> sem "${route.forbidCityInTitle}" hardcoded`,
@@ -624,11 +608,11 @@ async function main() {
       detail: soft404
         ? buildDetail({
             reason: "soft-404-on-200",
-            snippet:
-              (fetched.html
-                .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
-                .match(/<(?:title|h1|h2)[^>]*>[^<]*Ve[ií]culo n[ãa]o encontrado[^<]*<\/(?:title|h1|h2)>/i) ||
-                [])[0],
+            snippet: (fetched.html
+              .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+              .match(
+                /<(?:title|h1|h2)[^>]*>[^<]*Ve[ií]culo n[ãa]o encontrado[^<]*<\/(?:title|h1|h2)>/i
+              ) || [])[0],
           })
         : "ok",
     });
@@ -799,9 +783,7 @@ async function main() {
         console.log(`  - ${c.label} → ${c.detail ?? "—"}`);
         if (github) {
           const message = `${c.label}\n${c.detail ?? ""}`;
-          console.log(
-            `::error title=public-contract-smoke FAIL::${ghEscape(message)}`
-          );
+          console.log(`::error title=public-contract-smoke FAIL::${ghEscape(message)}`);
         }
       }
     }
@@ -827,7 +809,9 @@ async function main() {
 
 function buildJobSummary({ base, checks, passed, failed, vehicleHrefs }) {
   const lines = [];
-  lines.push(`## Smoke público — ${failed.length === 0 ? "✅" : "❌"} ${passed.length}/${checks.length}`);
+  lines.push(
+    `## Smoke público — ${failed.length === 0 ? "✅" : "❌"} ${passed.length}/${checks.length}`
+  );
   lines.push("");
   lines.push(`**Base:** \`${base}\``);
   lines.push(`**Hrefs /veiculo/* abertos:** ${vehicleHrefs.length}`);

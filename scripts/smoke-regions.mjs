@@ -82,7 +82,7 @@ function fail(label, detail) {
   failures.push({ label, detail });
 }
 
-async function fetchEndpoint({ slug, token, label }) {
+async function fetchEndpoint({ slug, token }) {
   const url = `${API_BASE_URL}/api/internal/regions/${encodeURIComponent(slug)}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
