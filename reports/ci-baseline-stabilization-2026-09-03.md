@@ -453,9 +453,138 @@ Os 4 arquivos protegidos seguem **untracked e fora de todos os commits**
 
 ---
 
+## CI-0.1 — Project audit
+
+O CI real da PR #53 passou em Backend e Integration, e no Frontend passou lint,
+typecheck e os 3554 testes — parando no passo `Project audit`, com **8 erros**.
+`Next.js build` e `E2E` ficaram como _skipped_ por consequência.
+
+### Classificação dos 8 achados
+
+Todos foram **reproduzidos primeiro na `main` limpa**, num worktree separado
+(`git worktree add --detach`, sem tocar na branch). Os oito existem na `main`
+exatamente iguais — **a CI-0 não introduziu nenhum**.
+
+| Finding                         | main | CI-0 | Classificação      | Correção                    |
+| ------------------------------- | ---- | ---- | ------------------ | --------------------------- |
+| `vehicle-breadcrumbs` jsx-in-ts | FAIL | FAIL | **Falso positivo** | analisador (`looksLikeJsx`) |
+| `AccountPanelShell` nested      | FAIL | FAIL | **Falso positivo** | analisador (`hasNestedTag`) |
+| `AccountPlanCard` wrapped       | FAIL | FAIL | **Falso positivo** | analisador (`tagWraps…`)    |
+| `AccountUserMenu` wrapped       | FAIL | FAIL | **Falso positivo** | analisador (`tagWraps…`)    |
+| `CatalogPagination` nested      | FAIL | FAIL | **Falso positivo** | analisador (`hasNestedTag`) |
+| `PromoBanner` nested            | FAIL | FAIL | **Falso positivo** | analisador (`hasNestedTag`) |
+| `HomeAnnounceBanner` nested     | FAIL | FAIL | **Falso positivo** | analisador (`hasNestedTag`) |
+| `HomeHero` nested               | FAIL | FAIL | **Falso positivo** | analisador (`hasNestedTag`) |
+
+**Zero arquivos de produção alterados.**
+
+### A causa raiz — uma só, para os oito
+
+O analisador lia o arquivo como **texto cru**. Um `<Link>` escrito dentro de um
+**comentário de documentação** contava como tag aberta.
+
+Instrumentei a função original (`hasNestedNextLink`) para imprimir _onde_ ela
+enxergava o aninhamento. Nos cinco arquivos, o "Link externo" acusado era uma
+menção em comentário:
+
+```
+CatalogPagination.tsx
+  ACUSOU: <Link da linha 20
+          o ">" que ele achou está na linha 20:
+          "* JavaScript. O clique continua sendo interceptado pelo `<Link>` do Ne"
+          depois viu <Link na linha 132 antes de </Link> na linha 143
+```
+
+O mesmo em `AccountPanelShell.tsx:156`, `PromoBanner.tsx:21`,
+`HomeAnnounceBanner.tsx:17` e `HomeHero.tsx:349`. E em
+`vehicle-breadcrumbs.ts:20` — um arquivo de 47 linhas, sem uma linha de JSX, que
+nem importa React: a menção a `` `<Link>` `` num JSDoc bastava.
+
+A contagem de tags confirma: em `CatalogPagination.tsx` há **4** ocorrências de
+`<Link` e **3** de `</Link>` — a quarta é a do comentário. O scanner abria escopo
+nela e nunca o fechava.
+
+A ironia vale registro: o projeto documenta bem os componentes, e era justamente
+a documentação que disparava o alarme. **O detector punia a boa prática.**
+
+Estruturalmente, as árvores estavam certas. `CatalogPagination` tem três `<Link>`
+**irmãos**; `AccountUserMenu` (linha 302) é irmão do `<Link>` (303) dentro do
+mesmo `<div>`; `AccountPlanCard` (376) está num `<div>` sem Link nenhum.
+
+Dois defeitos menores da mesma função foram corrigidos junto, porque
+apareceriam assim que o primeiro fosse resolvido: `<Link ... />` auto-fechado era
+tratado como abertura, e o `>` de um `=>` em `onClick={(e) => …}` era confundido
+com o fim da tag.
+
+### A correção
+
+`scripts/audit/lib/jsx-structure.mjs` — módulo novo, **zero dependência**, com
+`stripNonCode` (remove comentários, strings e template literals preservando
+offsets), um scanner de eventos de tag ciente de auto-fechamento e de `{…}` nos
+atributos, e as três funções que o audit consome.
+
+**Por que não um parser de verdade:** o job `frontend` roda `npm ci` só em
+`frontend/` e depois executa `audit:project` a partir da raiz — onde não há
+`node_modules`. `project-audit.mjs` importa apenas `node:fs` e `node:path`, e é
+por isso que funciona. Importar `typescript` derrubaria o audit com
+`MODULE_NOT_FOUND` no próprio CI que se quer consertar. Importar de
+`frontend/node_modules` faria o audit se comportar de um jeito com as
+dependências instaladas e de outro sem elas — o oposto de CI confiável.
+
+As duas funções antigas (`hasNestedNextLink`, `nextLinkWrapsComponent`, 70
+linhas) foram removidas: ficariam órfãs, e `scripts/` é lintado.
+
+`looksLikeJsx` procura **os mesmos sinais de antes** (`return (<`, `<svg`,
+`<div`, `<Link`) — a regra não ficou mais ampla nem mais permissiva. O que mudou
+é que agora eles são procurados no **código**, não no texto do arquivo.
+
+### O que NÃO foi feito
+
+Nenhuma regra desligada, nenhum `ERROR` rebaixado a `WARN`, nenhum `|| true`,
+nenhuma allowlist, nenhum arquivo ignorado, nenhum `exitCode` forçado. Nenhum
+`*.test.*` excluído em bloco.
+
+### Prova de que o detector não ficou cego
+
+25 testes em `tests/audit/jsx-structure.test.js`, cobrindo os casos A–E pedidos.
+E três mutações no repositório real, cada uma revertida em seguida:
+
+| Mutação                                                  | audit    | resultado                 |
+| -------------------------------------------------------- | -------- | ------------------------- |
+| `<Link>` REAL dentro de `<Link>` em `PromoBanner`        | `exit 1` | `direct-nested-link` ✓    |
+| `const x = <div>teste</div>` em `vehicle-breadcrumbs.ts` | `exit 1` | `jsx-in-ts` ✓             |
+| `<AccountPlanCard>` embrulhado por `<Link>` de verdade   | `exit 1` | `wrapped-self-linking…` ✓ |
+
+Uma quarta tentativa merece nota: a primeira mutação que escrevi inseriu o Link
+aninhado **dentro do comentário** da linha 21 (o regex casou a menção antes da
+tag real). O audit reportou 0 erros — e estava certo. O experimento falhou, o
+detector não.
+
+### Antes e depois
+
+|                           | Erros | Avisos  | exit  |
+| ------------------------- | ----- | ------- | ----- |
+| `main` (worktree limpo)   | 8     | 98      | 1     |
+| CI-0 antes desta correção | 8     | 101     | 1     |
+| **CI-0.1**                | **0** | **101** | **0** |
+
+Os avisos continuam não bloqueantes e **não foram tocados** — os ~101 de
+`missing-frontend-route`, `env-key-not-declared` e afins são outro trabalho.
+
+### Gates após a correção
+
+| Gate                             | Resultado                              |
+| -------------------------------- | -------------------------------------- |
+| `audit:project`                  | **PASS — 0 erros, 101 avisos, exit 0** |
+| Backend lint (`src` + `scripts`) | PASS — 0 erros, 222 warnings           |
+| Prettier incremental             | PASS                                   |
+| Testes do detector               | PASS — 25/25                           |
+
+---
+
 ## Situação
 
-5 commits em `codex/ci-baseline-stabilization-2026-09-03`, à frente de
+7 commits em `codex/ci-baseline-stabilization-2026-09-03`, à frente de
 `origin/main` (`190df7a5`).
 
 | Commit     | Assunto                                                  |
@@ -465,5 +594,7 @@ Os 4 arquivos protegidos seguem **untracked e fora de todos os commits**
 | `f79a8306` | `test:` contratos obsoletos de /seguranca e SEO regional |
 | `11048296` | `test:` fixtures de integração                           |
 | `daefe378` | `fix(scripts):` 11 erros de eslint do job de backend     |
+| `06bcd7c8` | `docs:` este relatório                                   |
+| (CI-0.1)   | `fix(ci):` falsos positivos do project audit             |
 
-**Não foi feito push, PR, merge nem deploy.**
+Branch pushada; a PR #53 está aberta. **Não foi feito merge nem deploy.**
