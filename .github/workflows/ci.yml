@@ -23,7 +23,13 @@ jobs:
       # testes unitários. Integração fica fora (`vitest run --exclude tests/integration/**`).
       NODE_ENV: test
     steps:
+      # fetch-depth: 0 — o gate de formatação compara o HEAD com a BASE do PR, e
+      # o checkout raso (default 1) não traz o commit da base. Sem o histórico,
+      # `git merge-base` não resolve e o passo não teria como saber o que a PR
+      # tocou. É o único job que precisa disso.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -33,8 +39,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prettier (format check — monorepo)
-        run: npm run format:check
+      # Incremental por decisão, não por conveniência: `prettier --check .`
+      # reprova 321 arquivos legados do monorepo, então reprovava TODA PR —
+      # inclusive as que não encostaram neles. Um gate sempre vermelho não
+      # gateia; ele treina o time a ignorar o passo, e some com o sinal quando
+      # alguém DE FATO manda arquivo mal formatado.
+      #
+      # Este passo cobra formatação apenas dos arquivos que o diff tocou. A
+      # dívida histórica continua registrada e visível em `npm run format:check`
+      # (mantido), que pode ser rodado sob demanda e quitado em lote próprio.
+      - name: Prettier (format check — arquivos alterados)
+        run: npm run format:check:changed
 
       - name: ESLint (backend)
         run: npm run lint

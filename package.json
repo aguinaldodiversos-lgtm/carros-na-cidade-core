@@ -72,7 +72,9 @@
     "e2e:full-flow": "npm run test:e2e:full-flow --prefix frontend",
     "e2e:prepare": "npm run integration:db:up && npm run integration:db:wait && npm run integration:db:prepare && node scripts/e2e-seed.mjs",
     "test:frontend": "npm run test --prefix frontend",
-    "test:frontend:coverage": "npm run test:coverage --prefix frontend"
+    "test:frontend:coverage": "npm run test:coverage --prefix frontend",
+    "format:check:changed": "node scripts/prettier-changed.mjs",
+    "format:changed": "node scripts/prettier-changed.mjs --write"
   },
   "engines": {
     "node": ">=20 <21"
