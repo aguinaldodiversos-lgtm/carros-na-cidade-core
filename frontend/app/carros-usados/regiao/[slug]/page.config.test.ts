@@ -203,7 +203,33 @@ describe("generateMetadata — gate de status code 404 (proteção parte 2)", ()
   });
 });
 
-describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (PR 2)", () => {
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS FLAGS REGIONAIS FORAM APOSENTADAS — E ESTE BLOCO EXISTE PARA MANTÊ-LAS ASSIM
+ * ════════════════════════════════════════════════════════════════════════════
+ * Até 2026-07-05 este bloco tinha três casos afirmando que
+ * `REGIONAL_PAGE_INDEXABLE` e `REGIONAL_PAGE_CANONICAL_SELF` podiam, cada uma,
+ * mudar `robots.index` e o canonical da rota regional.
+ *
+ * A "Onda 2 Fase 2a" aposentou essa promoção: a página de cidade
+ * `/carros-em/[slug]` com raio passou a cobrir a intenção regional, e a rota de
+ * região deixou de ser entidade indexável concorrente. O código de produção diz
+ * isso literalmente, e não por dedução:
+ *
+ *     // APOSENTADA: nunca indexável (canonical → cidade).
+ *     const indexable = false;
+ *
+ * Os três testes antigos ficaram vermelhos desde então — dois meses de sinal
+ * ignorado. Eles NÃO foram apenas apagados: virariam um buraco por onde a
+ * indexação regional poderia voltar sem ninguém perceber. Foram substituídos
+ * pelos casos abaixo, que afirmam a APOSENTADORIA: as flags agora são inertes
+ * para metadata, e ligá-las não reindexação a rota.
+ *
+ * Se alguém precisar reativar a promoção regional um dia, estes testes falham —
+ * que é exatamente o momento em que a decisão deve voltar à mesa, com o runbook
+ * de SEO territorial aberto.
+ */
+describe("generateMetadata — flags regionais APOSENTADAS (Onda 2 Fase 2a)", () => {
   async function buildMetadata() {
     const { isRegionalPageEnabled } = await import("@/lib/env/feature-flags");
     const { loadRegionalCatalogData } = await import("@/lib/buy/region-catalog-loader");
@@ -227,20 +253,21 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
     expect(md.alternates?.canonical).not.toContain("/carros-usados/regiao");
   });
 
-  it("INDEXABLE=true sozinha → index, mas canonical permanece para cidade-base", async () => {
+  it("INDEXABLE=true NÃO reindexação a rota — a flag é inerte", async () => {
     const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
+    // Ligada no máximo que a flag permite. A rota continua noindex.
     vi.mocked(shouldIndexRegionalPage).mockReturnValue(true);
     vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(false);
 
     const md = await buildMetadata();
 
-    expect(md.robots).toMatchObject({ index: true, follow: true });
+    expect(md.robots).toMatchObject({ index: false, follow: true });
     expect(md.alternates?.canonical).toContain("/carros-em/atibaia-sp");
   });
 
-  it("CANONICAL_SELF=true sozinha → canonical self, mas noindex permanece", async () => {
+  it("CANONICAL_SELF=true NÃO devolve o canonical para a própria regional", async () => {
     const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
@@ -250,11 +277,15 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
     const md = await buildMetadata();
 
     expect(md.robots).toMatchObject({ index: false, follow: true });
-    expect(md.alternates?.canonical).toContain("/carros-usados/regiao/atibaia-sp");
-    expect(md.alternates?.canonical).not.toContain("/carros-em/");
+    // O canonical continua consolidando na cidade-base, que é o ponto da
+    // aposentadoria: uma URL só disputando a intenção "carros em Atibaia".
+    expect(md.alternates?.canonical).toContain("/carros-em/atibaia-sp");
+    expect(md.alternates?.canonical).not.toContain("/carros-usados/regiao");
   });
 
-  it("ambas true (Fase D plena) → index + canonical self", async () => {
+  it("AMBAS as flags ligadas continuam sem reabrir a indexação regional", async () => {
+    // O cenário que a "Fase D" pretendia habilitar. Hoje ele não existe mais:
+    // nenhuma combinação de flags promove a rota regional.
     const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
       "@/lib/env/feature-flags"
     );
@@ -263,8 +294,39 @@ describe("generateMetadata — flags REGIONAL_PAGE_INDEXABLE + CANONICAL_SELF (P
 
     const md = await buildMetadata();
 
-    expect(md.robots).toMatchObject({ index: true, follow: true });
-    expect(md.alternates?.canonical).toContain("/carros-usados/regiao/atibaia-sp");
+    expect(md.robots).toMatchObject({ index: false, follow: true });
+    expect(md.alternates?.canonical).toContain("/carros-em/atibaia-sp");
+    expect(md.alternates?.canonical).not.toContain("/carros-usados/regiao");
+  });
+
+  it("nenhuma combinação de flags produz index:true (varredura das 4)", async () => {
+    /**
+     * A varredura é o que transforma três casos pontuais numa afirmação
+     * fechada: para QUALQUER combinação das duas flags, a rota é noindex e o
+     * canonical aponta para a cidade. Se alguém reintroduzir a promoção
+     * regional por qualquer caminho, este caso falha.
+     */
+    const { isRegionalPageCanonicalSelf, shouldIndexRegionalPage } = await import(
+      "@/lib/env/feature-flags"
+    );
+
+    for (const indexavel of [false, true]) {
+      for (const canonicalSelf of [false, true]) {
+        vi.mocked(shouldIndexRegionalPage).mockReturnValue(indexavel);
+        vi.mocked(isRegionalPageCanonicalSelf).mockReturnValue(canonicalSelf);
+
+        const md = await buildMetadata();
+        const combinacao = `indexável=${indexavel}, canonicalSelf=${canonicalSelf}`;
+
+        expect(md.robots, `combinação ${combinacao} reabriu a indexação`).toMatchObject({
+          index: false,
+          follow: true,
+        });
+        expect(md.alternates?.canonical, `combinação ${combinacao} moveu o canonical`).toContain(
+          "/carros-em/atibaia-sp"
+        );
+      }
+    }
   });
 
   it("title e description seguem o padrão do briefing", async () => {
