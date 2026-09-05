@@ -269,14 +269,14 @@ export default function BuyMarketplacePageClient({
   );
 
   /**
-   * A vitrine de CIDADE (`/carros-em/[slug]`) é a única que recebe o tratamento
-   * "catálogo limpo" da Fase 5.0B: container mais largo e quarta coluna em telas
-   * ≥1600px, e paginador visível mesmo com uma página só.
+   * O SHELL LARGO deixou de ser exclusivo da cidade — ver a nota de geometria
+   * no container do catálogo, abaixo. As cinco rotas compartilham um shell só.
    *
-   * As outras quatro rotas servidas por este componente (`/comprar`,
-   * `/comprar/estado/[uf]`, `/carros-usados/[uf]`, `/carros-usados/regiao/[slug]`)
-   * seguem exatamente como estavam. Toda diferença desta fase passa por esta
-   * flag — é o único ponto a inspecionar para saber o que muda e onde.
+   * O que AINDA é exclusivo de `/carros-em/[slug]` é o paginador de página
+   * única (`showSinglePage`), e por um motivo que não é de largura: só essa
+   * rota perdeu os blocos de SEO que marcavam o fim da listagem, e sem eles o
+   * grid emendava direto no rodapé. As outras quatro continuam com conteúdo
+   * depois do catálogo, então não precisam desse encerramento visual.
    */
   const isCityVariant = variant === "cidade";
 
@@ -382,15 +382,24 @@ export default function BuyMarketplacePageClient({
 
       <main>
         {/*
-          Container do catálogo — DOIS shells de desktop.
+          Container do catálogo — UM shell de desktop para as CINCO rotas.
 
-          As quatro rotas irmãs seguem no shell histórico: `max-w-7xl` (1280px),
-          `lg:px-8` (32px), sidebar de até 320px e `lg:gap-8` (32px) até o grid.
+          A referência é a página de resultados da Webmotors, e o que se copiou
+          dela foi o PRINCÍPIO, não o desenho: a listagem usa a largura útil da
+          viewport em vez de ficar presa a uma coluna central de 1280px.
 
-          A página de CIDADE recebe o shell largo. A referência é a página de
-          resultados da Webmotors, e o que se copiou dela foi o PRINCÍPIO, não o
-          desenho: a listagem usa a largura útil da viewport em vez de ficar
-          presa a uma coluna central de 1280px.
+          ── Por que o shell largo deixou de ser só da cidade ────────────────
+          A Fase 5.0B estreou esta geometria em `/carros-em/[slug]` e manteve as
+          irmãs no shell histórico (`max-w-7xl`, `lg:px-8`, sidebar até 320px,
+          `lg:gap-8`). Medido em produção a 1920px, o resultado era `/comprar`
+          com 864px de área de cards — 45% da tela — e três cards de 275px, ao
+          lado de uma rota de cidade com 1236px e quatro de 297px. Navegar de
+          `/comprar` para um estado ENCOLHIA a página em 320px.
+
+          A bifurcação foi removida em vez de ganhar um terceiro ramo: a
+          geometria abaixo é a mesma que o E2E da 5.0B já trava no navegador
+          (`e2e/catalog-city-clean-grid.spec.ts`), promovida a padrão. Nenhum
+          número novo foi inventado aqui — todos continuam sendo os medidos.
 
           O ganho vem de quatro folgas, não de uma:
 
@@ -420,19 +429,16 @@ export default function BuyMarketplacePageClient({
           Tentar a quarta coluna sem mexer no shell dava 201px por card (medido
           em runtime). O shell é a mudança; a coluna é a consequência. Ver a nota
           de geometria em `VehicleGrid.tsx`.
+
+          ── O cabeçalho da listagem acompanha ───────────────────────────────
+          `CatalogPageHeader` usa este mesmo teto e este mesmo `lg:px-6`. Ele
+          ficou para trás na 5.0B e o desalinhamento era visível: a 1920px os
+          cards começavam em x=153 e o H1 em x=313. O `PublicHeader` do site
+          continua em `max-w-7xl` DE PROPÓSITO — é a navegação global, não a
+          página.
         */}
-        <div
-          className={`mx-auto w-full px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:pb-12 ${
-            isCityVariant ? "max-w-[1600px] lg:px-6" : "max-w-7xl lg:px-8"
-          }`}
-        >
-          <div
-            className={`flex flex-col gap-4 lg:grid lg:items-start ${
-              isCityVariant
-                ? "lg:grid-cols-[296px_minmax(0,1fr)] lg:gap-5"
-                : "lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] lg:gap-8"
-            }`}
-          >
+        <div className="mx-auto w-full max-w-[1600px] px-3 pb-8 pt-4 sm:px-6 sm:pb-10 sm:pt-6 lg:px-6 lg:pb-12">
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[296px_minmax(0,1fr)] lg:items-start lg:gap-5">
             <aside className="hidden lg:sticky lg:top-[76px] lg:block lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pb-8 lg:pr-1">
               <FilterSidebar {...sidebarProps} />
             </aside>
@@ -486,7 +492,7 @@ export default function BuyMarketplacePageClient({
                 items={items}
                 inferWeight={inferWeight}
                 emptyContext={emptyContext}
-                columns={isCityVariant ? "wide" : "default"}
+                columns="wide"
               />
               {/*
                 `showSinglePage` só na cidade: a página perdeu os blocos SEO que

@@ -203,7 +203,14 @@ export function CatalogPageHeader({
 
   return (
     <div className="border-b border-cnc-line bg-cnc-surface">
-      <div className="mx-auto w-full max-w-7xl px-4 pb-3 pt-3 sm:px-6 sm:pb-5 sm:pt-6 lg:px-8 lg:pt-8">
+      {/* Teto e `lg:px-6` casados com o container do catálogo em
+          `BuyMarketplacePageClient` — este bloco (breadcrumb, H1, subtítulo,
+          busca, pill de território) tem de começar na mesma coluna dos cards.
+          Enquanto ficou em `max-w-7xl`, a 1920px o H1 abria em x=313 e o
+          primeiro card em x=153. O `px-4` do mobile fica: abaixo de `lg` o
+          catálogo usa `px-3`, e essa diferença de 4px é anterior a esta
+          mudança — mexer nela alteraria o mobile sem necessidade. */}
+      <div className="mx-auto w-full max-w-[1600px] px-4 pb-3 pt-3 sm:px-6 sm:pb-5 sm:pt-6 lg:px-6 lg:pt-8">
         <CatalogBreadcrumb items={breadcrumbItems} />
 
         <div className="mt-3 grid gap-3 sm:mt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-6">
@@ -270,11 +277,7 @@ export function CatalogPageHeader({
               <NearbyRegionButton
                 regionalEnabled={regionalEnabled}
                 context={
-                  variant === "estadual"
-                    ? "estadual"
-                    : variant === "cidade"
-                      ? "cidade"
-                      : "catalogo"
+                  variant === "estadual" ? "estadual" : variant === "cidade" ? "cidade" : "catalogo"
                 }
                 variant="compact"
                 stateUf={stateUf || city.state}

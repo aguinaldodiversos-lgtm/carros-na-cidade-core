@@ -45,14 +45,19 @@ type EmptyStateContext = {
 /**
  * Densidade de colunas do grid.
  *
- *   "default"  1 / 2 / 3 — o comportamento histórico, usado por TODAS as rotas.
+ *   "default"  1 / 2 / 3 — o fallback do componente, sem call-site no catálogo.
  *   "wide"     1 / 2 / 3 / 4 — a quarta coluna entra a partir de 1392px.
  *
- * ── Por que uma variante em vez de trocar `lg:grid-cols-3` por 4 ────────────
+ * ── Quem usa qual ───────────────────────────────────────────────────────────
  * `VehicleGrid` é montado por `BuyMarketplacePageClient`, que serve CINCO rotas
  * (`/comprar`, `/comprar/estado/[uf]`, `/carros-usados/[uf]`,
- * `/carros-usados/regiao/[slug]` e `/carros-em/[slug]`). Trocar a classe global
- * mudaria as cinco de uma vez. Só a página de cidade pediu 4 colunas.
+ * `/carros-usados/regiao/[slug]` e `/carros-em/[slug]`). Desde que o shell largo
+ * virou o único shell do catálogo, as cinco passam `columns="wide"`.
+ *
+ * "default" continua sendo o valor omitido de propósito: ele é o único que serve
+ * um container estreito, e é o que qualquer montagem futura de `VehicleGrid`
+ * fora do shell de 1600px recebe sem pedir. Os testes de coluna guardam essa
+ * separação — 4 colunas dentro de 864px dariam 201px por card.
  *
  * ── A coluna é consequência do shell, não a mudança em si ───────────────────
  * No shell histórico o card tem 275px em QUALQUER desktop, porque o container é
@@ -65,8 +70,9 @@ type EmptyStateContext = {
  * quarta coluna só em 1600px: era a única largura em que o shell antigo
  * comportava, e mesmo assim com card de 281px.
  *
- * A variante `cidade` passou a usar um shell próprio e mais largo (teto 1600px,
- * padding 24px, sidebar 296px, gap 20px — ver `BuyMarketplacePageClient`). Com
+ * O catálogo passou a usar um shell mais largo (teto 1600px, padding 24px,
+ * sidebar 296px, gap 20px — ver `BuyMarketplacePageClient`), estreado em
+ * `/carros-em/[slug]` pela Fase 5.0B e depois promovido às cinco rotas. Com
  * ele a área de cards cresce ~80px em qualquer viewport:
  *
  *     1440 → 257px por card       1600  → 297px por card

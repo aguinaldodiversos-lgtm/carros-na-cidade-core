@@ -116,9 +116,7 @@ function formatAds(total: number): string {
   return total === 1 ? "1 anúncio" : `${total.toLocaleString("pt-BR")} anúncios`;
 }
 
-export default async function ComprarNacionalPage({
-  searchParams = {},
-}: ComprarNacionalPageProps) {
+export default async function ComprarNacionalPage({ searchParams = {} }: ComprarNacionalPageProps) {
   const regionalEnabled = isRegionalPageEnabled();
 
   // Independentes entre si: o catálogo não precisa do diretório para renderizar
@@ -207,7 +205,11 @@ function renderNationalDirectory(directory: NationalDirectory) {
     <section
       aria-labelledby="explorar-localizacao"
       data-testid="national-territory-directory"
-      className="mx-auto w-full max-w-7xl border-t border-cnc-line px-4 py-8 sm:px-6 lg:px-8"
+      // Teto e `lg:px-6` casados com o container do catálogo acima
+      // (`BuyMarketplacePageClient`): este bloco vem logo depois da paginação e
+      // a borda superior (`border-t`) corta a página inteira — em `max-w-7xl`
+      // ela terminava 160px antes da coluna dos cards de cada lado.
+      className="mx-auto w-full max-w-[1600px] border-t border-cnc-line px-4 py-8 sm:px-6 lg:px-6"
     >
       <h2
         id="explorar-localizacao"
