@@ -574,8 +574,26 @@ export function FilterSidebar({
   const chipOff = "border-cnc-line-strong bg-cnc-surface text-cnc-muted hover:border-primary/40";
   const chipCls = (on: boolean) => `${chipBase} ${on ? chipOn : chipOff}`;
 
+  /**
+   * Controles de Vendedor — EMPILHADOS, um por linha.
+   *
+   * Em duas colunas o botão tinha 112px para um conteúdo de 165px (ícone 18 +
+   * "Particulares" 87 + "(0)" 15 + 2×gap 10 + padding 24 + borda 2). Faltavam
+   * ~54px, e o navegador escondia a conta comprimindo o SVG: o ícone de
+   * "Particulares" chegava a **largura 0** e o de "Lojas (33)" a 5,8px em
+   * produção. Nenhum ajuste de gap ou padding fecha 54px — só a linha inteira.
+   *
+   * `[&>svg]:shrink-0` é o que impede a compressão voltar: `w-[18px]` é só a
+   * base do flex, e sem `shrink-0` o ícone continua sendo o primeiro a ceder
+   * quando a contagem cresce. Com ele, falta de espaço vira transbordo visível
+   * em vez de um ícone que some sem avisar.
+   *
+   * `justify-start` alinha os dois ícones no mesmo eixo vertical — com
+   * `justify-center` cada botão centraria seu próprio conteúdo e os ícones
+   * ficariam em x diferentes, já que os rótulos têm larguras distintas.
+   */
   const segBase =
-    "inline-flex items-center justify-center gap-2.5 rounded-[11px] border px-3 py-3.5 text-[15px] font-semibold transition motion-reduce:transition-none [&>svg]:h-[18px] [&>svg]:w-[18px]";
+    "inline-flex items-center justify-start gap-2.5 whitespace-nowrap rounded-[11px] border px-3 py-3.5 text-[15px] font-semibold transition motion-reduce:transition-none [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0";
   const segCls = (on: boolean) => `${segBase} ${on ? chipOn : chipOff}`;
 
   /**
@@ -688,7 +706,7 @@ export function FilterSidebar({
             <Eyebrow>
               <span id="filter-vendedor">Vendedor</span>
             </Eyebrow>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-2.5">
               <button
                 type="button"
                 aria-pressed={filters.seller_kind === "dealer"}
