@@ -37,13 +37,13 @@ ocupar" — e a coluna caiu por consequência.
 
 ## 3. Os dois shells
 
-| | histórico (4 rotas) | cidade (esta fase) |
-|---|---|---|
-| teto do container | `max-w-7xl` = 1280px | **1600px** |
-| padding lateral (lg) | `px-8` = 32px | **`px-6` = 24px** |
-| sidebar | `minmax(280px,320px)` | **296px** |
-| gap sidebar → grid | `gap-8` = 32px | **`gap-5` = 20px** |
-| gap entre cards (lg) | 20px | **16px** |
+|                      | histórico (4 rotas)   | cidade (esta fase) |
+| -------------------- | --------------------- | ------------------ |
+| teto do container    | `max-w-7xl` = 1280px  | **1600px**         |
+| padding lateral (lg) | `px-8` = 32px         | **`px-6` = 24px**  |
+| sidebar              | `minmax(280px,320px)` | **296px**          |
+| gap sidebar → grid   | `gap-8` = 32px        | **`gap-5` = 20px** |
+| gap entre cards (lg) | 20px                  | **16px**           |
 
 Toda diferença passa por uma única flag no componente compartilhado:
 
@@ -60,20 +60,20 @@ const isCityVariant = variant === "cidade";
 `next start` de build de produção, Chromium, Atibaia-SP com 27 anúncios, todas as
 medidas por `getBoundingClientRect` no navegador:
 
-| viewport | container | sidebar | área do grid | colunas | card | margem externa |
-|---|---|---|---|---|---|---|
-| 390 (mobile) | 390 | — | 366 | 1 | **366 × 178** | 0 |
-| 412 (mobile) | 412 | — | 388 | 1 | 388 × 178 | 0 |
-| 768 (tablet) | 768 | — | 720 | 2 | **352 × 542** | 0 |
-| 1024 | 1024 | 296 | 660 | 3 | 209 × 436 | 0 |
-| **1280** | 1280 | 296 | 916 | **3** | **295 × 500** | 0 |
-| **1366** | 1366 | 296 | 1002 | **3** | **323 × 521** | 0 |
-| 1391 | 1391 | 296 | 1027 | 3 | 332 × 528 | 0 |
-| **1392** | 1392 | 296 | 1028 | **4** | **245 × 463** | 0 |
-| **1440** | 1440 | 296 | 1076 | **4** | **257 × 472** | 0 |
-| **1536** | 1536 | 296 | 1172 | **4** | **281 × 490** | 0 |
-| **1600** | 1600 | 296 | 1236 | **4** | **297 × 502** | 0 |
-| **1920** | 1600 | 296 | 1236 | **4** | **297 × 502** | 160 |
+| viewport     | container | sidebar | área do grid | colunas | card          | margem externa |
+| ------------ | --------- | ------- | ------------ | ------- | ------------- | -------------- |
+| 390 (mobile) | 390       | —       | 366          | 1       | **366 × 178** | 0              |
+| 412 (mobile) | 412       | —       | 388          | 1       | 388 × 178     | 0              |
+| 768 (tablet) | 768       | —       | 720          | 2       | **352 × 542** | 0              |
+| 1024         | 1024      | 296     | 660          | 3       | 209 × 436     | 0              |
+| **1280**     | 1280      | 296     | 916          | **3**   | **295 × 500** | 0              |
+| **1366**     | 1366      | 296     | 1002         | **3**   | **323 × 521** | 0              |
+| 1391         | 1391      | 296     | 1027         | 3       | 332 × 528     | 0              |
+| **1392**     | 1392      | 296     | 1028         | **4**   | **245 × 463** | 0              |
+| **1440**     | 1440      | 296     | 1076         | **4**   | **257 × 472** | 0              |
+| **1536**     | 1536      | 296     | 1172         | **4**   | **281 × 490** | 0              |
+| **1600**     | 1600      | 296     | 1236         | **4**   | **297 × 502** | 0              |
+| **1920**     | 1600      | 296     | 1236         | **4**   | **297 × 502** | 160            |
 
 Gap sidebar→grid: **20px** em todas. Gap entre cards: **16px** em todas.
 
@@ -112,12 +112,12 @@ aí que a coisa quebra.
 **A medição que decidiu.** Varri a largura da sidebar de 264 a 320 contando
 elementos cujo conteúdo transborda a caixa (`scrollWidth > clientWidth`):
 
-| sidebar | controles transbordando | "Limpar filtros" |
-|---|---|---|
-| 264 – 288px | **3** | 2 linhas |
-| 292px | 2 | 2 linhas |
-| **296px** | **0** | 2 linhas → 1 com `nowrap` |
-| 320px (histórico) | 0 | 1 linha |
+| sidebar           | controles transbordando | "Limpar filtros"          |
+| ----------------- | ----------------------- | ------------------------- |
+| 264 – 288px       | **3**                   | 2 linhas                  |
+| 292px             | 2                       | 2 linhas                  |
+| **296px**         | **0**                   | 2 linhas → 1 com `nowrap` |
+| 320px (histórico) | 0                       | 1 linha                   |
 
 O que estoura é o botão **"Particulares (0)"** do filtro de vendedor: caixa de
 103px para 111px de conteúdo, com a borda direita saindo cortada. Não é
@@ -166,11 +166,11 @@ Nenhuma constante de `limit` aparece no diff.
 
 ## 9. Fim da página
 
-| | main | branch (1440) |
-|---|---|---|
-| vão grid → rodapé (desktop) | **1752px** | 116px |
-| vão grid → rodapé (mobile 390) | **2509px** | 180px |
-| vão paginação → rodapé | — | **48px** |
+|                                | main       | branch (1440) |
+| ------------------------------ | ---------- | ------------- |
+| vão grid → rodapé (desktop)    | **1752px** | 116px         |
+| vão grid → rodapé (mobile 390) | **2509px** | 180px         |
+| vão paginação → rodapé         | —          | **48px**      |
 
 Saíram do render (não do projeto) `NearbyRadiusSection`, `CityAuthoritySection`,
 `CompactCitySeoBlock` e `FaqBlock` — seis `<h2>` no total:
@@ -198,11 +198,11 @@ naquela tela. A mudança tornou explícito o que já era inerte.
 
 ## 10. Mobile inalterado — prova por pixel
 
-| Comparação | Pixels diferentes |
-|---|---|
-| Mobile 390 — primeira dobra | 6 de 329.160 (0,0018%), delta máx **4/255** |
+| Comparação                  | Pixels diferentes                                 |
+| --------------------------- | ------------------------------------------------- |
+| Mobile 390 — primeira dobra | 6 de 329.160 (0,0018%), delta máx **4/255**       |
 | Mobile 390 — página inteira | **idênticas até a linha 5479**; diferem só abaixo |
-| Tablet 768 — card | 352 × 542 nos dois builds |
+| Tablet 768 — card           | 352 × 542 nos dois builds                         |
 
 Os 6 pixels estão em `x=19` e `x=21` — a borda arredondada do card — nas mesmas
 linhas (`y=517`, `y=707`) das duas versões. É antialiasing de foto, não
@@ -237,16 +237,16 @@ extra.
 
 ## 12. Rotas irmãs — não-regressão medida
 
-| largura | rota | container | sidebar | col | card | "Limpar filtros" |
-|---|---|---|---|---|---|---|
-| 1280 | `/carros-em/atibaia-sp` | **1280** | **296** | **3** | **295** | 37px |
-| 1440 | `/carros-em/atibaia-sp` | **1440** | **296** | **4** | **257** | 37px |
-| 1920 | `/carros-em/atibaia-sp` | **1600** | **296** | **4** | **297** | 37px |
-| 1280 | `/comprar` | 1280 | 320 | 3 | 275 | 37px |
-| 1440 | `/comprar` | 1280 | 320 | 3 | 275 | 37px |
-| 1920 | `/comprar` | 1280 | 320 | 3 | 275 | 37px |
-| 1280 / 1440 / 1920 | `/carros-usados/sp` | 1280 | 320 | 3 | 275 | 37px |
-| 1280 / 1440 / 1920 | `/comprar/estado/sp` | 1280 | 320 | 3 | 275 | 37px |
+| largura            | rota                    | container | sidebar | col   | card    | "Limpar filtros" |
+| ------------------ | ----------------------- | --------- | ------- | ----- | ------- | ---------------- |
+| 1280               | `/carros-em/atibaia-sp` | **1280**  | **296** | **3** | **295** | 37px             |
+| 1440               | `/carros-em/atibaia-sp` | **1440**  | **296** | **4** | **257** | 37px             |
+| 1920               | `/carros-em/atibaia-sp` | **1600**  | **296** | **4** | **297** | 37px             |
+| 1280               | `/comprar`              | 1280      | 320     | 3     | 275     | 37px             |
+| 1440               | `/comprar`              | 1280      | 320     | 3     | 275     | 37px             |
+| 1920               | `/comprar`              | 1280      | 320     | 3     | 275     | 37px             |
+| 1280 / 1440 / 1920 | `/carros-usados/sp`     | 1280      | 320     | 3     | 275     | 37px             |
+| 1280 / 1440 / 1920 | `/comprar/estado/sp`    | 1280      | 320     | 3     | 275     | 37px             |
 
 As três irmãs mantêm container 1280, sidebar 320, 3 colunas e card de 275px em
 **1920px de viewport** — o comportamento histórico, sem um pixel de diferença. E
@@ -301,11 +301,11 @@ comportamento com 2+ páginas é o de sempre.
 alimenta só metadata e JSON-LD, mas derrubava a página inteira, inclusive o
 catálogo, que vem de outro loader e estava no ar.
 
-| Situação | Comportamento |
-|---|---|
-| cidade não existe | **404**, sempre |
-| serviço caiu + `"degrade"` | modelo mínimo, **200** com `noindex` |
-| serviço caiu + padrão | **404** (histórico, mantido nas landings irmãs) |
+| Situação                   | Comportamento                                   |
+| -------------------------- | ----------------------------------------------- |
+| cidade não existe          | **404**, sempre                                 |
+| serviço caiu + `"degrade"` | modelo mínimo, **200** com `noindex`            |
+| serviço caiu + padrão      | **404** (histórico, mantido nas landings irmãs) |
 
 Verificado em runtime: `/carros-em/cidade-fantasma-zz` → **404**.
 
@@ -316,11 +316,11 @@ Verificado em runtime: `/carros-em/cidade-fantasma-zz` → **404**.
 Saíram do `Promise.all` da rota `loadNearbyRadiusAds` e `loadCitySeoOverview`:
 4 cargas paralelas viraram 2.
 
-| Métrica | main | branch |
-|---|---|---|
-| HTML SSR | 305.592 B | **248.955 B (−18,5%)** |
-| TTFB (mediana de 5 quentes) | 0,292 s | 0,317 s |
-| First Load JS | 136 kB | 136 kB |
+| Métrica                     | main      | branch                 |
+| --------------------------- | --------- | ---------------------- |
+| HTML SSR                    | 305.592 B | **248.955 B (−18,5%)** |
+| TTFB (mediana de 5 quentes) | 0,292 s   | 0,317 s                |
+| First Load JS               | 136 kB    | 136 kB                 |
 
 **O TTFB não melhorou de forma mensurável** e as faixas se sobrepõem; as chamadas
 removidas batiam em backend com cache e não dominavam o tempo. O ganho real é de
@@ -331,12 +331,12 @@ eram Server Components — dizer que "a página ficou mais leve no JS" seria fal
 
 ## 17. Testes
 
-| Suíte | Arquivo | Testes |
-|---|---|---|
-| Variante de colunas | `components/buy/VehicleGrid.columns.test.tsx` | 6 |
-| Paginação página única | `components/buy/CatalogPagination.test.tsx` | 23 (6 novos) |
-| Resiliência SEO | `lib/seo/local-seo-data.resilience.test.ts` | 6 |
-| Geometria + sidebar E2E | `e2e/catalog-city-clean-grid.spec.ts` | **18** |
+| Suíte                   | Arquivo                                       | Testes       |
+| ----------------------- | --------------------------------------------- | ------------ |
+| Variante de colunas     | `components/buy/VehicleGrid.columns.test.tsx` | 6            |
+| Paginação página única  | `components/buy/CatalogPagination.test.tsx`   | 23 (6 novos) |
+| Resiliência SEO         | `lib/seo/local-seo-data.resilience.test.ts`   | 6            |
+| Geometria + sidebar E2E | `e2e/catalog-city-clean-grid.spec.ts`         | **18**       |
 
 O E2E mede bounding box real, com **piso de largura por viewport**: sem isso, um
 teste de "4 colunas" aceitaria 4 colunas de qualquer tamanho — inclusive as de
@@ -364,13 +364,13 @@ Playwright: **18 passed**.
 ## 18. Dois erros meus, registrados
 
 **Asserções de ausência vacuosas.** A lista de "blocos removidos" usava strings
-deduzidas do *nome* dos componentes ("Panorama do mercado", "Também na região
+deduzidas do _nome_ dos componentes ("Panorama do mercado", "Também na região
 de"…). Quatro das cinco **nunca existiram no HTML**: `not.toContain` de algo que
 jamais esteve lá é verde com ou sem a mudança. Descoberto ao comparar os `<h2>`
 dos dois builds; a lista foi refeita a partir do HTML medido e o teste ganhou uma
 contraprova (exige que H1 e cabeçalho de resultados continuem presentes).
 
-**Seletor certo no elemento errado.** `main .grid` casava o grid de *layout*
+**Seletor certo no elemento errado.** `main .grid` casava o grid de _layout_
 (sidebar + conteúdo): media "2 cards por linha" em qualquer largura, com card de
 624px. Não falhava — media outra coisa. O sinal foi o número absurdo. Corrigido
 ancorando em `[data-variant="grid"]`, que aparece 27 vezes (= 27 anúncios) e só
@@ -397,18 +397,18 @@ como wrapper de card.
 `reports/screenshots/fase-5-0b/` — 15 capturas da branch, 4 do baseline (`main`)
 e os JSON com todas as medidas.
 
-| Arquivo | O que mostra |
-|---|---|
-| `01-city-desktop-1280` (branch + baseline) | o antes e o depois em 1280 |
-| `02-city-desktop-1366` | 3 colunas, card de 323px |
-| `12-city-desktop-1392` | **o corte** — 4 colunas de 245px |
-| `03-city-desktop-1440` | **o obrigatório** — 4 colunas de 257px |
-| `04-city-desktop-1536` · `05-city-desktop-1600` · `06-city-desktop-1920` | 4 colunas |
-| `07-…-1440-fullpage` · `08-…-1920-fullpage` | página inteira |
-| `09/10-city-mobile-390` (branch + baseline) | base da comparação por pixel |
-| `11-city-tablet-768` | 2 colunas, inalterado |
-| `13-city-paginacao-desktop` · `14-city-footer-transition` | o fim da página |
-| `15-…-1280-fullpage` (branch + baseline) | o antes/depois com os blocos SEO |
+| Arquivo                                                                  | O que mostra                           |
+| ------------------------------------------------------------------------ | -------------------------------------- |
+| `01-city-desktop-1280` (branch + baseline)                               | o antes e o depois em 1280             |
+| `02-city-desktop-1366`                                                   | 3 colunas, card de 323px               |
+| `12-city-desktop-1392`                                                   | **o corte** — 4 colunas de 245px       |
+| `03-city-desktop-1440`                                                   | **o obrigatório** — 4 colunas de 257px |
+| `04-city-desktop-1536` · `05-city-desktop-1600` · `06-city-desktop-1920` | 4 colunas                              |
+| `07-…-1440-fullpage` · `08-…-1920-fullpage`                              | página inteira                         |
+| `09/10-city-mobile-390` (branch + baseline)                              | base da comparação por pixel           |
+| `11-city-tablet-768`                                                     | 2 colunas, inalterado                  |
+| `13-city-paginacao-desktop` · `14-city-footer-transition`                | o fim da página                        |
+| `15-…-1280-fullpage` (branch + baseline)                                 | o antes/depois com os blocos SEO       |
 
 ---
 
@@ -434,20 +434,20 @@ cd frontend && npx playwright test e2e/catalog-city-clean-grid.spec.ts --reporte
 
 ## 22. Gate
 
-| | |
-|---|---|
-| 1440 mostra 4 cards | ✅ card 257px |
-| cards com largura saudável | ✅ 245px no piso (1392), 257 em 1440, 297 em 1600+ |
-| sidebar legível | ✅ zero transbordos em 296px; rótulo em 1 linha |
-| sem compressão de título/preço | ✅ verificado nas capturas de 1392 a 1920 |
-| sem quebra de CTA | ✅ travado por teste E2E de `scrollWidth` |
-| 1366 testado de verdade | ✅ testado e **reprovado** — 3 colunas, com o porquê no §6 |
-| 1536 e 1920 mostram 4 | ✅ 281px e 297px |
-| mobile intacto | ✅ 6 pixels de antialiasing; idêntico até a linha 5479 |
-| outras rotas intactas | ✅ 1280/320/3col/275px em 1920 |
-| paginação intacta | ✅ inerte com 1 página, 0 links |
-| limit 50 intacto | ✅ três constantes fora do diff |
-| rodapé imediato após paginação | ✅ vão de 48px |
+|                                |                                                            |
+| ------------------------------ | ---------------------------------------------------------- |
+| 1440 mostra 4 cards            | ✅ card 257px                                              |
+| cards com largura saudável     | ✅ 245px no piso (1392), 257 em 1440, 297 em 1600+         |
+| sidebar legível                | ✅ zero transbordos em 296px; rótulo em 1 linha            |
+| sem compressão de título/preço | ✅ verificado nas capturas de 1392 a 1920                  |
+| sem quebra de CTA              | ✅ travado por teste E2E de `scrollWidth`                  |
+| 1366 testado de verdade        | ✅ testado e **reprovado** — 3 colunas, com o porquê no §6 |
+| 1536 e 1920 mostram 4          | ✅ 281px e 297px                                           |
+| mobile intacto                 | ✅ 6 pixels de antialiasing; idêntico até a linha 5479     |
+| outras rotas intactas          | ✅ 1280/320/3col/275px em 1920                             |
+| paginação intacta              | ✅ inerte com 1 página, 0 links                            |
+| limit 50 intacto               | ✅ três constantes fora do diff                            |
+| rodapé imediato após paginação | ✅ vão de 48px                                             |
 
 **Uma linha do gate não foi cumprida como pedida**: 1366 ficou em 3 colunas. O
 §6 traz a medição que levou a isso e a alternativa, caso a decisão de produto
