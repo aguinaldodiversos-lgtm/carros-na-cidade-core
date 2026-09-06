@@ -24,8 +24,32 @@ import { HOME_HERO_BANNER } from "@/lib/site/brand-assets";
  * md+ (≥768 px): aspect-[2120/640] = 53/16 ≈ 3.31
  *   - 1280 px de viewport → 386 px de altura (≈ histórico 380 px).
  *   - Casa com a recomendação de upload desktop: 2120×640 px.
+ *
+ * lg+ (≥1024 px): aspect-[2120/600] ≈ 3.53
+ *   - No teto de 1600 px → 453 px de altura (era 483 px em `md`).
+ *
+ * ── Por que 600 e não 560 ────────────────────────────────────────────────────
+ * O pedido era 560 (≈423 px). A arte REAL que o admin publica não tem a
+ * proporção recomendada: os banners em produção são 2048×683 (ratio 3.00),
+ * não 2120×640 (3.31). Como o slide usa `object-cover`, a diferença entre o
+ * ratio da arte e o do container vira corte no topo e na base:
+ *
+ *     container      altura@1600   corte no topo (px da arte de 683)
+ *     2120/640          483 px      32 px
+ *     2120/600          453 px      52 px      ← escolhido
+ *     2120/580          438 px      61 px      pin do logo colado na borda
+ *     2120/560          423 px      71 px      CORTA o pin do logo
+ *
+ * Medido nos três banners de produção: em 560 o marcador do logo
+ * "Carros na Cidade" (canto superior esquerdo) e o pin azul do canto direito
+ * perdem o topo. Em 600 os dois ficam com folga. Título, subtítulo, CTA e
+ * veículo sobrevivem em todas as proporções — o que decide é o logo.
+ *
+ * Se um dia a arte for republicada em 2120×640 de verdade, o corte some e
+ * proporções mais baixas voltam a caber. Enquanto a arte for 3.00, 600 é o
+ * piso seguro.
  */
-const BANNER_ASPECT_CLASS = "aspect-[2000/1400] md:aspect-[2120/640]";
+const BANNER_ASPECT_CLASS = "aspect-[2000/1400] md:aspect-[2120/640] lg:aspect-[2120/600]";
 
 /** Intervalo de autoplay em ms (Fase 4.1.3). */
 const AUTOPLAY_INTERVAL_MS = 6000;
@@ -301,10 +325,12 @@ export function HomeHero({
         escalada, nunca recortada a mais — o `object-cover` do desktop opera
         sempre sobre um container de mesmo aspect-ratio.
 
-        `pt-5 sm:pt-7` fica: é o respiro que separa a faixa do PublicHeader
-        sticky, e removê-lo mudaria o espaçamento vertical — fora do pedido.
+        `pt-5 sm:pt-7` fica no mobile e no tablet — é o respiro que separa o
+        card do PublicHeader sticky. No desktop (`lg:pt-0`) ele sai: ali o
+        banner é uma faixa encostada nas bordas, e o espaço em branco entre o
+        header e a faixa só empurrava a primeira dobra para baixo.
       */
-      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:max-w-[1600px] lg:px-0"
+      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:max-w-[1600px] lg:px-0 lg:pt-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
