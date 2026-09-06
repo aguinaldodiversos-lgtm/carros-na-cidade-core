@@ -278,14 +278,35 @@ export function HomeHero({
 
   return (
     <section
-      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:px-8"
+      /*
+        FAIXA FULL-BLEED a partir de `lg` (1024px).
+
+        Até `md` nada muda: teto `max-w-8xl` (90rem = 1440px), `px-4 sm:px-6` e
+        os cantos arredondados — o mobile aprovado fica intacto, inclusive o
+        `aspect-[2000/1400]` e o `object-contain` do slide.
+
+        De `lg` para cima o teto e o padding lateral saem (`lg:max-w-none
+        lg:px-0`) e o banner encosta nas duas bordas da viewport. A proporção
+        NÃO muda: o container mantém `md:aspect-[2120/640]`, então a altura
+        cresce junto com a largura e a arte é escalada, nunca recortada — o
+        `object-cover` do desktop opera sobre um container com o mesmo
+        aspect-ratio do asset.
+
+        `lg:rounded-none` acompanha por consequência: canto arredondado só faz
+        sentido quando existe margem para revelá-lo. Encostado na borda, ele
+        recortaria a arte nos quatro cantos sem nada atrás.
+
+        `pt-5 sm:pt-7` fica: é o respiro que separa a faixa do PublicHeader
+        sticky, e removê-lo mudaria o espaçamento vertical — fora do pedido.
+      */
+      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:max-w-none lg:px-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
       {/* Wrapper: overflow-hidden + rounded + shadow. SEM background — cada
           slide controla o seu (arte pronta usa bg neutro claro; fallback
           textual usa bg-cnc-footer-a). */}
-      <div className="relative w-full overflow-hidden rounded-2xl shadow-premium md:rounded-3xl">
+      <div className="relative w-full overflow-hidden rounded-2xl shadow-premium md:rounded-3xl lg:rounded-none">
         {/* Track: flex linear; movimento via transform: translateX. Não usa
             scroll-snap → não cria barra horizontal nativa. */}
         <div

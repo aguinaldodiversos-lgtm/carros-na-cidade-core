@@ -20,6 +20,7 @@ import { NextResponse } from "next/server";
 import { CITY_COOKIE_NAME } from "@/lib/city/city-constants";
 import { parseCityCookieValue } from "@/lib/city/parse-city-cookie-server";
 import { resolveTerritorialIndexTarget } from "@/lib/city/territorial-index-redirect";
+import { buildPublicRedirectUrl } from "@/lib/http/public-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -29,5 +30,9 @@ export async function GET(request: Request) {
   const target = await resolveTerritorialIndexTarget("simulador-financiamento", fromCookie?.slug);
 
   // 307: destino depende do cookie e do estoque vivo — não é permanente.
-  return NextResponse.redirect(new URL(target, request.url), 307);
+  //
+  // Mesma correção de origem de `/tabela-fipe`: o `Location` vem da origem
+  // pública (forwarded), nunca do host interno que `request.url` carrega
+  // atrás do proxy. Ver `lib/http/public-origin.ts`.
+  return NextResponse.redirect(buildPublicRedirectUrl(target, request), 307);
 }
