@@ -285,21 +285,26 @@ export function HomeHero({
         os cantos arredondados — o mobile aprovado fica intacto, inclusive o
         `aspect-[2000/1400]` e o `object-contain` do slide.
 
-        De `lg` para cima o teto e o padding lateral saem (`lg:max-w-none
-        lg:px-0`) e o banner encosta nas duas bordas da viewport. A proporção
-        NÃO muda: o container mantém `md:aspect-[2120/640]`, então a altura
-        cresce junto com a largura e a arte é escalada, nunca recortada — o
-        `object-cover` do desktop opera sobre um container com o mesmo
-        aspect-ratio do asset.
+        De `lg` para cima o padding lateral sai (`lg:px-0`) e o teto sobe de
+        `max-w-8xl` (1440px) para **1600px**, o mesmo do shell do catálogo
+        (`BuyMarketplacePageClient`, `CatalogPageHeader`) — é o valor de largura
+        máxima já padronizado no projeto, não um número novo.
 
-        `lg:rounded-none` acompanha por consequência: canto arredondado só faz
-        sentido quando existe margem para revelá-lo. Encostado na borda, ele
-        recortaria a arte nos quatro cantos sem nada atrás.
+        O teto existe porque `lg:max-w-none` (a primeira volta desta mudança)
+        deixava o banner crescer sem limite: em 1920 ele tomava a viewport
+        inteira e ficava grande demais. Com 1600px ele usa toda a largura
+        disponível até esse ponto e, acima dele, para de crescer e fica
+        centrado por `mx-auto`, abrindo ~160px de respiro de cada lado em 1920.
+
+        A proporção NÃO muda em nenhuma largura: o container mantém
+        `md:aspect-[2120/640]`, então a altura acompanha a largura e a arte é
+        escalada, nunca recortada a mais — o `object-cover` do desktop opera
+        sempre sobre um container de mesmo aspect-ratio.
 
         `pt-5 sm:pt-7` fica: é o respiro que separa a faixa do PublicHeader
         sticky, e removê-lo mudaria o espaçamento vertical — fora do pedido.
       */
-      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:max-w-none lg:px-0"
+      className="mx-auto w-full max-w-8xl px-4 pt-5 sm:px-6 sm:pt-7 lg:max-w-[1600px] lg:px-0"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
