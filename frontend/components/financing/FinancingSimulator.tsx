@@ -376,7 +376,7 @@ export default function FinancingSimulator({
           <span className="text-primary">
             <ShieldIcon />
           </span>
-          <span>Cálculo estimado. Valores sujeitos à análise de crédito.</span>
+          <span>Cálculo estimado. Valores sujeitos à análise de crédito e não incluem tarifas bancárias, tributos e demais encargos da operação.</span>
         </p>
       </section>
     </>
