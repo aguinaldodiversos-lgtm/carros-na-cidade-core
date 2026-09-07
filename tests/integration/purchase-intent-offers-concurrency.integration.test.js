@@ -119,9 +119,7 @@ process.env.DATABASE_URL = dbUrl;
 process.env.TEST_DATABASE_URL = dbUrl;
 process.env.NODE_ENV = "test";
 
-const offers = await import(
-  "../../src/modules/purchase-intents/purchase-intent-offers.service.js"
-);
+const offers = await import("../../src/modules/purchase-intents/purchase-intent-offers.service.js");
 const { closeDatabasePool } = await import("../../src/infrastructure/database/db.js");
 
 const pool = new Pool(buildPoolConfig(dbUrl));
@@ -252,11 +250,9 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
   it("getAdForDealer roda contra o banco (é o caminho do envio)", async () => {
     const world = await seedWorld();
 
-    const result = await offers.sendVehicleToBuyer(
-      String(world.dealerId),
-      String(world.intentId),
-      { ad_id: world.adIds[0] }
-    );
+    const result = await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+      ad_id: world.adIds[0],
+    });
     expect(result.created).toBe(true);
   }, 180000);
 
@@ -266,10 +262,7 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
       ad_id: world.adIds[0],
     });
 
-    const result = await offers.listReceivedOffers(
-      String(world.buyerId),
-      String(world.intentId)
-    );
+    const result = await offers.listReceivedOffers(String(world.buyerId), String(world.intentId));
     expect(result.offers).toHaveLength(1);
     expect(result.offers[0].vehicle.vehicle_name).toBe("Honda HR-V");
     expect(result.offers[0].dealer.name).toBe("ittmotors");
@@ -290,11 +283,9 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
       world.advertiserId,
     ]);
 
-    const sent = await offers.sendVehicleToBuyer(
-      String(world.dealerId),
-      String(world.intentId),
-      { ad_id: world.adIds[0] }
-    );
+    const sent = await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+      ad_id: world.adIds[0],
+    });
 
     const result = await offers.resolveOfferWhatsapp(
       String(world.buyerId),
@@ -312,11 +303,9 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
 
   it("a precedência COALESCE(whatsapp, mobile_phone, phone) vale no banco real", async () => {
     const world = await seedWorld();
-    const sent = await offers.sendVehicleToBuyer(
-      String(world.dealerId),
-      String(world.intentId),
-      { ad_id: world.adIds[0] }
-    );
+    const sent = await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+      ad_id: world.adIds[0],
+    });
 
     const whatsappOf = async () => {
       const result = await offers.resolveOfferWhatsapp(
@@ -333,9 +322,7 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
     );
     expect(await whatsappOf()).toBe("/5511911111111");
 
-    await pool.query(`UPDATE advertisers SET whatsapp = NULL WHERE id = $1`, [
-      world.advertiserId,
-    ]);
+    await pool.query(`UPDATE advertisers SET whatsapp = NULL WHERE id = $1`, [world.advertiserId]);
     expect(await whatsappOf()).toBe("/5511922222222");
 
     await pool.query(`UPDATE advertisers SET mobile_phone = NULL WHERE id = $1`, [
@@ -363,11 +350,9 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
       world.advertiserId,
     ]);
 
-    const sent = await offers.sendVehicleToBuyer(
-      String(world.dealerId),
-      String(world.intentId),
-      { ad_id: world.adIds[0] }
-    );
+    const sent = await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+      ad_id: world.adIds[0],
+    });
 
     // Outro comprador, com procura própria.
     const { rows: otherRows } = await pool.query(
@@ -430,11 +415,9 @@ describe.sequential("integração — as três consultas rodam no PostgreSQL rea
         world.advertiserId,
       ]);
 
-      const sent = await offers.sendVehicleToBuyer(
-        String(world.dealerId),
-        String(world.intentId),
-        { ad_id: world.adIds[0] }
-      );
+      const sent = await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+        ad_id: world.adIds[0],
+      });
 
       await pool.query(setup.sql, [setup.ad ? world.adIds[0] : world.advertiserId]);
 
@@ -564,11 +547,9 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
 
     await pool.query(`UPDATE ads SET status = 'paused' WHERE id = $1`, [world.adIds[0]]);
 
-    const fourth = await offers.sendVehicleToBuyer(
-      String(world.dealerId),
-      String(world.intentId),
-      { ad_id: world.adIds[3] }
-    );
+    const fourth = await offers.sendVehicleToBuyer(String(world.dealerId), String(world.intentId), {
+      ad_id: world.adIds[3],
+    });
     expect(fourth.created).toBe(true);
 
     // A relação do carro pausado continua no histórico — 4 linhas, não 3.
@@ -603,10 +584,7 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
       world.adIds[0],
     ]);
 
-    const result = await offers.listReceivedOffers(
-      String(world.buyerId),
-      String(world.intentId)
-    );
+    const result = await offers.listReceivedOffers(String(world.buyerId), String(world.intentId));
     expect(result.offers).toHaveLength(1);
     expect(Number(result.offers[0].vehicle.price)).toBe(96900);
     expect(result.offers[0].vehicle.mileage).toBe(74000);
@@ -621,12 +599,19 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
         ad_id: world.adIds[0],
       });
 
-      await pool.query(`UPDATE ads SET status = $2 WHERE id = $1`, [world.adIds[0], status]);
-
-      const result = await offers.listReceivedOffers(
-        String(world.buyerId),
-        String(world.intentId)
+      // A migration 062 (moderação administrativa, Fase 4.10A) acrescentou
+      // `ads_blocked_requires_reason_code`: status 'blocked' exige
+      // `blocked_reason_code`. Esta fixture é anterior e passou a violar o
+      // CHECK — a suíte inteira caía aqui. O motivo abaixo é sintético; o que
+      // o teste mede é `vehicle.available === false`, não o texto do motivo.
+      await pool.query(
+        `UPDATE ads SET status = $2,
+                blocked_reason_code = CASE WHEN $2 = 'blocked' THEN 'fraud_suspicion' ELSE NULL END
+          WHERE id = $1`,
+        [world.adIds[0], status]
       );
+
+      const result = await offers.listReceivedOffers(String(world.buyerId), String(world.intentId));
       expect(result.offers, `status ${status}`).toHaveLength(1);
       expect(result.offers[0].vehicle.available, `status ${status}`).toBe(false);
     }
@@ -642,10 +627,7 @@ describe.sequential("integração — limite de 3 sob concorrência real", () =>
       world.advertiserId,
     ]);
 
-    const result = await offers.listReceivedOffers(
-      String(world.buyerId),
-      String(world.intentId)
-    );
+    const result = await offers.listReceivedOffers(String(world.buyerId), String(world.intentId));
     expect(result.offers).toHaveLength(1);
     expect(result.offers[0].vehicle.available).toBe(false);
   }, 180000);

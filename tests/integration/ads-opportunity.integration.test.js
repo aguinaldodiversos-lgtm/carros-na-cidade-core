@@ -141,8 +141,12 @@ async function setupFixtures(db) {
   const userId = userRows[0].id;
 
   const { rows: advRows } = await db.query(
-    `INSERT INTO advertisers (user_id, name) VALUES ($1, 'Vendedor Test') RETURNING id`,
-    [userId]
+    // `city_id` e `slug` são NOT NULL desde a baseline 003; a fixture ficou
+    // para trás e derrubava o arquivo inteiro no setup (18 das 40 falhas da
+    // suíte de integração). Ver reports/homologacao-…-2026-09-06.md, BUG-INT-01.
+    `INSERT INTO advertisers (user_id, city_id, name, slug)
+     VALUES ($1, $2, 'Vendedor Test', 'vendedor-test-opp') RETURNING id`,
+    [userId, cityId]
   );
   const advertiserId = advRows[0].id;
 

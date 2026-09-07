@@ -321,16 +321,7 @@ for (const ad of DEALER_ADS) {
             status = 'active', images = '[]'::jsonb, updated_at = NOW()
       WHERE slug = $1
       RETURNING id`,
-    [
-      ad.slug,
-      advertiser.id,
-      advertiser.city_id,
-      ad.title,
-      ad.price,
-      ad.model,
-      ad.year,
-      ad.mileage,
-    ]
+    [ad.slug, advertiser.id, advertiser.city_id, ad.title, ad.price, ad.model, ad.year, ad.mileage]
   );
 
   if (touched.rowCount === 0) {
@@ -595,6 +586,361 @@ await pool.query(
   ]
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+// FASE H1.5 — o que a suíte exige e o seed não entregava
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// A homologação de 2026-09-06 mediu: 25 dos 38 vermelhos e 6 dos 13 skips do
+// E2E vinham daqui, não do produto. O caso mais grave era silencioso — o gate
+// do CI (`full-flow.spec.ts`) pulava 6 dos 9 testes porque `testa@`/`testb@`
+// não existiam, e o job terminava verde sem ter exercitado publicação nenhuma.
+//
+// Todos os dados abaixo são SINTÉTICOS. Nada vem de produção.
+
+const SENHA_PADRAO_TESTE = "Admin@12345";
+
+/**
+ * Cria/atualiza uma conta de teste de forma idempotente.
+ *
+ * `UPDATE`-primeiro em vez de `INSERT … ON CONFLICT` porque o e-mail pode já
+ * existir com outra senha (rodadas anteriores, banco compartilhado): o que
+ * importa é o estado FINAL determinístico, não quem chegou primeiro.
+ */
+async function ensureTestAccount({ email, senha, nome, documentType = "cpf", role = "user" }) {
+  const senhaHash = await bcrypt.hash(senha, 10);
+
+  const atualizado = await pool.query(
+    `UPDATE users
+        SET password_hash = $2, name = $3, document_type = $4, role = $5,
+            email_verified = true, document_verified = true, plan = COALESCE(plan, 'free')
+      WHERE LOWER(email) = LOWER($1)
+      RETURNING id`,
+    [email, senhaHash, nome, documentType, role]
+  );
+  if (atualizado.rows[0]) return String(atualizado.rows[0].id);
+
+  const criado = await pool.query(
+    `INSERT INTO users (email, password_hash, name, document_type, role, plan,
+                        email_verified, document_verified)
+     VALUES ($1, $2, $3, $4, $5, 'free', true, true)
+     RETURNING id`,
+    [email, senhaHash, nome, documentType, role]
+  );
+  return String(criado.rows[0].id);
+}
+
+// --- USERS.A / USERS.B (frontend/e2e/helpers.ts) -----------------------------
+//
+// Os defaults dos helpers, não valores novos: `testa@carrosnacidade.com` /
+// `SenhaTesteA123!`. Inventar outro par aqui só empurraria o problema para o
+// dia em que alguém rodasse sem exportar TEST_USER_A_*.
+//
+// São contas de PESSOA FÍSICA com documento verificado, porque o fluxo que o
+// gate protege é justamente cadastro → wizard → publicação, e o gate de
+// documento pararia o wizard no primeiro passo.
+const CONTAS_FULL_FLOW = [
+  { email: "testa@carrosnacidade.com", senha: "SenhaTesteA123!", nome: "E2E Usuário A" },
+  { email: "testb@carrosnacidade.com", senha: "SenhaTesteB123!", nome: "E2E Usuário B" },
+];
+
+const idsFullFlow = [];
+for (const conta of CONTAS_FULL_FLOW) {
+  const id = await ensureTestAccount(conta);
+  idsFullFlow.push({ ...conta, id });
+  // O wizard publica através de um advertiser; sem ele o POST final falha com
+  // erro de vínculo, e o teste acusaria "publicação quebrada" sem estar.
+  await ensureAdvertiserForUser(id, { cityId: Number(seedCityId), source: "e2e-seed" });
+}
+
+// --- Conta administrativa de moderação (BUG-E2E-02) --------------------------
+//
+// `admin-ad-moderation.spec.ts:22` declara exatamente este par. O spec falhava
+// com "login falhou para admin.mod@example.com: 401" — a conta simplesmente
+// não existia. `role = 'admin'` é o que `requireAdmin()` exige.
+const adminModId = await ensureTestAccount({
+  email: "admin.mod@example.com",
+  senha: SENHA_PADRAO_TESTE,
+  nome: "E2E Admin Moderação",
+  role: "admin",
+});
+
+// O mesmo spec loga como `cnpj@carrosnacidade.com` com a MESMA senha — os
+// lojistas acima são criados com outra. Alinhar aqui evita um 401 no dono.
+await pool.query(`UPDATE users SET password_hash = $2 WHERE LOWER(email) = LOWER($1)`, [
+  "cnpj@carrosnacidade.com",
+  await bcrypt.hash(SENHA_PADRAO_TESTE, 10),
+]);
+
+// --- Fotos e estoque da vitrine ---------------------------------------------
+//
+// Dois problemas distintos, mesma origem:
+//
+//   • `catalog-city-clean-grid.spec.ts` exige `boxes.length > expected`, com
+//     `expected` chegando a 4. Com 3 anúncios em Atibaia, TODOS os casos
+//     desktop reprovavam na pré-condição — 11 vermelhos que não falavam sobre
+//     o grid, e sim sobre o seed.
+//   • `vehicle-detail-premium.spec.ts` esperava galeria, e os 4 anúncios
+//     semeados tinham `images = '[]'`.
+//
+// As imagens apontam para arquivos reais de `frontend/public/` — caminho
+// relativo, servido pelo próprio Next. Nada de URL externa: um teste de galeria
+// não pode depender de rede de terceiros.
+const FOTOS_TESTE = [
+  "/images/carro_pagina_simulador.png",
+  "/images/banner-simulador-financiamento-desktop.png",
+  "/images/banner-simulador-financiamento-mobile.png",
+  "/images/pagina-simulador-de-financiamento.png",
+  "/images/vender-para-loja.png",
+];
+
+/** Dá `quantidade` fotos ao anúncio do slug. 0 = anúncio sem foto (caso real). */
+async function setAdImages(slug, quantidade) {
+  await pool.query(`UPDATE ads SET images = $2::jsonb, updated_at = NOW() WHERE slug = $1`, [
+    slug,
+    JSON.stringify(FOTOS_TESTE.slice(0, quantidade)),
+  ]);
+}
+
+for (const ad of DEALER_ADS) {
+  await setAdImages(ad.slug, 3);
+}
+
+// Anúncios extras em Atibaia — sobem o estoque da cidade-base de 3 para 8.
+// Variedade de marca/modelo/preço é deliberada: um grid de 8 carros idênticos
+// esconderia bug de ordenação e de deduplicação.
+const ADS_VITRINE = [
+  {
+    slug: "vw-nivus-comfortline-2022-atibaia-sp-e2e-5",
+    title: "Volkswagen Nivus Comfortline 2022",
+    brand: "Volkswagen",
+    model: "NIVUS COMFORTLINE 1.0 TSI Flex",
+    price: 112900,
+    year: 2022,
+    mileage: 38000,
+    body: "suv",
+  },
+  {
+    slug: "fiat-argo-drive-2021-atibaia-sp-e2e-6",
+    title: "Fiat Argo Drive 2021",
+    brand: "Fiat",
+    model: "ARGO DRIVE 1.3 Flex 8V 5p",
+    price: 68900,
+    year: 2021,
+    mileage: 51000,
+    body: "hatch",
+  },
+  {
+    slug: "toyota-corolla-xei-2020-atibaia-sp-e2e-7",
+    title: "Toyota Corolla XEi 2020",
+    brand: "Toyota",
+    model: "COROLLA XEi 2.0 Flex 16V Aut.",
+    price: 118500,
+    year: 2020,
+    mileage: 62000,
+    body: "sedan",
+  },
+  {
+    slug: "jeep-renegade-longitude-2023-atibaia-sp-e2e-8",
+    title: "Jeep Renegade Longitude 2023",
+    brand: "Jeep",
+    model: "RENEGADE LONGITUDE 1.3 T270 Aut.",
+    price: 134900,
+    year: 2023,
+    mileage: 22000,
+    body: "suv",
+  },
+  {
+    slug: "hyundai-hb20-vision-2022-atibaia-sp-e2e-9",
+    title: "Hyundai HB20 Vision 2022",
+    brand: "Hyundai",
+    model: "HB20 VISION 1.0 Flex 12V Mec.",
+    price: 74900,
+    year: 2022,
+    mileage: 44000,
+    body: "hatch",
+  },
+];
+
+const { rows: lojaAtibaiaRows } = await pool.query(
+  `SELECT adv.id, adv.city_id
+     FROM advertisers adv
+     JOIN users u ON u.id = adv.user_id
+    WHERE LOWER(u.email) = LOWER($1)
+    ORDER BY adv.id ASC
+    LIMIT 1`,
+  ["cnpj@carrosnacidade.com"]
+);
+const lojaAtibaia = lojaAtibaiaRows[0];
+if (!lojaAtibaia)
+  throw new Error("[e2e-seed] Advertiser de cnpj@carrosnacidade.com não encontrado.");
+
+for (const ad of ADS_VITRINE) {
+  const tocado = await pool.query(
+    `UPDATE ads
+        SET advertiser_id = $2, city_id = $3, title = $4, price = $5, brand = $6, model = $7,
+            year = $8, mileage = $9, body_type = $10, transmission = 'automatico',
+            status = 'active', images = $11::jsonb, updated_at = NOW()
+      WHERE slug = $1
+      RETURNING id`,
+    [
+      ad.slug,
+      lojaAtibaia.id,
+      lojaAtibaia.city_id,
+      ad.title,
+      ad.price,
+      ad.brand,
+      ad.model,
+      ad.year,
+      ad.mileage,
+      ad.body,
+      JSON.stringify(FOTOS_TESTE.slice(0, 3)),
+    ]
+  );
+  if (tocado.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO ads (advertiser_id, city_id, title, price, brand, model, year, mileage,
+                        body_type, transmission, status, slug, images)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'automatico', 'active', $10, $11::jsonb)`,
+      [
+        lojaAtibaia.id,
+        lojaAtibaia.city_id,
+        ad.title,
+        ad.price,
+        ad.brand,
+        ad.model,
+        ad.year,
+        ad.mileage,
+        ad.body,
+        ad.slug,
+        JSON.stringify(FOTOS_TESTE.slice(0, 3)),
+      ]
+    );
+  }
+}
+
+// --- Os três slugs fixos de `vehicle-detail-premium.spec.ts` -----------------
+//
+// O spec referencia slugs LITERAIS, herdados de um dataset de produção. Não dá
+// para "consertar o locator": ou o ambiente tem esses slugs, ou o spec não roda
+// em lugar nenhum a não ser produção — que é justamente onde a suíte não pode
+// rodar. Semear os três slugs com conteúdo sintético devolve o teste ao ciclo
+// local, e a contagem de fotos (5 / 1 / 0) é o contrato que ele afirma.
+const ADS_DETALHE_PREMIUM = [
+  {
+    slug: "fiat-pulse-audace-1-0-turbo-200-flex-aut-2024-1775233738284",
+    title: "Fiat Pulse Audace 1.0 Turbo 200 Flex Aut. 2024",
+    brand: "Fiat",
+    model: "PULSE AUDACE 1.0 TURBO 200 Flex Aut.",
+    price: 119900,
+    year: 2024,
+    mileage: 18000,
+    body: "suv",
+    fotos: 5,
+  },
+  {
+    slug: "gm-chevrolet-onix-sedan-plus-ltz-1-0-12v-tb-flex-aut-2025-1775185123098",
+    title: "Chevrolet Onix Sedan Plus LTZ 1.0 Turbo 2025",
+    brand: "Chevrolet",
+    model: "ONIX SEDAN PLUS LTZ 1.0 12V TB Flex Aut.",
+    price: 109900,
+    year: 2025,
+    mileage: 9000,
+    body: "sedan",
+    fotos: 1,
+  },
+  {
+    slug: "vw-volkswagen-t-cross-200-tsi-1-0-flex-12v-5p-aut-2024-1775008912992",
+    title: "Volkswagen T-Cross 200 TSI 1.0 Flex 2024",
+    brand: "Volkswagen",
+    model: "T-CROSS 200 TSI 1.0 Flex 12V 5p Aut.",
+    price: 127900,
+    year: 2024,
+    mileage: 26000,
+    body: "suv",
+    fotos: 0,
+  },
+];
+
+for (const ad of ADS_DETALHE_PREMIUM) {
+  const imagens = JSON.stringify(FOTOS_TESTE.slice(0, ad.fotos));
+  const tocado = await pool.query(
+    `UPDATE ads
+        SET advertiser_id = $2, city_id = $3, title = $4, price = $5, brand = $6, model = $7,
+            year = $8, mileage = $9, body_type = $10, transmission = 'automatico',
+            status = 'active', images = $11::jsonb, updated_at = NOW()
+      WHERE slug = $1
+      RETURNING id`,
+    [
+      ad.slug,
+      lojaAtibaia.id,
+      lojaAtibaia.city_id,
+      ad.title,
+      ad.price,
+      ad.brand,
+      ad.model,
+      ad.year,
+      ad.mileage,
+      ad.body,
+      imagens,
+    ]
+  );
+  if (tocado.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO ads (advertiser_id, city_id, title, price, brand, model, year, mileage,
+                        body_type, transmission, status, slug, images)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'automatico', 'active', $10, $11::jsonb)`,
+      [
+        lojaAtibaia.id,
+        lojaAtibaia.city_id,
+        ad.title,
+        ad.price,
+        ad.brand,
+        ad.model,
+        ad.year,
+        ad.mileage,
+        ad.body,
+        ad.slug,
+        imagens,
+      ]
+    );
+  }
+}
+
+const { rows: contagemRows } = await pool.query(
+  `SELECT COUNT(*)::int AS n
+     FROM ads a JOIN cities c ON c.id = a.city_id
+    WHERE a.status = 'active' AND c.slug = 'atibaia-sp'`
+);
+const anunciosAtibaia = contagemRows[0]?.n ?? 0;
+if (anunciosAtibaia < 6) {
+  throw new Error(
+    `[e2e-seed] Atibaia ficou com ${anunciosAtibaia} anúncios ativos; a suíte de grid exige ao menos 6.`
+  );
+}
+
+// --- Marcador de "ambiente E2E preparado" ------------------------------------
+//
+// Lido por `frontend/playwright.config.ts`, que liga `E2E_SEEDED=1` e, com
+// isso, converte SKIP em FAIL no caminho crítico. Sem este arquivo o skip
+// continua legítimo (quem não preparou o ambiente não deve ver 30 vermelhos);
+// com ele, login que falha é defeito e o CI reprova — que é o ponto.
+const contasSemeadas = [
+  ...idsFullFlow.map((c) => ({ email: c.email, purpose: "USERS.A/B — full-flow.spec.ts" })),
+  { email: "admin.mod@example.com", role: "admin", purpose: "admin-ad-moderation.spec.ts" },
+  { email: E2E_EMAIL, documentType: "cpf", purpose: "LOCAL_EMAIL — loginAsLocalUser" },
+  { email: "cnpj@carrosnacidade.com", documentType: "cnpj", purpose: "lojista dono/Atibaia" },
+];
+
+const marcador = {
+  seededAt: new Date().toISOString(),
+  databaseUrl: conn,
+  accounts: contasSemeadas,
+  activeAdsInBaseCity: anunciosAtibaia,
+};
+const { writeFileSync } = await import("node:fs");
+const marcadorPath = path.join(__dirname, "../frontend/e2e/.seed-state.json");
+writeFileSync(marcadorPath, `${JSON.stringify(marcador, null, 2)}\n`, "utf8");
+
 await closeDatabasePool();
 
 console.log(
@@ -602,5 +948,10 @@ console.log(
   E2E_EMAIL,
   "+ cidade Atibaia + advertiser + lojistas CNPJ (Atibaia x2/Bragança)",
   `+ ${DEALER_ADS.length} anúncios de estoque (Fase 3)`,
-  `+ solicitação de venda #${saleRequestId} com 4 fotos (Fase 4.3)`
+  `+ solicitação de venda #${saleRequestId} com 4 fotos (Fase 4.3)`,
+  `+ ${CONTAS_FULL_FLOW.length} contas full-flow (testa/testb)`,
+  `+ admin.mod#${adminModId}`,
+  `+ ${ADS_VITRINE.length} anúncios de vitrine e ${ADS_DETALHE_PREMIUM.length} de detalhe premium`,
+  `= ${anunciosAtibaia} ativos em Atibaia`,
+  `| marcador: ${marcadorPath}`
 );

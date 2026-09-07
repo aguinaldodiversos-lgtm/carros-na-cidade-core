@@ -31,6 +31,8 @@ import {
   logout,
   waitForDashboard,
   createAdDraft,
+  requireSeededApi,
+  requireSeededLogin,
 } from "./helpers";
 import { runPublishWizardFlow } from "./publish-wizard";
 
@@ -69,21 +71,10 @@ test.describe.serial("1 — Dashboard carrega após login [P1]", () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      if (!loginRes.ok()) {
-        const body = await loginRes.text();
-        test.skip(
-          loginRes.status() === 401,
-          `Credenciais inválidas para usuário A (${USERS.A.email}). ` +
-            `Crie o usuário com npm run e2e:prepare ou defina TEST_USER_A_EMAIL/PASS. ${body.slice(0, 160)}`
-        );
-        test.skip(
-          loginRes.status() >= 500 || /ECONNREFUSED/i.test(body),
-          `API/DB indisponível (HTTP ${loginRes.status()}). Suba Postgres + API. ${body.slice(0, 160)}`
-        );
-        throw new Error(
-          `POST /api/auth/login falhou: HTTP ${loginRes.status()} — ${body.slice(0, 500)}`
-        );
-      }
+      await requireSeededLogin(loginRes, {
+        email: USERS.A.email,
+        hint: "conta criada por scripts/e2e-seed.mjs (ou TEST_USER_A_EMAIL/PASS)",
+      });
 
       await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60_000 });
       await page.waitForURL(/\/dashboard/, { timeout: 60_000 });
@@ -92,8 +83,15 @@ test.describe.serial("1 — Dashboard carrega após login [P1]", () => {
       await waitForDashboard(page);
 
       // Conteúdo esperado: saudação "Olá" ou heading do painel.
+      // `.first()`: o `.or()` casava DOIS elementos (o H1 "Olá, …" e o H2
+      // "Meus anúncios" do card) e o strict mode reprovava com
+      // "resolved to 2 elements". A intenção é "ao menos um sinal de painel
+      // renderizado" — que é o que `.first()` afirma.
       await expect(
-        page.getByText(/Olá,/i).or(page.getByRole("heading", { name: /Painel|Resumo|Meus/i }))
+        page
+          .getByText(/Olá,/i)
+          .or(page.getByRole("heading", { name: /Painel|Resumo|Meus/i }))
+          .first()
       ).toBeVisible({ timeout: 30_000 });
 
       // O elemento raiz deve carregar o user-id — prova que os dados são do usuário correto.
@@ -115,7 +113,13 @@ test.describe.serial("1 — Dashboard carrega após login [P1]", () => {
       data: { email: USERS.A.email, password: USERS.A.password },
       headers: { "Content-Type": "application/json" },
     });
-    test.skip(!loginRes.ok(), "Usuário A indisponível — pule este teste (ver Suite 1, teste 1).");
+    await requireSeededLogin(loginRes, { email: USERS.A.email });
+
+    // O POST acima é só a SONDA que decide falhar-vs-pular; ele deixa o cookie
+    // de sessão no contexto. Sem limpar, o /login abaixo redireciona para o
+    // painel (usuário já autenticado) e o formulário nunca aparece — o teste
+    // acusaria "login-email não visível" sem haver defeito nenhum.
+    await prepareCleanBrowserState(page, context);
 
     await login(page, USERS.A);
     await waitForDashboard(page);
@@ -156,7 +160,7 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
         data: { email: emailA, password },
         headers: { "Content-Type": "application/json" },
       });
-      test.skip(!regA.ok(), "Registro indisponível (backend/Postgres). Suba a API.");
+      await requireSeededApi(regA, { what: "cadastro do usuário A" });
 
       const meA = await ctxA.get("/api/dashboard/me");
       expect(
@@ -176,7 +180,7 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
         data: { email: emailB, password },
         headers: { "Content-Type": "application/json" },
       });
-      test.skip(!regB.ok(), "Registro indisponível (backend/Postgres). Suba a API.");
+      await requireSeededApi(regB, { what: "cadastro do usuário B" });
 
       const meB = await ctxB.get("/api/dashboard/me");
       expect(
@@ -213,7 +217,7 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
         data: { email: emailA, password },
         headers: { "Content-Type": "application/json" },
       });
-      test.skip(!regA.ok(), "Registro indisponível — pule isolamento avançado.");
+      await requireSeededApi(regA, { what: "cadastro do usuário A (isolamento)" });
     } finally {
       await ctxSetup.dispose();
     }
@@ -227,7 +231,7 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
         headers: { "Content-Type": "application/json" },
       });
       const meA = await ctxA.get("/api/dashboard/me");
-      if (!meA.ok()) test.skip(true, "Login como A falhou.");
+      await requireSeededApi(meA, { what: "GET /api/dashboard/me do usuário A" });
       const jsonA = (await meA.json()) as {
         user?: { id?: string };
         active_ads?: Array<{ user_id?: string }>;
@@ -263,7 +267,7 @@ test.describe.serial("2 — Isolamento de dados entre usuários [P1]", () => {
         data: { email: USERS.A.email, password: USERS.A.password },
         headers: { "Content-Type": "application/json" },
       });
-      test.skip(!loginRes.ok(), "Usuário A indisponível — pule teste de logout.");
+      await requireSeededLogin(loginRes, { email: USERS.A.email });
 
       await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60_000 });
       await waitForDashboard(page);
@@ -296,7 +300,7 @@ test.describe.serial("3 — Upload de fotos no wizard [P2]", () => {
       data: { email: USERS.A.email, password: USERS.A.password },
       headers: { "Content-Type": "application/json" },
     });
-    test.skip(!loginRes.ok(), "Usuário A indisponível — pule teste de upload.");
+    await requireSeededLogin(loginRes, { email: USERS.A.email });
 
     // Injeta estado mínimo no localStorage para pular steps 0 e 1 do wizard
     // sem precisar de FIPE (marcas/modelos). Vai direto para step 2 (Fotos).
@@ -429,18 +433,10 @@ test.describe.serial("4 — Fluxo completo: login → wizard → publicação �
         headers: { "Content-Type": "application/json" },
       });
 
-      if (!loginRes.ok()) {
-        const body = await loginRes.text();
-        test.skip(
-          loginRes.status() === 401,
-          `Login usuário A falhou (401). Configure TEST_USER_A_EMAIL/PASS. ${body.slice(0, 160)}`
-        );
-        test.skip(
-          loginRes.status() >= 500 || /ECONNREFUSED/i.test(body),
-          `API/DB indisponível (HTTP ${loginRes.status()}). Suba Postgres + API. ${body.slice(0, 160)}`
-        );
-        throw new Error(`POST /api/auth/login: ${loginRes.status()} — ${body.slice(0, 400)}`);
-      }
+      await requireSeededLogin(loginRes, {
+        email: USERS.A.email,
+        hint: "este é o gate do caminho crítico — publicar exige sessão",
+      });
 
       // Navega para o painel para confirmar que está logado.
       await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -495,7 +491,7 @@ test.describe.serial("4 — Fluxo completo: login → wizard → publicação �
       data: { email: USERS.A.email, password: USERS.A.password },
       headers: { "Content-Type": "application/json" },
     });
-    test.skip(!loginRes.ok(), "Usuário A indisponível.");
+    await requireSeededLogin(loginRes, { email: USERS.A.email });
 
     await createAdDraft(page);
 

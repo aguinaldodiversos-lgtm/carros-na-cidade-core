@@ -71,7 +71,7 @@ jobs:
         run: echo "### Backend checks passed" >> "$GITHUB_STEP_SUMMARY"
 
   integration-ads:
-    name: Integration (ads + Postgres)
+    name: Integration (ads + Postgres + MinIO)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -92,6 +92,18 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
       NODE_ENV: test
       PG_SSL_MODE: disable
+      # ── Object storage de TESTE (BUG-ENV-01) ────────────────────────────────
+      # Mesmos NOMES que produção usa com o Cloudflare R2 — o produto não sabe
+      # que está falando com MinIO. A diferença é 100% de env; nenhum adapter
+      # muda. Credenciais sintéticas, iguais às do docker-compose.test.yml.
+      R2_ENDPOINT: http://127.0.0.1:9000
+      R2_ACCOUNT_ID: carros-e2e
+      R2_ACCESS_KEY_ID: carros-e2e-access-key
+      R2_SECRET_ACCESS_KEY: carros-e2e-secret-key
+      R2_BUCKET_NAME: carros-e2e-test
+      AWS_REGION: us-east-1
+      R2_PUBLIC_BASE_URL: http://127.0.0.1:9000/carros-e2e-test
+      NEXT_PUBLIC_R2_PUBLIC_BASE_URL: http://127.0.0.1:9000/carros-e2e-test
     steps:
       - uses: actions/checkout@v4
 
@@ -103,12 +115,37 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Integration tests (ads + DB)
-        run: npm run ci:integration-ads
+      # MinIO sobe pelo MESMO docker-compose.test.yml usado no desenvolvimento.
+      # Reaproveitar a definição (em vez de reescrever `docker run` aqui) evita
+      # que CI e máquina local divirjam em imagem, credencial ou região.
+      - name: Start MinIO (object storage de teste)
+        run: docker compose -f docker-compose.test.yml up -d minio_test
+
+      # Espera o storage responder a uma chamada ASSINADA e cria o bucket.
+      # Falha aqui derruba o job de propósito: indisponibilidade de storage não
+      # pode virar skip — foi exatamente assim que o BUG-ENV-01 passou batido.
+      - name: Prepare test bucket (falha se MinIO não subir)
+        run: npm run storage:prepare
+
+      # Antes desta fase o CI chamava `ci:integration-ads`, que aponta para UM
+      # arquivo (`ads-pipeline`). Os outros 21 de `tests/integration/**` nunca
+      # rodavam na pipeline — e seis estavam quebrados por fixtures defasadas
+      # em relação ao schema. Ver relatório da Fase H1.5, BUG-INT-01.
+      - name: Integration tests (suíte completa + Postgres)
+        run: npm run ci:integration
+
+      # Quarentena VISÍVEL: dois arquivos continuam vermelhos porque acharam
+      # defeito real (BUG-REG-01 self-row de region_memberships; BUG-MIG-01 FK
+      # de platform_settings em banco legado com users.id UUID). Não bloqueiam o
+      # merge, mas aparecem em toda execução — o oposto de sumir da pipeline.
+      # Remover este passo quando os dois achados forem resolvidos.
+      - name: Integration — quarentena (não bloqueante, ver BUG-REG-01/BUG-MIG-01)
+        continue-on-error: true
+        run: npm run ci:integration:quarantine
 
       - name: Job summary
         if: success()
-        run: echo "### Integration (ads) passed" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "### Integration (suíte completa, exceto quarentena) passed" >> "$GITHUB_STEP_SUMMARY"
 
   frontend:
     name: Frontend (lint + typecheck + test + build)
@@ -177,14 +214,40 @@ jobs:
       E2E_BACKEND_API_URL: http://127.0.0.1:4000
       BACKEND_API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
-      TEST_USER_A_EMAIL: ${{ secrets.E2E_USER_A_EMAIL }}
-      TEST_USER_A_PASS: ${{ secrets.E2E_USER_A_PASS }}
-      TEST_USER_B_EMAIL: ${{ secrets.E2E_USER_B_EMAIL }}
-      TEST_USER_B_PASS: ${{ secrets.E2E_USER_B_PASS }}
+      # As contas A/B vêm do seed oficial (scripts/e2e-seed.mjs), não de secrets.
+      # O acoplamento anterior era a RAIZ do BUG-CI-01: um secret vazio virava
+      # string vazia (`process.env.X ?? default` não substitui ""), o login
+      # falhava e os 6 testes do caminho crítico PULAVAM — com o job publicando
+      # "E2E full-flow passed" sem ter exercitado publicação nenhuma.
+      #
+      # E2E_SEEDED=1 declara o ambiente como preparado. Nesse estado,
+      # `requireSeededLogin` (frontend/e2e/helpers.ts) converte skip em FALHA.
+      E2E_SEEDED: "1"
       JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-jwt-secret-placeholder' }}
-      AUTH_SESSION_SECRET: ${{ secrets.AUTH_SESSION_SECRET || 'ci-session-secret-placeholder' }}
+      # AUTH_SESSION_SECRET fica DELIBERADAMENTE indefinido.
+      #
+      # Vários specs (active-buyers, dealer-*, admin-ad-moderation) forjam o
+      # cookie de sessão assinando com a constante de desenvolvimento
+      # "cnc-dev-session-secret" (services/sessionService.ts). Definir outro
+      # segredo aqui quebra o HMAC de todos eles com 401 — sem nenhuma relação
+      # com o produto. Medido na homologação de 2026-09-06 (BUG-AMB-01).
       PW_START_SERVER: "1"
       NODE_ENV: test
+      DISABLE_REDIS: "true"
+      RUN_MIGRATIONS: "false"
+      RUN_WORKERS: "false"
+      # ── Object storage de TESTE (BUG-ENV-01) ────────────────────────────────
+      # Mesmos NOMES que produção usa com o Cloudflare R2 — o produto não sabe
+      # que está falando com MinIO. A diferença é 100% de env; nenhum adapter
+      # muda. Credenciais sintéticas, iguais às do docker-compose.test.yml.
+      R2_ENDPOINT: http://127.0.0.1:9000
+      R2_ACCOUNT_ID: carros-e2e
+      R2_ACCESS_KEY_ID: carros-e2e-access-key
+      R2_SECRET_ACCESS_KEY: carros-e2e-secret-key
+      R2_BUCKET_NAME: carros-e2e-test
+      AWS_REGION: us-east-1
+      R2_PUBLIC_BASE_URL: http://127.0.0.1:9000/carros-e2e-test
+      NEXT_PUBLIC_R2_PUBLIC_BASE_URL: http://127.0.0.1:9000/carros-e2e-test
     defaults:
       run:
         working-directory: frontend
@@ -209,6 +272,20 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      # MinIO sobe pelo MESMO docker-compose.test.yml usado no desenvolvimento.
+      # Reaproveitar a definição (em vez de reescrever `docker run` aqui) evita
+      # que CI e máquina local divirjam em imagem, credencial ou região.
+      - name: Start MinIO (object storage de teste)
+        working-directory: ${{ github.workspace }}
+        run: docker compose -f docker-compose.test.yml up -d minio_test
+
+      # Espera o storage responder a uma chamada ASSINADA e cria o bucket.
+      # Falha aqui derruba o job de propósito: indisponibilidade de storage não
+      # pode virar skip — foi exatamente assim que o BUG-ENV-01 passou batido.
+      - name: Prepare test bucket (falha se MinIO não subir)
+        working-directory: ${{ github.workspace }}
+        run: npm run storage:prepare
+
       - name: Apply migrations
         working-directory: ${{ github.workspace }}
         run: npm run integration:db:prepare
@@ -226,10 +303,46 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/carros_na_cidade_test
           PG_SSL_MODE: disable
 
+      # A API Express NUNCA foi iniciada neste job (BUG-CI-02).
+      #
+      # Enquanto o login sem backend apenas PULAVA os testes (BUG-CI-01), a
+      # ausência não aparecia: o job publicava "E2E full-flow passed" sem ter
+      # exercitado publicação nenhuma. Com E2E_SEEDED=1 o skip virou falha — e
+      # sem este passo o job ficaria vermelho pelo motivo errado.
+      #
+      # `PW_START_SERVER=1` sobe apenas o Next (BFF). O BFF proxia autenticação,
+      # publicação e upload para 127.0.0.1:4000; sem esse processo, o fluxo
+      # crítico não tem como completar.
+      - name: Start Express API (porta 4000)
+        working-directory: ${{ github.workspace }}
+        run: |
+          # nohup: o shell do passo termina assim que a API responde, e sem
+          # isso o node herdaria o SIGHUP e morreria antes do Playwright rodar.
+          PORT=4000 nohup node src/index.js > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4000/health > /dev/null; then
+              echo "API pronta em ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API Express não respondeu em /health após 60s"
+          cat "$RUNNER_TEMP/api.log"
+          exit 1
+
       - name: Run E2E full-flow suite
         run: npm run test:e2e:full-flow
         env:
           CI: "true"
+
+      - name: Upload API log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-log-e2e
+          path: ${{ runner.temp }}/api.log
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Upload Playwright report
         if: always()

@@ -1,4 +1,33 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+
+import { assertSafeE2eTargetForDir } from "./test/guards/production-target";
+import { applySeedStateToEnv } from "./test/guards/seed-state";
+
+/**
+ * GUARD DE ALVO — roda no LOAD do config, antes de qualquer spec.
+ *
+ * A suíte E2E cadastra usuários e publica anúncios. `frontend/.env.local`
+ * aponta para a API de produção, e o `next dev` lê esse arquivo mesmo quando
+ * `process.env` está limpo — então o guard resolve os dois e aborta se o alvo
+ * não for local/staging. Ver `test/guards/production-target.ts`.
+ *
+ * Falhar aqui é intencional: melhor a suíte nem começar do que descobrir o
+ * engano depois de criar contas em produção.
+ */
+// frontend/package.json declara "type": "module" — este arquivo é ESM e não
+// tem __dirname. Derivar de import.meta.url é o equivalente.
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+
+assertSafeE2eTargetForDir(configDir, process.env);
+
+/**
+ * Declara o ambiente como "E2E preparado" quando o seed oficial rodou contra
+ * este mesmo banco. É o que transforma SKIP em FAIL no caminho crítico —
+ * ver `test/guards/seed-state.ts` e `helpers.ts:requireSeededLogin`.
+ */
+applySeedStateToEnv(path.join(configDir, "e2e"), process.env);
 
 /**
  * Ambiente injetado no `npm run dev` quando PW_START_SERVER=1.

@@ -137,10 +137,14 @@ async function seedFixtures(db) {
     return rows[0].id;
   }
 
-  async function makeAdvertiser(userId, name) {
+  // `city_id` e `slug` são NOT NULL desde a baseline 003. A fixture antiga
+  // omitia os dois e o arquivo morria no setup — ver BUG-INT-01.
+  // O slug carrega o userId porque há um advertiser por usuário no fixture e o
+  // slug é único: usar só o nome colidiria na segunda chamada.
+  async function makeAdvertiser(userId, name, cityId) {
     const { rows } = await db.query(
-      `INSERT INTO advertisers (user_id, name) VALUES ($1, $2) RETURNING id`,
-      [userId, name]
+      `INSERT INTO advertisers (user_id, city_id, name, slug) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [userId, cityId, name, `adv-${userId}-${cityId}`]
     );
     return rows[0].id;
   }
@@ -157,8 +161,16 @@ async function seedFixtures(db) {
   // distintos, mas para isolar fixture, criamos 1 advertiser por (plano, cidade).
   const advertisers = {};
   for (const [plan, userId] of Object.entries(users)) {
-    advertisers[`${plan}-base`] = await makeAdvertiser(userId, `${plan} base`);
-    advertisers[`${plan}-vizinha`] = await makeAdvertiser(userId, `${plan} vizinha`);
+    advertisers[`${plan}-base`] = await makeAdvertiser(
+      userId,
+      `${plan} base`,
+      cityIds["cidade-base-tt"]
+    );
+    advertisers[`${plan}-vizinha`] = await makeAdvertiser(
+      userId,
+      `${plan} vizinha`,
+      cityIds["cidade-vizinha-tt"]
+    );
   }
 
   const baseCreatedAt = new Date("2026-04-01T12:00:00Z").toISOString();
@@ -174,8 +186,14 @@ async function seedFixtures(db) {
         1, 'active', $4, $5, $6, $6
       ) RETURNING id
       `,
+      // `cityId` era destructurado no parâmetro e nunca chegava ao INSERT: o SQL
+      // declara $1..$6 e a lista trazia 5 valores, então o Postgres respondia
+      // "bind message supplies 5 parameters, but prepared statement requires 6"
+      // e o arquivo inteiro caía no setup. Como o teste é sobre o boost de
+      // CIDADE-BASE, a coluna que faltava é justamente a que ele mede.
       [
         advertiserId,
+        cityId,
         title,
         `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${advertiserId}`,
         highlightUntil,

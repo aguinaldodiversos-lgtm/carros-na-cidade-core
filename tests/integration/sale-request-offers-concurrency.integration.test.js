@@ -210,6 +210,22 @@ async function insertSaleRequest({
      RETURNING id`,
     [world.ownerId, cityId ?? world.cityId, minimumAcceptedPrice, status]
   );
+
+  // A Fase 4.7 (rodadas/handoff) passou a exigir uma RODADA ABERTA para aceitar
+  // proposta: `sale-requests.offers.service.js` chama `getCurrentRound` e, sem
+  // linha, devolve 409 SALE_OPPORTUNITY_OFFER_CLOSED. Esta fixture é anterior ao
+  // modelo de rodadas e criava só a solicitação — por isso as 17 asserções de
+  // concorrência falhavam todas com "expected false to be true": nenhuma
+  // proposta chegava a ser aceita, e o teste parecia estar reprovando o lock.
+  //
+  // O seed oficial (`scripts/e2e-seed.mjs`) já cria a rodada 1 do mesmo jeito.
+  await pool.query(
+    `INSERT INTO sale_request_rounds (sale_request_id, round_number, minimum_accepted_price)
+     VALUES ($1, 1, $2)
+     ON CONFLICT (sale_request_id, round_number) DO NOTHING`,
+    [rows[0].id, minimumAcceptedPrice]
+  );
+
   return String(rows[0].id);
 }
 
@@ -449,16 +465,12 @@ describe.sequential("integração — concorrência real", () => {
     const first = await insertSaleRequest();
     const second = await insertSaleRequest();
 
-    const [a, b] = await Promise.all([
-      propose(0, first, "50000"),
-      propose(1, second, "40000"),
-    ]);
+    const [a, b] = await Promise.all([propose(0, first, "50000"), propose(1, second, "40000")]);
 
     expect(a.ok).toBe(true);
     expect(b.ok).toBe(true);
   });
 });
-
 
 // ============================================================================
 describe.sequential("integração — o PISO do proprietário sob concorrência (4.3.3)", () => {
@@ -498,9 +510,10 @@ describe.sequential("integração — o PISO do proprietário sob concorrência 
     // B pode cair em qualquer uma das duas barreiras dependendo de quem pegou o
     // lock primeiro — abaixo do piso, ou abaixo do líder que A acabou de criar.
     // O que NÃO pode é entrar.
-    expect(["SALE_OPPORTUNITY_OFFER_BELOW_MINIMUM", "SALE_OPPORTUNITY_OFFER_NOT_LEADING"]).toContain(
-      b.code
-    );
+    expect([
+      "SALE_OPPORTUNITY_OFFER_BELOW_MINIMUM",
+      "SALE_OPPORTUNITY_OFFER_NOT_LEADING",
+    ]).toContain(b.code);
 
     const gravadas = await readOffers(saleRequestId);
     expect(gravadas).toHaveLength(1);
@@ -661,10 +674,23 @@ describe.sequential("teste POR MUTAÇÃO — o cenário é discriminante?", () =
         return { ok: false };
       }
 
+      // `round_id` virou NOT NULL na Fase 4.7 (rodadas). A réplica sem lock
+      // ainda inseria sem ele: o INSERT lançava, o catch devolvia {ok:false} e
+      // NENHUMA das duas propostas era gravada — então a violação não aparecia
+      // e o próprio teste de mutação acusava "o cenário não é discriminante".
+      // Acusar foi o comportamento certo; o que estava errado era a réplica ter
+      // parado de espelhar o INSERT real do service.
+      const { rows: roundRows } = await client.query(
+        `SELECT id FROM sale_request_rounds
+          WHERE sale_request_id = $1 ORDER BY round_number DESC LIMIT 1`,
+        [saleRequestId]
+      );
+      const roundId = roundRows[0]?.id ?? null;
+
       await client.query(
-        `INSERT INTO sale_request_offers (sale_request_id, dealer_user_id, advertiser_id, amount)
-         VALUES ($1, $2, $3, $4)`,
-        [saleRequestId, dealerUserId, advertiserId, amount]
+        `INSERT INTO sale_request_offers (sale_request_id, round_id, dealer_user_id, advertiser_id, amount)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [saleRequestId, roundId, dealerUserId, advertiserId, amount]
       );
       await client.query("COMMIT");
       return { ok: true };
@@ -717,10 +743,7 @@ describe.sequential("teste POR MUTAÇÃO — o cenário é discriminante?", () =
     const saleRequestId = await insertSaleRequest();
     await propose(0, saleRequestId, "50000");
 
-    await Promise.all([
-      propose(1, saleRequestId, "51000"),
-      propose(2, saleRequestId, "50500"),
-    ]);
+    await Promise.all([propose(1, saleRequestId, "51000"), propose(2, saleRequestId, "50500")]);
 
     const amounts = (await readOffers(saleRequestId)).map((row) => Number(row.amount));
     const violates = amounts.some(

@@ -12,5 +12,52 @@ services:
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
 
+  # ---------------------------------------------------------------------------
+  # Object storage de TESTE (BUG-ENV-01)
+  # ---------------------------------------------------------------------------
+  #
+  # O fluxo crítico (wizard → upload → publicação) não completa sem storage: o
+  # backend recusa publicar um anúncio cujas fotos ele não consegue confirmar, e
+  # o BFF só aceita referências absolutas vindas do Step 2. Sem R2 configurado,
+  # `POST /api/ads/upload-images` responde 500 (`[r2] Variável obrigatória
+  # ausente: R2_ACCOUNT_ID`), o BFF cai no fallback de disco e a publicação
+  # termina em 400. Isso é comportamento CORRETO do produto — faltava a
+  # dependência no ambiente de teste.
+  #
+  # Por que MinIO serve sem tocar no produto:
+  #   • o adapter usa `@aws-sdk/client-s3` (não um SDK proprietário da Cloudflare);
+  #   • `R2_ENDPOINT` já sobrescreve o endpoint padrão do R2;
+  #   • `forcePathStyle: true` já é incondicional (o R2 exige, e o MinIO também).
+  # Ou seja: a diferença entre produção e teste é 100% de variável de ambiente.
+  #
+  # Credenciais SINTÉTICAS. Nunca apontar para Cloudflare, bucket ou endpoint
+  # real — ver `scripts/e2e-storage-prepare.mjs`, que recusa endpoint não-local.
+  minio_test:
+    image: minio/minio:latest
+    container_name: carros-minio-test
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: carros-e2e-access-key
+      MINIO_ROOT_PASSWORD: carros-e2e-secret-key
+      # SigV4 assina a região. O adapter usa `AWS_REGION` (default "auto"), e
+      # fixar a mesma região dos dois lados evita SignatureDoesNotMatch.
+      MINIO_REGION: us-east-1
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      # `/minio/health/live` responde 200 assim que o servidor aceita requisição.
+      # Sem healthcheck, `docker compose up -d` volta antes de o MinIO atender e
+      # a criação do bucket falha por corrida.
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - minio_test_data:/data
+
 volumes:
   postgres_test_data:
+  minio_test_data:

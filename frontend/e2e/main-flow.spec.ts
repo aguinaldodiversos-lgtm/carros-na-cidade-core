@@ -64,7 +64,11 @@ test.describe.serial("PF — cadastro → publicar → painel → público (veí
         waitUntil: "domcontentloaded",
         timeout: 60_000,
       });
-      await expect(page.getByRole("heading", { name: /Meus anúncios/i })).toBeVisible({
+      // `getByRole("heading", { name: /Meus anúncios/i })` casava DOIS elementos
+      // — o H1 da página e o H2 do card da lista — e o strict mode do Playwright
+      // reprovava com "resolved to 2 elements". `level: 1` desambigua pela
+      // semântica do documento, sem precisar de testid novo nem de mexer na UI.
+      await expect(page.getByRole("heading", { level: 1, name: /Meus anúncios/i })).toBeVisible({
         timeout: 90_000,
       });
 

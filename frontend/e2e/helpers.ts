@@ -1,22 +1,116 @@
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type APIResponse, type BrowserContext, type Page } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
+
+import { isSeededEnvironment } from "../test/guards/seed-state";
+
+/**
+ * Login de conta OBRIGATÓRIA: skip só é aceitável em ambiente não preparado.
+ *
+ * ── O defeito que esta função existe para matar (BUG-CI-01) ─────────────────
+ * O gate E2E do CI roda um único spec, `full-flow.spec.ts`. Seis dos seus nove
+ * testes eram `test.skip(!loginRes.ok(), "Usuário A indisponível…")`. Como o
+ * seed nunca criou `testa@`/`testb@`, o login falhava, os testes pulavam e o
+ * job publicava "E2E full-flow passed" — sem ter exercitado cadastro, wizard,
+ * publicação, persistência nem painel. Verde por ausência de teste.
+ *
+ * ── A regra ─────────────────────────────────────────────────────────────────
+ * Ambiente que se DECLAROU preparado (`E2E_SEEDED=1`, posto pelo CI ou pelo
+ * marcador que `npm run e2e:prepare` escreve) não tem direito a pular: se a
+ * conta obrigatória não loga, ou o seed regrediu ou a autenticação quebrou —
+ * os dois são defeito, e os dois precisam reprovar.
+ *
+ * Ambiente NÃO preparado continua pulando, com instrução no lugar do enigma.
+ * Essa é a única forma de skip que sobra no caminho crítico.
+ */
+export async function requireSeededApi(
+  res: APIResponse,
+  opts: { what: string; hint?: string }
+): Promise<void> {
+  if (res.ok()) return;
+
+  const body = await res.text().catch(() => "");
+  const resumo = body.slice(0, 300);
+  const detalhe =
+    `${opts.what} falhou: HTTP ${res.status()}` +
+    (opts.hint ? ` — ${opts.hint}` : "") +
+    (resumo ? ` — ${resumo}` : "");
+
+  if (isSeededEnvironment()) {
+    throw new Error(
+      `[e2e] ${detalhe}\n\n` +
+        `Este ambiente está declarado como PREPARADO (E2E_SEEDED=1 ou frontend/e2e/.seed-state.json).\n` +
+        `Nesse estado, operação obrigatória que falha é FALHA — nunca skip. ` +
+        `Rode 'npm run e2e:prepare' contra o mesmo banco da API e confira se ela subiu com o DATABASE_URL certo.`
+    );
+  }
+
+  test.skip(
+    true,
+    `[e2e] ${detalhe}. Ambiente não preparado: rode 'npm run e2e:prepare' e execute de novo. ` +
+      `Para exigir falha em vez de skip, defina E2E_SEEDED=1.`
+  );
+}
+
+/** Açúcar para o caso mais comum: login de conta obrigatória. */
+export async function requireSeededLogin(
+  res: APIResponse,
+  opts: { email: string; hint?: string }
+): Promise<void> {
+  return requireSeededApi(res, { what: `login de ${opts.email}`, hint: opts.hint });
+}
+
+/**
+ * Rótulos dos passos do wizard — espelho de
+ * `components/painel/new-ad-wizard/types.ts:STEP_LABELS`.
+ *
+ * Existe para o teste falar a MESMA língua do produto. A suíte antiga
+ * procurava um H1 "Dados do veículo" que o produto não renderiza há tempo
+ * indeterminado; como o CI não executa esses specs, cinco arquivos de
+ * publicação ficaram vermelhos sem que ninguém visse.
+ */
+export const WIZARD_STEP_LABELS = ["Veículo", "Preço", "Fotos", "Descrição", "Revisão"] as const;
+
+/**
+ * Container do passo N do wizard (1-based, como o atributo `data-step`).
+ *
+ * Preferido ao heading por texto: `data-testid="wizard-step-container"` e
+ * `data-step` são âncoras estruturais que sobrevivem a mudança de copy.
+ */
+export function wizardStepContainer(page: Page, step: number) {
+  return page.locator(`[data-testid="wizard-step-container"][data-step="${step}"]`);
+}
+
+/** H1 do passo atual do wizard, ancorado no container. */
+export function wizardStepHeading(page: Page, step: number) {
+  return wizardStepContainer(page, step).getByRole("heading", { level: 1 });
+}
 
 // ---------------------------------------------------------------------------
 // Credentials for the two isolated E2E users used in full-flow.spec.ts
 // ---------------------------------------------------------------------------
+/**
+ * `??` NÃO substitui string vazia — e um secret de CI ausente chega como "".
+ * Era assim que `TEST_USER_A_EMAIL: ${{ secrets.… }}` sem secret configurado
+ * produzia `USERS.A.email === ""`, login 400 e skip do caminho crítico.
+ * `trim() ||` cai no default do seed em vez de mandar vazio para a API.
+ */
+function fromEnv(chave: string, padrao: string): string {
+  return String(process.env[chave] ?? "").trim() || padrao;
+}
+
 export const USERS = {
   A: {
-    email: process.env.TEST_USER_A_EMAIL ?? "testa@carrosnacidade.com",
-    password: process.env.TEST_USER_A_PASS ?? "SenhaTesteA123!",
+    email: fromEnv("TEST_USER_A_EMAIL", "testa@carrosnacidade.com"),
+    password: fromEnv("TEST_USER_A_PASS", "SenhaTesteA123!"),
   },
   B: {
-    email: process.env.TEST_USER_B_EMAIL ?? "testb@carrosnacidade.com",
-    password: process.env.TEST_USER_B_PASS ?? "SenhaTesteB123!",
+    email: fromEnv("TEST_USER_B_EMAIL", "testb@carrosnacidade.com"),
+    password: fromEnv("TEST_USER_B_PASS", "SenhaTesteB123!"),
   },
 } as const;
 
-export const LOCAL_EMAIL = process.env.E2E_EMAIL ?? "cpf@carrosnacidade.com";
-export const LOCAL_PASSWORD = process.env.E2E_PASSWORD ?? "123456";
+export const LOCAL_EMAIL = fromEnv("E2E_EMAIL", "cpf@carrosnacidade.com");
+export const LOCAL_PASSWORD = fromEnv("E2E_PASSWORD", "123456");
 
 export async function ensureDevServerUp(request: APIRequestContext, baseURL: string | undefined) {
   const origin = baseURL ?? "http://127.0.0.1:3000";
@@ -181,17 +275,23 @@ export async function registerMinimalUserViaApi(page: Page, cred: MinimalRegiste
 export async function completePendingProfileIfNeeded(page: Page) {
   await page.waitForFunction(
     () => {
+      // O passo 1 do wizard é identificado pelo CONTAINER, não pelo texto do
+      // H1: o rótulo vem de `STEP_LABELS[0]` e já mudou uma vez ("Dados do
+      // veículo" → "Veículo"), quebrando toda a suíte de publicação em
+      // silêncio. `data-testid="wizard-step-container"` + `data-step` são
+      // âncoras que o layout mantém.
+      if (document.querySelector('[data-testid="wizard-step-container"][data-step="1"]')) {
+        return true;
+      }
       const headings = Array.from(document.querySelectorAll("h1")).map(
         (el) => el.textContent || ""
       );
-      return headings.some(
-        (t) => /Dados do veículo/i.test(t) || /Complete seu cadastro para anunciar/i.test(t)
-      );
+      return headings.some((t) => /Complete seu cadastro para anunciar/i.test(t));
     },
     { timeout: 120_000 }
   );
 
-  const vehicle = page.getByRole("heading", { level: 1, name: /Dados do veículo/i });
+  const vehicle = wizardStepContainer(page, 1);
   if (await vehicle.isVisible()) {
     return;
   }
@@ -211,9 +311,10 @@ export async function completePendingProfileIfNeeded(page: Page) {
   await page.getByRole("button", { name: /Salvar e continuar/i }).click();
   await verifyPromise;
 
-  await expect(page.getByRole("heading", { level: 1, name: /Dados do veículo/i })).toBeVisible({
-    timeout: 120_000,
-  });
+  // Depois do gate, o wizard abre no passo 1. Ancorado no container, não na
+  // copy do H1 — ver WIZARD_STEP_LABELS.
+  await expect(wizardStepContainer(page, 1)).toBeVisible({ timeout: 120_000 });
+  await expect(wizardStepHeading(page, 1)).toHaveText(WIZARD_STEP_LABELS[0]);
 }
 
 export async function registerNewUserViaUi(page: Page, cred: RegisterCredentials) {
