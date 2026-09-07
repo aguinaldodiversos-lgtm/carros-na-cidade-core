@@ -1,0 +1,30 @@
+# Postgres LOCAL com snapshot de PRODUÇÃO (F0 — governança do Search Policy Engine).
+#
+# Por que um serviço separado do docker-compose.test.yml:
+#   • produção roda PostgreSQL 18.3; o serviço de teste é postgres:15. Um dump
+#     feito pelo pg_dump 18 não restaura limpo num servidor 15 (meta-comandos
+#     novos do psql/pg_restore), então o snapshot precisa da mesma major.
+#   • o banco de teste (5433) é recriado por migrations + seed sintético e as
+#     suítes de integração o TRUNCAM. O snapshot (5434) guarda dados reais e
+#     não pode ser alvo de TRUNCATE de teste.
+#
+# Popular: `node scripts/db/snapshot-prod-to-local.mjs` (lê DATABASE_URL1 do
+# .env apenas para pg_dump; nunca escreve na origem).
+#
+# Apontar o código para ele: DATABASE_URL=postgresql://postgres:postgres@localhost:5434/carros_na_cidade_snapshot
+services:
+  postgres_snapshot:
+    image: postgres:18
+    container_name: carros-postgres-snapshot
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: carros_na_cidade_snapshot
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_snapshot_data:/var/lib/postgresql
+
+volumes:
+  postgres_snapshot_data:

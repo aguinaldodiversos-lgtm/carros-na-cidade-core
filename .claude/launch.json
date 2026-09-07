@@ -4,14 +4,20 @@
     {
       "name": "frontend-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "cwd": "./frontend"
     },
     {
       "name": "frontend-dev-regional",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "cwd": "./frontend",
       "env": {
@@ -23,7 +29,10 @@
     {
       "name": "veiculo-preview-mock",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "cwd": "./frontend",
       "env": {
@@ -31,6 +40,46 @@
         "NEXT_PUBLIC_API_URL": "http://127.0.0.1:4000",
         "INTERNAL_BACKEND_API_URL": "http://127.0.0.1:4000",
         "NEXT_PUBLIC_R2_PUBLIC_BASE_URL": ""
+      }
+    },
+    {
+      "name": "f0-backend-snapshot",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "src/index.js"
+      ],
+      "port": 4000,
+      "env": {
+        "PORT": "4000",
+        "NODE_ENV": "development",
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5434/carros_na_cidade_snapshot",
+        "PG_SSL_MODE": "disable",
+        "RUN_MIGRATIONS": "false",
+        "RUN_WORKERS": "false",
+        "DISABLE_REDIS": "true",
+        "REDIS_URL": "",
+        "BOT_BLOCKER_ENABLED": "false",
+        "INTERNAL_API_TOKEN": "f0-local-internal-token"
+      }
+    },
+    {
+      "name": "f0-frontend-snapshot",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "cwd": "./frontend",
+      "env": {
+        "BACKEND_API_URL": "http://127.0.0.1:4000",
+        "NEXT_PUBLIC_API_URL": "http://127.0.0.1:4000",
+        "INTERNAL_BACKEND_API_URL": "http://127.0.0.1:4000",
+        "SITE_URL": "http://localhost:3000",
+        "PUBLIC_SITE_URL": "http://localhost:3000",
+        "NEXT_PUBLIC_SITE_URL": "http://localhost:3000",
+        "INTERNAL_API_TOKEN": "f0-local-internal-token",
+        "REGIONAL_PAGE_ENABLED": "true"
       }
     }
   ]
