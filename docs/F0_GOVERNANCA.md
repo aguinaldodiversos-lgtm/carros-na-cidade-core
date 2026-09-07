@@ -215,3 +215,14 @@ Achado colateral: existe um arquivo **rastreado** chamado `main` (0 bytes, 2026-
 2. `main` local 22 commits atrás de `origin/main` — fast-forward a fazer pelo usuário.
 3. Decisão sobre a árvore wip (§7), em especial `ci.yml` (muda o gate de todos os PRs) e o teste de ranking (necessário em F2).
 4. Serviço de backend do Render fora do `render.yaml` — permanece como ponto cego de revisão.
+
+---
+
+## 10. Fechamento de F0 (decisões do usuário, 2026-09-07)
+
+1. **Base de F1–F5 = `origin/main @ 65bc2e95`** (opção A). A auditoria `docs/AUDITORIA_HEAD_SEARCH.md` feita em `7ee7599c` **permanece válida** para essa base: `origin/main` = `7ee7599c` + 1 commit que altera apenas uma string de copy em `frontend/components/financing/FinancingSimulator.tsx` (`git diff --stat 7ee7599c origin/main` → 1 arquivo, 1 linha). Nenhum arquivo de busca, território, ranking ou SEO difere.
+2. **F5 e F6 refutadas em produção com evidência de log.** Produção (§2): as três URLs respondem 200 com `q` presente no input, no chip e nos cards. HEAD local (§3): o backend registrou `GET /api/ads/search?q=onix&city_slug=braganca-paulista-sp&sort=relevance&page=1&limit=50` durante o SSR da página de cidade, e a regional/`/comprar` devolveram os mesmos 6 cards Onix de produção. As hipóteses H4/F5/F6 ficam encerradas.
+3. `main` local foi avançado por fast-forward para `origin/main` (`git merge --ff-only`), a pedido.
+4. Arquivo rastreado `main` (0 bytes, criado em `1a93a81a`, 2026-03-03, "chore: apply stashed changes"): grep em `package.json`, `.github/workflows`, `scripts/`, `docs/`, `render.yaml` não encontrou nenhuma referência ao arquivo (as ocorrências de `main` são funções `main()`, `"main": "src/index.js"` e o nome do branch). Removido em commit próprio nesta branch.
+5. `ci.yml` da árvore wip vira PR separado, fora das fases; F1–F5 usam o `ci.yml` de `origin/main`.
+6. Da árvore wip: a fixture corrigida de `ads-ranking-base-city-boost` entra em F2 (cherry-pick único, citado no relatório); `frontend/test/guards/production-target` entra em F3. O restante fica em `wip/pre-f0-worktree`.
