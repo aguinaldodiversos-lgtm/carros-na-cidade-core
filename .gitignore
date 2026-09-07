@@ -31,3 +31,6 @@ scripts/data/*.json
 /frontend/public/images/pagina-detalhe.png
 # nome acentuado (git mostra como revis\303\203o-...): glob evita mismatch de encoding
 /frontend/public/images/revis*-anuncio.png
+
+# Snapshots locais de produção (dados reais — nunca versionar)
+.local/
