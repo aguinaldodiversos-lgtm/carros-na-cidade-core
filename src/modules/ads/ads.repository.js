@@ -2,6 +2,20 @@ import db from "../../infrastructure/database/db.js";
 import { normalizeAdVehicleFieldsForPersistence } from "./ads.storage-normalize.js";
 import { AD_STATUS } from "./ads.canonical.constants.js";
 import { normalizeVehicleOptions } from "./ad-options.catalog.js";
+import { deriveCommercialModel } from "../../shared/vehicle/commercial-model.js";
+
+/**
+ * Modelo comercial persistido em `ads.commercial_model` (F1 §3.2).
+ * Derivado de `ads.model` (descrição FIPE) + marca. Falha → NULL, nunca bloqueia
+ * a escrita do anúncio: o anúncio só deixa de entrar em buscas por modelo.
+ */
+export function deriveCommercialModelForPersistence(model, brand) {
+  try {
+    return deriveCommercialModel(model, { brand })?.label ?? null;
+  } catch {
+    return null;
+  }
+}
 
 const UPDATE_FIELDS = [
   "title",
@@ -57,12 +71,13 @@ export async function createAd(data) {
       plan,
       slug,
       vehicle_options,
+      commercial_model,
       search_vector,
       created_at,
       updated_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,$21::jsonb,
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18,$19,$20,$21::jsonb,$22,
       to_tsvector('portuguese',
         COALESCE($9,'') || ' ' || COALESCE($10,'') || ' ' || COALESCE($2,'') || ' ' || COALESCE($3,'')
       ),
@@ -93,6 +108,7 @@ export async function createAd(data) {
     row.plan || "free",
     row.slug,
     JSON.stringify(normalizeVehicleOptions(row.vehicle_options)),
+    deriveCommercialModelForPersistence(row.model, row.brand),
   ];
 
   const { rows } = await db.query(query, values);
@@ -188,6 +204,25 @@ export async function updateAd(id, data) {
         values.push(normalized[field]);
       }
     }
+  }
+
+  // F1 §3.2 — brand/model mudaram? recomputa commercial_model. Em update
+  // parcial (só um dos dois), lê o outro do banco: derivar com a marca errada
+  // produziria entidade errada (ex.: "5" da Omoda depende da marca).
+  const hasBrand = Object.prototype.hasOwnProperty.call(normalized, "brand");
+  const hasModel = Object.prototype.hasOwnProperty.call(normalized, "model");
+  if (hasBrand || hasModel) {
+    let brand = normalized.brand;
+    let model = normalized.model;
+    if (!hasBrand || !hasModel) {
+      const current = await findById(id);
+      if (current) {
+        if (!hasBrand) brand = current.brand;
+        if (!hasModel) model = current.model;
+      }
+    }
+    fields.push(`commercial_model = $${index++}`);
+    values.push(deriveCommercialModelForPersistence(model, brand));
   }
 
   if (!fields.length) {
