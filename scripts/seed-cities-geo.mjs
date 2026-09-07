@@ -50,6 +50,18 @@ import fs from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import { pool, closeDatabasePool } from "../src/infrastructure/database/db.js";
 import { slugify } from "../src/shared/utils/slugify.js";
+import {
+  enqueueCityGeoChanged,
+  closeCityGeoChangedQueue,
+} from "../src/queues/city-geo-changed.queue.js";
+
+/**
+ * F1 §3.1 — ao preencher lat/lng de POUCAS cidades, recomputa só as linhas
+ * delas em region_memberships (fila cities.geo-changed; inline sem Redis).
+ * Acima deste teto o rebuild nacional (npm run regions:build) é mais barato
+ * que N recomputes e é o que o script recomenda.
+ */
+const GEO_CHANGED_INLINE_MAX = Number(process.env.GEO_CHANGED_INLINE_MAX || 50);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -259,13 +271,14 @@ export async function seedCitiesGeo({ force = false, sourceEntries = null } = {}
   );
 
   const { rows: cities } = await pool.query(
-    `SELECT slug, latitude, longitude FROM cities WHERE slug IS NOT NULL`
+    `SELECT id, slug, latitude, longitude FROM cities WHERE slug IS NOT NULL`
   );
 
   let updated = 0;
   let alreadyPopulated = 0;
   let unmatched = 0;
   const matchedSlugs = new Set();
+  const updatedCityIds = [];
 
   for (const city of cities) {
     const geo = slugToGeo.get(city.slug);
@@ -287,6 +300,19 @@ export async function seedCitiesGeo({ force = false, sourceEntries = null } = {}
       city.slug,
     ]);
     updated += 1;
+    updatedCityIds.push(Number(city.id));
+  }
+
+  // F1 §3.1 — vizinhança das cidades que acabaram de ganhar coordenadas.
+  if (updatedCityIds.length > 0 && updatedCityIds.length <= GEO_CHANGED_INLINE_MAX) {
+    for (const cityId of updatedCityIds) {
+      const r = await enqueueCityGeoChanged(cityId);
+      console.log(`[seed:cities-geo] region_memberships da cidade ${cityId}: ${r.mode}`);
+    }
+  } else if (updatedCityIds.length > GEO_CHANGED_INLINE_MAX) {
+    console.log(
+      `[seed:cities-geo] ${updatedCityIds.length} cidades atualizadas (> ${GEO_CHANGED_INLINE_MAX}): rode npm run regions:build para reconstruir region_memberships.`
+    );
   }
 
   const extras = slugToGeo.size - matchedSlugs.size;
@@ -312,6 +338,7 @@ if (isDirectRun) {
     console.error("[seed:cities-geo] Falha:", err?.message || err);
     process.exitCode = 1;
   } finally {
+    await closeCityGeoChangedQueue().catch(() => {});
     await closeDatabasePool().catch(() => {});
   }
 }

@@ -148,4 +148,15 @@ export const WORKERS_REGISTRY = [
     startExport: "startDealerAcquisitionWorker",
     stopExport: "stopDealerAcquisitionWorker",
   },
+  {
+    // F1 §3.1 — fila cities.geo-changed. Default "true": só sobe se houver Redis
+    // (sem Redis o producer executa inline); com Redis e sem worker, os jobs
+    // ficariam presos na fila.
+    name: "City Geo Changed Worker",
+    env: "RUN_WORKER_CITY_GEO_CHANGED",
+    defaultValue: "true",
+    load: () => import("../cities/city-geo-changed.worker.js"),
+    startExport: "startCityGeoChangedWorker",
+    stopExport: "stopCityGeoChangedWorker",
+  },
 ];
