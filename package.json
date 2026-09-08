@@ -33,6 +33,7 @@
     "db:migrate": "node scripts/run-migrations.mjs",
     "regions:build": "node scripts/build-region-memberships.mjs",
     "regions:build:dry-run": "node scripts/build-region-memberships.mjs --dry-run",
+    "regions:verify": "node scripts/regions-verify.mjs",
     "ads:backfill-commercial-model": "node scripts/backfill-ads-commercial-model.mjs",
     "ads:backfill-commercial-model:dry-run": "node scripts/backfill-ads-commercial-model.mjs --dry-run",
     "seed:cities": "node scripts/seed-ibge-municipios.mjs",

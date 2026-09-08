@@ -151,9 +151,40 @@ export async function buildRegionMemberships({ dryRun = false, backupTable = nul
     `[regions:build] leitores legados (layer <= 3): ${byteIdentical ? "IDÊNTICOS ao estado atual" : "DIVERGEM do estado atual — revisar antes de gravar"}.`
   );
 
+  // Divergência IRRECUPERÁVEL: linha que existe nos dois conjuntos com layer ou
+  // distância diferentes. O novo valor venceria (o reinsert do backup é
+  // ON CONFLICT DO NOTHING), então a leitura legada mudaria. Já linha apenas
+  // AUSENTE do conjunto novo é reinserida do backup por construção — o
+  // superconjunto se mantém —, mas ainda assim exige olho humano no dry-run.
+  const mutaLeituraLegada = cmp.layerChanged.length > 0 || cmp.distanceChanged.length > 0;
+
   if (dryRun) {
     console.log("[regions:build] --dry-run: nada gravado.");
+    // Veredito explícito: quem executa não interpreta contador.
+    console.log("");
+    if (byteIdentical) {
+      console.log("PROSSIGA");
+    } else {
+      const motivos = [];
+      if (cmp.layerChanged.length)
+        motivos.push(`${cmp.layerChanged.length} linha(s) mudariam de layer`);
+      if (cmp.distanceChanged.length)
+        motivos.push(`${cmp.distanceChanged.length} linha(s) mudariam de distance_km`);
+      if (cmp.missing.length)
+        motivos.push(
+          `${cmp.missing.length} linha(s) atual(is) nao estao no conjunto novo (seriam preservadas do backup, mas confira antes)`
+        );
+      console.log(`PARE: ${motivos.join("; ")} — nao rode o build real.`);
+    }
     return { processed: stats.cities, rows: rows.length, dryRun: true, ...cmp, byteIdentical };
+  }
+
+  if (mutaLeituraLegada) {
+    console.log("");
+    console.log(
+      `PARE: ${cmp.layerChanged.length} linha(s) mudariam de layer e ${cmp.distanceChanged.length} de distance_km — a leitura legada mudaria. Nada foi gravado.`
+    );
+    return { processed: stats.cities, aborted: true, ...cmp, byteIdentical };
   }
 
   const backup = backupTable || defaultBackupTableName();
@@ -163,6 +194,16 @@ export async function buildRegionMemberships({ dryRun = false, backupTable = nul
   );
   console.log(`[regions:build] backup: ${result.backupTable}`);
   console.log(`[regions:build] rollback:\n${rollbackSql(result.backupTable)}`);
+  console.log("");
+  if (result.after >= result.before && result.after === rows.length) {
+    console.log(
+      `PROSSIGA — proximo passo: npm run regions:verify -- --backup-table=${result.backupTable}`
+    );
+  } else {
+    console.log(
+      `PARE: gravou ${result.after} linhas, esperado ${rows.length} (antes: ${result.before}). Use o rollback acima.`
+    );
+  }
   return { processed: stats.cities, ...result };
 }
 
