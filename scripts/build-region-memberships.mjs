@@ -1,182 +1,65 @@
 #!/usr/bin/env node
 /**
- * Reconstrói `region_memberships` (vizinhança aproximada por cidade-base)
- * a partir de `cities.latitude/longitude` + UF.
+ * Reconstrói `region_memberships` — Search Policy Engine v2.1, Fase F1 (§3.1).
  *
- * Algoritmo:
- *   - Lê todas as cidades com latitude/longitude NOT NULL.
- *   - Agrupa por UF (cidades de UFs diferentes nunca compõem a mesma região).
- *   - Para cada cidade-base, calcula Haversine para todas as outras na mesma UF.
- *   - Layer 1: distance_km <= 30, top 12 por distância ASC.
- *   - Layer 2: 30 < distance_km <= 60, top 18 por distância ASC.
- *   - Layer 3: 60 < distance_km <= 100, top 40 por distância ASC.
- *   - DELETE memberships antigos da base (preservando a self-row, layer 0).
- *   - INSERT ON CONFLICT DO UPDATE com a nova vizinhança.
- *   - Tudo em transação por base — rerun é idempotente e seguro.
+ * O que muda em relação ao build antigo (até 65bc2e95):
+ *   - SEM filtro de UF: Bragança Paulista-SP ↔ Extrema-MG (25,4 km) passa a existir.
+ *   - Alcance 150 km (era 100), sem tetos de vizinhas por camada.
+ *   - `layer` 1–3 continua EXATAMENTE pela regra antiga (mesma UF, 30/60/100 km,
+ *     top 12/18/40) para a página regional (`layer <= 2`) não mudar; toda linha
+ *     nova recebe `layer = 4`. Ver src/modules/regions/region-memberships.builder.js.
+ *   - Self-row (layer 0, 0 km) gerada para TODA cidade, com ou sem coordenadas.
+ *   - Execução: conjunto novo em tabela TEMPORÁRIA → backup da tabela atual em
+ *     tabela real → DELETE + INSERT numa única transação. A tabela nunca fica
+ *     vazia para leitores. Superconjunto das linhas atuais garantido por
+ *     construção (linhas antigas ausentes são reinseridas; contagem menor aborta).
  *
- * Não roda automaticamente. Uso manual:
- *   npm run regions:build
+ * Uso:
+ *   node scripts/build-region-memberships.mjs --dry-run     # só contagens, não grava
+ *   node scripts/build-region-memberships.mjs               # grava (com backup)
+ *   node scripts/build-region-memberships.mjs --backup-table=region_memberships_backup_prod_f1
  *
- * Pré-requisito: migration 021 aplicada e cities.latitude/longitude populados
- * (etapa separada — seed IBGE). Cidades sem lat/long são puladas em silêncio.
+ * Rollback: o script imprime o SQL exato (DELETE + INSERT ... FROM <backup>).
  *
- * Performance: O(N²) por UF. Para o Brasil (5570 municípios distribuídos em
- * 27 UFs, avg ~206 por UF), são ~42k computações por UF × 27 ≈ 1.1M ops.
- * Em JS isso roda em ~2-5s; o gargalo é o I/O do Postgres (uma transação por
- * cidade-base). Aceitável para uma execução manual ocasional.
+ * Banco alvo: DATABASE_URL (via src/infrastructure/database/db.js). Em F1–F5 a
+ * execução local é contra o snapshot (porta 5434); em produção, pelo pipeline
+ * de deploy após aprovação.
+ *
+ * Exports mantidos para os testes históricos (tests/regions/region-builder-unit.test.js):
+ * `haversineKm`, `pickRegionMembers` (visão legada: mesma UF, camadas 1–3),
+ * `parseUfFilter` (aceito e ignorado: o build agora é sempre nacional — a
+ * vizinhança cruza UF por definição).
  */
 import "dotenv/config";
 import { fileURLToPath } from "node:url";
 import { pool, closeDatabasePool } from "../src/infrastructure/database/db.js";
+import {
+  applyMemberships,
+  hasAnyNeighborRow,
+  buildAllMemberships,
+  compareWithExisting,
+  defaultBackupTableName,
+  haversineKm,
+  layerMapFrom,
+  loadCities,
+  loadExistingMemberships,
+  MAX_DISTANCE_KM,
+  pickLegacyRegionMembers,
+  rollbackSql,
+  summarizeMemberships,
+} from "../src/modules/regions/region-memberships.builder.js";
 
-const EARTH_RADIUS_KM = 6371;
-const LAYER_1_MAX_KM = 30;
-const LAYER_2_MAX_KM = 60;
-// Layer 3 (60 < d <= 100 km) — banda ADITIVA introduzida p/ o filtro de
-// "Distância (km)" do /comprar honrar os stops 75 e 100 km (antes saturavam em
-// 60). É lida SÓ pela query System A (`getRadiusMembers`, `distance_km <= km`).
-// A Página Regional (System B) filtra `layer <= 2` e permanece intocada em
-// ≤60 km. Teto e cap configuráveis por env (não cravar no código).
-const LAYER_3_MAX_KM =
-  Number.parseInt(String(process.env.REGIONAL_LAYER3_MAX_KM ?? "100"), 10) || 100;
+export { haversineKm };
 
-/**
- * Limites de cidades por região, configuráveis via env vars.
- *
- * Defaults (12 + 18 = 30 vizinhos) calibrados para Brasil típico em
- * raios de 30/60 km. Override no Render (ou .env local) sem precisar
- * mexer no código:
- *
- *   REGIONAL_LAYER1_MAX_MEMBERS=20    # vizinhos ≤30 km
- *   REGIONAL_LAYER2_MAX_MEMBERS=30    # vizinhos 30-60 km
- *
- * Quando admin tiver UI no portal para isso, mover para `platform_settings`
- * (mesmo padrão de `regional.radius_km`).
- */
-function parsePositiveInt(raw, fallback) {
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
-  return Math.floor(parsed);
-}
-const LAYER_1_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER1_MAX_MEMBERS, 12);
-const LAYER_2_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER2_MAX_MEMBERS, 18);
-// Cap do layer 3 (60-100 km). Default 40 calibrado com coordenadas reais IBGE:
-// garante contagem estritamente crescente 25<50<75<100 em metrópoles densas
-// (SP/Campinas) e cidades médias (Ribeirão/Bauru), sem inflar demais as linhas
-// (base fica com ≤ 12+18+40 = 70 membros; ~2× o volume anterior).
-const LAYER_3_MAX_MEMBERS = parsePositiveInt(process.env.REGIONAL_LAYER3_MAX_MEMBERS, 40);
-
-function toRadians(degrees) {
-  return (degrees * Math.PI) / 180;
-}
-
-/**
- * Distância em km entre dois pontos lat/long pela fórmula de Haversine.
- * Para os fins desta vizinhança aproximada (raios de 30/60 km), erro
- * residual da Terra como esfera é < 0.5%, totalmente aceitável.
- */
-export function haversineKm(lat1, lon1, lat2, lon2) {
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
-function classifyLayer(distanceKm) {
-  if (distanceKm <= LAYER_1_MAX_KM) return 1;
-  if (distanceKm <= LAYER_2_MAX_KM) return 2;
-  if (distanceKm <= LAYER_3_MAX_KM) return 3;
-  return null;
-}
-
-/**
- * Para uma cidade-base, escolhe os top-K candidatos de cada layer ordenados
- * por distância ASC. Retorna array { member_city_id, distance_km, layer }.
- */
+/** Contrato legado (mesma UF, camadas 1–3 com tetos). */
 export function pickRegionMembers(baseCity, candidates) {
-  const layer1 = [];
-  const layer2 = [];
-  const layer3 = [];
-
-  for (const candidate of candidates) {
-    if (candidate.id === baseCity.id) continue;
-    if (candidate.state !== baseCity.state) continue;
-    if (candidate.latitude == null || candidate.longitude == null) continue;
-
-    const distance = haversineKm(
-      baseCity.latitude,
-      baseCity.longitude,
-      candidate.latitude,
-      candidate.longitude
-    );
-    const layer = classifyLayer(distance);
-    if (!layer) continue;
-
-    const entry = { member_city_id: candidate.id, distance_km: distance, layer };
-    if (layer === 1) layer1.push(entry);
-    else if (layer === 2) layer2.push(entry);
-    else if (layer === 3) layer3.push(entry);
-  }
-
-  layer1.sort((a, b) => a.distance_km - b.distance_km);
-  layer2.sort((a, b) => a.distance_km - b.distance_km);
-  layer3.sort((a, b) => a.distance_km - b.distance_km);
-
-  return [
-    ...layer1.slice(0, LAYER_1_MAX_MEMBERS),
-    ...layer2.slice(0, LAYER_2_MAX_MEMBERS),
-    ...layer3.slice(0, LAYER_3_MAX_MEMBERS),
-  ];
-}
-
-async function rebuildMembershipsForBase(client, baseCity, candidatesInState) {
-  const members = pickRegionMembers(baseCity, candidatesInState);
-
-  await client.query("BEGIN");
-  try {
-    // Limpa apenas as memberships não-self da base (preserva self-row layer 0).
-    await client.query(
-      `DELETE FROM region_memberships
-       WHERE base_city_id = $1 AND member_city_id != $1`,
-      [baseCity.id]
-    );
-
-    for (const m of members) {
-      await client.query(
-        `
-        INSERT INTO region_memberships (base_city_id, member_city_id, distance_km, layer)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (base_city_id, member_city_id) DO UPDATE
-        SET distance_km = EXCLUDED.distance_km,
-            layer = EXCLUDED.layer
-        `,
-        [baseCity.id, m.member_city_id, Number(m.distance_km.toFixed(2)), m.layer]
-      );
-    }
-
-    await client.query("COMMIT");
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  }
-
-  return {
-    layer1: members.filter((m) => m.layer === 1).length,
-    layer2: members.filter((m) => m.layer === 2).length,
-    layer3: members.filter((m) => m.layer === 3).length,
-  };
+  return pickLegacyRegionMembers(baseCity, candidates);
 }
 
 /**
- * Filtro de UFs por arg `--uf=SP,MG` ou env `BUILD_UF=SP,MG`.
- * Retorna `Set<string>` de UFs upper-case, ou `null` se "todas".
- *
- * Por que existe?
- *   Render Postgres free-tier corta conexões longas no meio do build. Para
- *   recuperação, é prático rodar em batches de 3-5 UFs com conexão fresca
- *   a cada vez. Idempotência preservada (ON CONFLICT DO UPDATE no INSERT).
+ * Mantido por compatibilidade de CLI (`--uf=SP,MG` / `BUILD_UF`). O valor é
+ * parseado e IGNORADO com aviso: o build nacional é obrigatório para que as
+ * linhas cross-UF existam dos dois lados da fronteira.
  */
 export function parseUfFilter(argv = process.argv, env = process.env) {
   const argRaw = argv.find((a) => typeof a === "string" && a.startsWith("--uf="));
@@ -192,253 +75,102 @@ export function parseUfFilter(argv = process.argv, env = process.env) {
   return set.size ? set : null;
 }
 
-const CONNECTION_DROP_HINTS = [
-  "connection terminated",
-  "econnreset",
-  "client has encountered a connection error",
-  "terminating connection",
-  "server closed the connection unexpectedly",
-  "read econnreset",
-  "socket hang up",
-];
-
-function isConnectionDrop(err) {
-  const msg = String(err?.message || err || "").toLowerCase();
-  return CONNECTION_DROP_HINTS.some((p) => msg.includes(p));
-}
-
-/**
- * Processa uma UF inteira numa conexão dedicada, com retry em connection drop.
- *
- * Por que conexão por UF?
- *   Antes, o script segurava um único `client` durante todo o loop de UFs.
- *   Em ambientes com idle reaper agressivo (Render free-tier Postgres) ou
- *   latência transcontinental, qualquer drop derrubava o build inteiro
- *   sem chance de retomar. Conexão fresca por UF reduz a janela de
- *   exposição e isola a falha — UFs já gravadas ficam (idempotência), e
- *   a UF que caiu é retentada até MAX_ATTEMPTS.
- *
- * Handler `client.on('error', ...)`:
- *   pg emite `error` async quando o socket cai entre queries. Sem handler,
- *   Node derruba o processo com Unhandled 'error' event. Aqui nós só
- *   logamos — o erro real vai bubble pela próxima `client.query()` e
- *   cair no catch do retry-loop.
- */
-async function processStateWithRetry(state, citiesInState, { maxAttempts = 3 } = {}) {
-  let attempt = 0;
-  let lastErr = null;
-
-  while (attempt < maxAttempts) {
-    attempt += 1;
-    const client = await pool.connect();
-    client.on("error", (err) => {
-      console.warn(`[regions:build] [${state}] client error silenciado: ${err?.message || err}`);
-    });
-
-    let stateLayer1 = 0;
-    let stateLayer2 = 0;
-    let stateLayer3 = 0;
-    let released = false;
-
-    try {
-      for (const baseCity of citiesInState) {
-        const stats = await rebuildMembershipsForBase(client, baseCity, citiesInState);
-        stateLayer1 += stats.layer1;
-        stateLayer2 += stats.layer2;
-        stateLayer3 += stats.layer3;
-      }
-      client.release();
-      released = true;
-      return { stateLayer1, stateLayer2, stateLayer3, attempts: attempt };
-    } catch (err) {
-      lastErr = err;
-      // Em connection drop, devolver o client com erro para o pool descartá-lo.
-      // `release(err)` sinaliza ao pool que esta conexão está corrompida.
-      if (!released) {
-        try {
-          client.release(err);
-          released = true;
-        } catch {
-          // Devolver ao pool uma conexão já derrubada pode lançar. Não há o que
-          // fazer aqui: o objetivo era só marcá-la como corrompida, e a falha
-          // original (`err`) é a que interessa e segue sendo tratada abaixo.
-        }
-      }
-
-      if (!isConnectionDrop(err)) throw err;
-      if (attempt >= maxAttempts) break;
-
-      const waitMs = Math.min(8000, 1000 * 3 ** (attempt - 1));
-      console.warn(
-        `[regions:build] [${state}] connection drop na tentativa ${attempt}/${maxAttempts}: ${err?.message}. Retentando em ${waitMs}ms…`
-      );
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-
-  throw lastErr || new Error(`[regions:build] [${state}] esgotou ${maxAttempts} tentativas`);
-}
-
-export async function buildRegionMemberships({ ufFilter } = {}) {
-  const start = Date.now();
-  const filter = ufFilter === undefined ? parseUfFilter() : ufFilter;
-
-  const { rows: cities } = await pool.query(
-    `
-    SELECT id, slug, name, state, latitude, longitude
-    FROM cities
-    WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-    ORDER BY state ASC, name ASC
-    `
+function parseArgs(argv) {
+  const flags = new Set(argv.filter((a) => a.startsWith("--") && !a.includes("=")));
+  const kv = Object.fromEntries(
+    argv.filter((a) => a.startsWith("--") && a.includes("=")).map((a) => a.slice(2).split("="))
   );
+  return {
+    dryRun: flags.has("--dry-run"),
+    backupTable: kv["backup-table"] || null,
+  };
+}
 
-  if (!cities.length) {
-    console.log(
-      "[regions:build] Nenhuma cidade com lat/long encontrada — rode o seed IBGE primeiro. Saindo."
-    );
-    return { processed: 0, byState: {} };
-  }
+function fmt(n) {
+  return Number(n).toLocaleString("pt-BR");
+}
 
-  const byState = new Map();
-  for (const city of cities) {
-    const key = String(city.state || "").toUpperCase();
-    if (!byState.has(key)) byState.set(key, []);
-    byState.get(key).push(city);
-  }
-
-  const plannedStates = [...byState.keys()].filter((s) => !filter || filter.has(s));
-  if (filter) {
-    console.log(`[regions:build] filtro UF ativo: ${plannedStates.join(", ")}`);
-  } else {
-    console.log(`[regions:build] processando todas as ${plannedStates.length} UFs`);
-  }
-
-  const summary = {};
-  let totalProcessed = 0;
-  let totalLayer1 = 0;
-  let totalLayer2 = 0;
-  let totalLayer3 = 0;
-  const failedStates = [];
-
-  for (const state of plannedStates) {
-    const citiesInState = byState.get(state);
-    try {
-      const { stateLayer1, stateLayer2, stateLayer3, attempts } = await processStateWithRetry(
-        state,
-        citiesInState
-      );
-      summary[state] = {
-        cities: citiesInState.length,
-        layer1Total: stateLayer1,
-        layer2Total: stateLayer2,
-        layer3Total: stateLayer3,
-        attempts,
-      };
-      totalLayer1 += stateLayer1;
-      totalLayer2 += stateLayer2;
-      totalLayer3 += stateLayer3;
-      totalProcessed += citiesInState.length;
-      const retryNote = attempts > 1 ? ` (recuperado em ${attempts} tentativas)` : "";
-      console.log(
-        `[regions:build] ${state}: ${citiesInState.length} cidades, ${stateLayer1} layer 1, ${stateLayer2} layer 2, ${stateLayer3} layer 3${retryNote}`
-      );
-    } catch (err) {
-      failedStates.push(state);
-      summary[state] = {
-        cities: citiesInState.length,
-        error: err?.message || String(err),
-      };
-      console.error(
-        `[regions:build] ${state}: FALHA após retries — ${err?.message || err}. Pulando para próxima UF.`
-      );
-    }
-  }
-
-  const elapsedSec = ((Date.now() - start) / 1000).toFixed(1);
+function printSummary(label, summary) {
+  console.log(`[regions:build] ${label}:`);
   console.log(
-    `[regions:build] OK — ${totalProcessed} cidades-base processadas, ${totalLayer1} layer 1 + ${totalLayer2} layer 2 + ${totalLayer3} layer 3 em ${elapsedSec}s.`
+    `  total: ${fmt(summary.total)} (self: ${fmt(summary.self)}, cross-UF: ${fmt(summary.crossUf)})`
   );
-  if (failedStates.length) {
-    console.warn(
-      `[regions:build] UFs que falharam após retries: ${failedStates.join(", ")} — rode novamente com --uf=${failedStates.join(",")} para retomar.`
-    );
-  }
-
-  // ── Relatório nacional de cobertura ─────────────────────────────────
-  //
-  // Mostra, ao fim do build, números agregados para auditoria:
-  //   - Total de cidades cadastradas vs com coordenadas.
-  //   - Cidades sem coordenadas (gap geográfico do dataset IBGE).
-  //   - Cidades com vizinhança gravada (layer > 0) vs sem.
-  //   - Cobertura por UF (proporção entre cidades base com membros).
-  //
-  // Em UFs com cidades isoladas (interior do Norte, Centro-Oeste), é
-  // esperado que algumas cidades fiquem sem vizinhança (geografia real,
-  // não regressão). O relatório torna isso explícito.
-  try {
-    const { rows: nacional } = await pool.query(
-      `SELECT
-         COUNT(*)::int AS total,
-         COUNT(latitude)::int AS com_coords,
-         COUNT(*) FILTER (WHERE latitude IS NULL)::int AS sem_coords
-       FROM cities`
-    );
-    const { rows: coberturaPorUf } = await pool.query(
-      `SELECT c.state,
-              COUNT(DISTINCT c.id)::int AS total_cities,
-              COUNT(DISTINCT c.id) FILTER (
-                WHERE EXISTS (
-                  SELECT 1 FROM region_memberships rm
-                  WHERE rm.base_city_id = c.id AND rm.layer > 0
-                )
-              )::int AS com_vizinhanca
-       FROM cities c
-       WHERE c.latitude IS NOT NULL
-       GROUP BY c.state
-       ORDER BY c.state`
-    );
-
-    console.log("");
-    console.log("[regions:build] ── COBERTURA NACIONAL ─────────────────");
-    console.log(
-      `[regions:build] ${nacional[0].total} cidades cadastradas, ${nacional[0].com_coords} com coords (${nacional[0].sem_coords} sem).`
-    );
-    console.log("[regions:build] UF | base_cities | com_vizinhança | % cobertura");
-    let totalComViz = 0;
-    let totalBase = 0;
-    for (const row of coberturaPorUf) {
-      const pct =
-        row.total_cities > 0 ? ((row.com_vizinhanca / row.total_cities) * 100).toFixed(0) : "0";
-      console.log(
-        `[regions:build] ${row.state}  | ${String(row.total_cities).padStart(5)} | ${String(row.com_vizinhanca).padStart(5)}          | ${pct.padStart(3)}%`
-      );
-      totalComViz += row.com_vizinhanca;
-      totalBase += row.total_cities;
-    }
-    const pctNacional = totalBase > 0 ? ((totalComViz / totalBase) * 100).toFixed(1) : "0";
-    console.log(
-      `[regions:build] TOTAL: ${totalComViz}/${totalBase} cidades com vizinhança gravada (${pctNacional}%).`
-    );
-    console.log(
-      `[regions:build] Cidades sem vizinhança são, em geral, isoladas geograficamente (sem vizinhos no raio de ${LAYER_3_MAX_KM} km na mesma UF). Não é regressão.`
-    );
-  } catch (err) {
-    console.warn(
-      `[regions:build] Falha ao gerar relatório de cobertura — ${err?.message || err}. (Build em si concluiu OK.)`
-    );
-  }
-
-  return { processed: totalProcessed, byState: summary, failedStates };
+  console.log(
+    `  por layer: ${Object.entries(summary.byLayer)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([l, n]) => `${l}=${fmt(n)}`)
+      .join("  ")}`
+  );
+  console.log(
+    `  por faixa (km): ${Object.entries(summary.byBand)
+      .map(([b, n]) => `${b}=${fmt(n)}`)
+      .join("  ")}`
+  );
 }
 
-// Auto-execução quando rodado via `node scripts/build-region-memberships.mjs`.
-// Em testes, o arquivo é importado por nome — `pickRegionMembers` e
-// `haversineKm` são exportados para teste unitário sem tocar Postgres.
+export async function buildRegionMemberships({ dryRun = false, backupTable = null } = {}) {
+  const started = Date.now();
+  if (parseUfFilter()) {
+    console.warn(
+      "[regions:build] --uf/BUILD_UF ignorado: o build é nacional (pares cruzam UF por definição)."
+    );
+  }
+
+  const cities = await loadCities(pool);
+  if (!cities.length) {
+    console.log("[regions:build] Nenhuma cidade cadastrada. Saindo.");
+    return { processed: 0 };
+  }
+
+  const existing = await loadExistingMemberships(pool);
+  // Tabela já povoada → congela: nada novo entra em layer <= 3 (R4).
+  const freezeLegacyLayer3 = hasAnyNeighborRow(existing);
+  const { rows, stats } = buildAllMemberships(cities, {
+    existingLayerByKey: layerMapFrom(existing),
+    freezeLegacyLayer3,
+  });
+  const computeMs = Date.now() - started;
+
+  const currentSummary = summarizeMemberships([...existing.values()], cities);
+  const nextSummary = summarizeMemberships(rows, cities);
+  const cmp = compareWithExisting(existing, rows);
+
+  console.log(
+    `[regions:build] ${fmt(stats.cities)} cidades (${fmt(stats.basesWithCoords)} com coords, ${fmt(stats.basesWithoutCoords)} sem; layer legado ${freezeLegacyLayer3 ? "CONGELADO" : "regra completa"}) → ${fmt(rows.length)} linhas calculadas em ${computeMs} ms (alcance ${MAX_DISTANCE_KM} km).`
+  );
+  printSummary("ATUAL (tabela)", currentSummary);
+  printSummary("NOVO (calculado)", nextSummary);
+  // Prova de superconjunto LINHA A LINHA (R3/R4), não só contagem.
+  const ex = (list) => (list.length ? ` (ex.: ${list.slice(0, 5).join(", ")})` : "");
+  console.log(
+    `[regions:build] superconjunto: ${fmt(cmp.existing)} linhas atuais → ${fmt(cmp.missing.length)} ausentes${ex(cmp.missing)}, ${fmt(cmp.layerChanged.length)} com layer diferente${ex(cmp.layerChanged)}, ${fmt(cmp.distanceChanged.length)} com distance_km diferente${ex(cmp.distanceChanged)}.`
+  );
+  const byteIdentical =
+    cmp.missing.length === 0 && cmp.layerChanged.length === 0 && cmp.distanceChanged.length === 0;
+  console.log(
+    `[regions:build] leitores legados (layer <= 3): ${byteIdentical ? "IDÊNTICOS ao estado atual" : "DIVERGEM do estado atual — revisar antes de gravar"}.`
+  );
+
+  if (dryRun) {
+    console.log("[regions:build] --dry-run: nada gravado.");
+    return { processed: stats.cities, rows: rows.length, dryRun: true, ...cmp, byteIdentical };
+  }
+
+  const backup = backupTable || defaultBackupTableName();
+  const result = await applyMemberships(pool, rows, { backupTable: backup });
+  console.log(
+    `[regions:build] OK — ${fmt(result.before)} → ${fmt(result.after)} linhas (${fmt(result.reinsertedFromBackup)} reinseridas do backup) em ${result.elapsedMs} ms; total ${Date.now() - started} ms.`
+  );
+  console.log(`[regions:build] backup: ${result.backupTable}`);
+  console.log(`[regions:build] rollback:\n${rollbackSql(result.backupTable)}`);
+  return { processed: stats.cities, ...result };
+}
+
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 
 if (isDirectRun) {
   try {
-    await buildRegionMemberships();
+    await buildRegionMemberships(parseArgs(process.argv.slice(2)));
   } catch (err) {
     console.error("[regions:build] Falha:", err?.message || err);
     process.exitCode = 1;

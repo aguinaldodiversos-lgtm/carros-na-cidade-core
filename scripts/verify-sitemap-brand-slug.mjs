@@ -59,7 +59,9 @@ function dedupeSum(rows, keyFn) {
 
 async function main() {
   console.log(`${C.bold}Verificação Onda 1 — sitemap + slug de marca${C.reset}`);
-  console.log(`${C.dim}SITEMAP_MIN_ADS = ${MIN} | alerta acima de ${ALERT_THRESHOLD} URLs/tipo${C.reset}`);
+  console.log(
+    `${C.dim}SITEMAP_MIN_ADS = ${MIN} | alerta acima de ${ALERT_THRESHOLD} URLs/tipo${C.reset}`
+  );
 
   let hadAlert = false;
 
@@ -78,14 +80,22 @@ async function main() {
     const oldSlug = brandModelSlug(row.brand);
     const newSlug = canonicalBrandSlug(row.brand);
     if (oldSlug !== newSlug) {
-      changed.push({ brand: row.brand, oldSlug, newSlug, display: canonicalBrandLabel(row.brand), total: row.total });
+      changed.push({
+        brand: row.brand,
+        oldSlug,
+        newSlug,
+        display: canonicalBrandLabel(row.brand),
+        total: row.total,
+      });
     } else {
       unchanged += 1;
     }
   }
   info(`marcas distintas com estoque ativo: ${brandsRes.rows.length}`);
   if (changed.length === 0) {
-    warn("nenhuma marca com prefixo de grupo FIPE encontrada no estoque atual (ok se não há GM/VW).");
+    warn(
+      "nenhuma marca com prefixo de grupo FIPE encontrada no estoque atual (ok se não há GM/VW)."
+    );
   } else {
     ok(`${changed.length} marca(s) MUDAM de slug (resgatadas pelo fix):`);
     for (const c of changed) {
@@ -108,7 +118,10 @@ async function main() {
 
   // ── 2. Páginas marca+cidade resgatadas (noindex → index) ──────────────────
   h1("2. Páginas marca+cidade: efeito do fix + limiar");
-  const brandPageSum = dedupeSum(cityBrandRows, (r) => `${r.city_slug}|${canonicalBrandSlug(r.brand)}`);
+  const brandPageSum = dedupeSum(
+    cityBrandRows,
+    (r) => `${r.city_slug}|${canonicalBrandSlug(r.brand)}`
+  );
   const eligibleBrandPages = [...brandPageSum.entries()].filter(([, total]) => total >= MIN);
 
   // resgatadas pelo SLUG = grupos elegíveis cujo brand tinha prefixo FIPE
@@ -124,10 +137,18 @@ async function main() {
 
   ok(`marca+cidade index-elegíveis (>= ${MIN}): ${eligibleBrandPages.length}`);
   ok(`  das quais resgatadas pelo fix de slug (GM/VW etc.): ${C.green}${rescued.length}${C.reset}`);
-  info(`${belowThreshold} combinação(ões) marca+cidade com 1..${MIN - 1} anúncios → ficam noindex (proteção anti-thin, intencional).`);
+  info(
+    `${belowThreshold} combinação(ões) marca+cidade com 1..${MIN - 1} anúncios → ficam noindex (proteção anti-thin, intencional).`
+  );
   if (rescued.length > 0) {
     info("exemplos resgatados:");
-    rescued.slice(0, 10).forEach(([key, total]) => console.log(`    /cidade/${key.split("|")[0]}/marca/${key.split("|")[1]}  (${total} anúncios)`));
+    rescued
+      .slice(0, 10)
+      .forEach(([key, total]) =>
+        console.log(
+          `    /cidade/${key.split("|")[0]}/marca/${key.split("|")[1]}  (${total} anúncios)`
+        )
+      );
   }
 
   // ── 3. Contagem de URLs por sitemap (com filtro >= MIN) ───────────────────
@@ -199,7 +220,9 @@ async function main() {
     ok("braganca-paulista-sp FORA do below-fipe.xml (correto).");
   }
   if (belowFipeRows.length > 0) {
-    info(`cidades no below-fipe.xml: ${belowFipeRows.map((r) => `${r.city_slug}(${r.total})`).join(", ")}`);
+    info(
+      `cidades no below-fipe.xml: ${belowFipeRows.map((r) => `${r.city_slug}(${r.total})`).join(", ")}`
+    );
   }
 
   // ── 4. Recorte da região de Atibaia ───────────────────────────────────────
@@ -211,10 +234,16 @@ async function main() {
        JOIN region_memberships rm ON rm.base_city_id = base.id
        JOIN cities m ON m.id = rm.member_city_id
       WHERE base.slug = 'atibaia-sp'
+        AND rm.layer <= 3
       ORDER BY rm.layer, rm.distance_km`
+    // Guard F1: este diagnóstico descreve a região COMO OS LEITORES LEGADOS a
+    // veem. Sem o filtro, o rebuild de 150 km faria o recorte crescer de ~30
+    // para ~200 cidades e o relatório deixaria de casar com as páginas.
   );
   if (region.rows.length === 0) {
-    warn("nenhuma membership para atibaia-sp (região não populada? rode regions:build). Pulando recorte.");
+    warn(
+      "nenhuma membership para atibaia-sp (região não populada? rode regions:build). Pulando recorte."
+    );
   } else {
     const slugs = ["atibaia-sp", ...region.rows.map((r) => r.member_slug)];
     const counts = (
@@ -231,7 +260,8 @@ async function main() {
     let regionEligible = 0;
     for (const slug of slugs) {
       const n = byCity.get(slug) || 0;
-      const flag = n >= MIN ? `${C.green}index/sitemap${C.reset}` : `${C.dim}noindex (<${MIN})${C.reset}`;
+      const flag =
+        n >= MIN ? `${C.green}index/sitemap${C.reset}` : `${C.dim}noindex (<${MIN})${C.reset}`;
       if (n >= MIN) regionEligible += 1;
       console.log(`    ${slug.padEnd(28)} ${String(n).padStart(4)} anúncios  → ${flag}`);
     }
