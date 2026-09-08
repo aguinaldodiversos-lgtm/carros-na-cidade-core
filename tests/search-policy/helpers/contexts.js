@@ -25,8 +25,17 @@ for (const origin of ORIGINS) {
   for (const mode of MODES) {
     for (const combo of FILTER_COMBOS) {
       const key = `${origin}|${mode.key}|${combo.key}`;
-      CONTEXTS.push({ key, origin, mode: mode.key, combo: combo.key, query: { city_slug: origin, sort: "relevance", limit: "50", ...mode.query, ...combo.query } });
-      LEGACY_CONTEXTS.push({ key, filters: { city_slug: origin, sort: "relevance", limit: 50, page: 1, ...combo.legacy } });
+      CONTEXTS.push({
+        key,
+        origin,
+        mode: mode.key,
+        combo: combo.key,
+        query: { city_slug: origin, sort: "relevance", limit: "50", ...mode.query, ...combo.query },
+      });
+      LEGACY_CONTEXTS.push({
+        key,
+        filters: { city_slug: origin, sort: "relevance", limit: 50, page: 1, ...combo.legacy },
+      });
     }
   }
 }

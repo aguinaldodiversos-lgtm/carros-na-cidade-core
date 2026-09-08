@@ -89,20 +89,72 @@ export const CITIES = [
 
 /** Os 6 Onix ativos de Atibaia, literais (§3.3 do gate). */
 export const ONIX = [
-  { model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.", transmission: "manual", price: 70900, below: true, year: 2025 },
-  { model: "ONIX SEDAN Plus LT 1.0 12V Flex 4p Mec.", transmission: "manual", price: 74900, below: false, year: 2025 },
-  { model: "ONIX HATCH 1.0 12V Flex 5p Mec.", transmission: "manual", price: 74900, below: false, year: 2025 },
-  { model: "ONIX SEDAN Plus LT 1.0 12V Flex 4p Mec.", transmission: "manual", price: 77900, below: true, year: 2025 },
-  { model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.", transmission: "manual", price: 78900, below: false, year: 2025 },
-  { model: "ONIX SEDAN Plus LTZ 1.0 12V TB Flex Aut.", transmission: "automatico", price: 78900, below: false, year: 2023 },
+  {
+    model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.",
+    transmission: "manual",
+    price: 70900,
+    below: true,
+    year: 2025,
+  },
+  {
+    model: "ONIX SEDAN Plus LT 1.0 12V Flex 4p Mec.",
+    transmission: "manual",
+    price: 74900,
+    below: false,
+    year: 2025,
+  },
+  {
+    model: "ONIX HATCH 1.0 12V Flex 5p Mec.",
+    transmission: "manual",
+    price: 74900,
+    below: false,
+    year: 2025,
+  },
+  {
+    model: "ONIX SEDAN Plus LT 1.0 12V Flex 4p Mec.",
+    transmission: "manual",
+    price: 77900,
+    below: true,
+    year: 2025,
+  },
+  {
+    model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.",
+    transmission: "manual",
+    price: 78900,
+    below: false,
+    year: 2025,
+  },
+  {
+    model: "ONIX SEDAN Plus LTZ 1.0 12V TB Flex Aut.",
+    transmission: "automatico",
+    price: 78900,
+    below: false,
+    year: 2023,
+  },
 ];
 
 /** Restante do estoque de Atibaia (27) — distribuição real de commercial_model. */
 export const ATIBAIA_OTHERS = [
-  ...Array.from({ length: 4 }, (_, i) => ({ brand: "Hyundai", cm: "HB20", model: `HB20 Vision 1.0 Flex ${i}`, body: "hatch", price: 62000 + i * 1000 })),
+  ...Array.from({ length: 4 }, (_, i) => ({
+    brand: "Hyundai",
+    cm: "HB20",
+    model: `HB20 Vision 1.0 Flex ${i}`,
+    body: "hatch",
+    price: 62000 + i * 1000,
+  })),
   ...["T-Cross", "Pulse", "C3", "Mobi", "Polo", "Kwid", "HR-V", "Fox", "Argo"].flatMap((cm, j) =>
     [0, 1].map((k) => ({
-      brand: { "T-Cross": "VW - VolksWagen", Polo: "VW - VolksWagen", Fox: "VW - VolksWagen", Pulse: "Fiat", Mobi: "Fiat", Argo: "Fiat", C3: "Citroën", Kwid: "Renault", "HR-V": "Honda" }[cm],
+      brand: {
+        "T-Cross": "VW - VolksWagen",
+        Polo: "VW - VolksWagen",
+        Fox: "VW - VolksWagen",
+        Pulse: "Fiat",
+        Mobi: "Fiat",
+        Argo: "Fiat",
+        C3: "Citroën",
+        Kwid: "Renault",
+        "HR-V": "Honda",
+      }[cm],
       cm,
       model: `${cm.toUpperCase()} 1.0 Flex ${k}`,
       body: cm === "T-Cross" || cm === "HR-V" || cm === "Pulse" ? "suv" : "hatch",
@@ -110,7 +162,13 @@ export const ATIBAIA_OTHERS = [
     }))
   ),
   ...["Compass", "Virtus", "Ecosport", "Strada", "Civic"].map((cm, j) => ({
-    brand: { Compass: "Jeep", Virtus: "VW - VolksWagen", Ecosport: "Ford", Strada: "Fiat", Civic: "Honda" }[cm],
+    brand: {
+      Compass: "Jeep",
+      Virtus: "VW - VolksWagen",
+      Ecosport: "Ford",
+      Strada: "Fiat",
+      Civic: "Honda",
+    }[cm],
     cm,
     model: `${cm.toUpperCase()} 1.6 Flex`,
     body: cm === "Strada" ? "picape" : cm === "Compass" || cm === "Ecosport" ? "suv" : "sedan",
@@ -202,12 +260,42 @@ export async function seedF2Fixture(db) {
   ids.users.pf = await user("pf@f2.local", "cpf-free-essential", "cpf");
   ids.users.pfBoost = await user("boost@f2.local", "cpf-free-essential", "cpf");
 
-  ids.advertisers.ittmotors = await advertiser(ids.users.pro, "Ittmotors", "atibaia-sp", "Ittmotors");
-  ids.advertisers.proBraganca = await advertiser(ids.users.pro, "Loja Bragança", "braganca-paulista-sp", "Loja Bragança");
-  ids.advertisers.pfBraganca = await advertiser(ids.users.pf, "Aguinaldo", "braganca-paulista-sp", null);
-  ids.advertisers.pfAtibaia = await advertiser(ids.users.pfBoost, "Particular Atibaia", "atibaia-sp", null);
-  ids.advertisers.startExtrema = await advertiser(ids.users.start, "Loja Extrema", "extrema-mg", "Loja Extrema");
-  ids.advertisers.startRio = await advertiser(ids.users.start, "Loja Rio", "rio-de-janeiro-rj", "Loja Rio");
+  ids.advertisers.ittmotors = await advertiser(
+    ids.users.pro,
+    "Ittmotors",
+    "atibaia-sp",
+    "Ittmotors"
+  );
+  ids.advertisers.proBraganca = await advertiser(
+    ids.users.pro,
+    "Loja Bragança",
+    "braganca-paulista-sp",
+    "Loja Bragança"
+  );
+  ids.advertisers.pfBraganca = await advertiser(
+    ids.users.pf,
+    "Aguinaldo",
+    "braganca-paulista-sp",
+    null
+  );
+  ids.advertisers.pfAtibaia = await advertiser(
+    ids.users.pfBoost,
+    "Particular Atibaia",
+    "atibaia-sp",
+    null
+  );
+  ids.advertisers.startExtrema = await advertiser(
+    ids.users.start,
+    "Loja Extrema",
+    "extrema-mg",
+    "Loja Extrema"
+  );
+  ids.advertisers.startRio = await advertiser(
+    ids.users.start,
+    "Loja Rio",
+    "rio-de-janeiro-rj",
+    "Loja Rio"
+  );
 
   const base = new Date("2026-08-01T12:00:00Z").getTime();
   let n = 0;
@@ -310,11 +398,35 @@ export async function seedF2Fixture(db) {
 
   // Extrema-MG — Start, 2 anúncios cross-UF (25 km de Bragança, 38 km de Atibaia).
   ids.ads.extrema = [
-    await ad({ advertiserId: ids.advertisers.startExtrema, citySlug: "extrema-mg", title: "Gol Extrema", brand: "VW - VolksWagen", model: "GOL 1.0 Flex", commercialModel: "Gol", price: 45000 }),
-    await ad({ advertiserId: ids.advertisers.startExtrema, citySlug: "extrema-mg", title: "Uno Extrema", brand: "Fiat", model: "UNO Way 1.0 Flex", commercialModel: "Uno", price: 38000 }),
+    await ad({
+      advertiserId: ids.advertisers.startExtrema,
+      citySlug: "extrema-mg",
+      title: "Gol Extrema",
+      brand: "VW - VolksWagen",
+      model: "GOL 1.0 Flex",
+      commercialModel: "Gol",
+      price: 45000,
+    }),
+    await ad({
+      advertiserId: ids.advertisers.startExtrema,
+      citySlug: "extrema-mg",
+      title: "Uno Extrema",
+      brand: "Fiat",
+      model: "UNO Way 1.0 Flex",
+      commercialModel: "Uno",
+      price: 38000,
+    }),
   ];
   // Rio — fora de 150 km de tudo.
-  ids.ads.rio = await ad({ advertiserId: ids.advertisers.startRio, citySlug: "rio-de-janeiro-rj", title: "Corolla Rio", brand: "Toyota", model: "COROLLA XEi 2.0 Flex", commercialModel: "Corolla", price: 110000 });
+  ids.ads.rio = await ad({
+    advertiserId: ids.advertisers.startRio,
+    citySlug: "rio-de-janeiro-rj",
+    title: "Corolla Rio",
+    brand: "Toyota",
+    model: "COROLLA XEi 2.0 Flex",
+    commercialModel: "Corolla",
+    price: 110000,
+  });
 
   return ids;
 }
