@@ -36,6 +36,7 @@
     "regions:verify": "node scripts/regions-verify.mjs",
     "ads:backfill-commercial-model": "node scripts/backfill-ads-commercial-model.mjs",
     "ads:backfill-commercial-model:dry-run": "node scripts/backfill-ads-commercial-model.mjs --dry-run",
+    "ads:verify-commercial-model": "node scripts/ads-verify-commercial-model.mjs",
     "seed:cities": "node scripts/seed-ibge-municipios.mjs",
     "seed:cities-geo": "node scripts/seed-cities-geo.mjs",
     "import:cities": "node scripts/import-ibge-cities.js",
