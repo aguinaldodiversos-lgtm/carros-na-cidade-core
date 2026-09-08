@@ -1,4 +1,5 @@
 import { cacheInvalidatePrefix } from "../../shared/cache/cache.middleware.js";
+import { invalidateSearchPolicyCaches } from "./search-policy/policy-cache.js";
 
 /**
  * Invalidação de caches após mutação de anúncios (listas, facets, autocomplete).
@@ -18,5 +19,7 @@ export async function invalidateAdsCachesAfterMutation() {
     cacheInvalidatePrefix("public:city:model"),
     cacheInvalidatePrefix("public:city:opportunities"),
     cacheInvalidatePrefix("public:city:below-fipe"),
+    // Search Policy Engine (F2): sp:liq:* e sp:relax:* — Redis ou LRU em memória.
+    invalidateSearchPolicyCaches(),
   ]);
 }
