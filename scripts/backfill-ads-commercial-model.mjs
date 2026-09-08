@@ -140,18 +140,38 @@ export async function backfillCommercialModel({ dryRun = false } = {}) {
     );
   }
 
+  const nullRateAlta = ads.length > 0 && plan.nulls.length / ads.length > NULL_RATE_ALERT;
+
   const updates = [...plan.fill, ...plan.change];
   if (dryRun) {
     console.log(
       `[ads:commercial-model] --dry-run: ${updates.length} updates seriam gravados. Nada gravado.`
     );
+    // Veredito explícito: quem executa não interpreta contador.
+    console.log("");
+    if (nullRateAlta) {
+      console.log(
+        `PARE: ${pct(plan.nulls.length, ads.length)} dos anuncios ficariam com commercial_model NULL (limite 20 %). Revise a lista acima antes de gravar.`
+      );
+    } else {
+      console.log("PROSSIGA");
+    }
     return {
       total: ads.length,
       derivable,
       nulls: plan.nulls.length,
       updates: updates.length,
       dryRun: true,
+      nullRateAlta,
     };
+  }
+
+  if (nullRateAlta) {
+    console.log("");
+    console.log(
+      `PARE: ${pct(plan.nulls.length, ads.length)} de NULL acima do limite de 20 % — nada foi gravado.`
+    );
+    return { total: ads.length, derivable, nulls: plan.nulls.length, aborted: true, nullRateAlta };
   }
 
   const written = await applyUpdates(updates);
@@ -164,6 +184,14 @@ export async function backfillCommercialModel({ dryRun = false } = {}) {
   console.log(
     `[ads:commercial-model] OK — ${written} linhas atualizadas em ${Date.now() - started} ms; search_vector sem o modelo comercial: ${check[0].n} (esperado 0).`
   );
+  console.log("");
+  if (check[0].n === 0) {
+    console.log("PROSSIGA");
+  } else {
+    console.log(
+      `PARE: ${check[0].n} anuncio(s) com commercial_model preenchido cujo search_vector nao contem o modelo — o trigger nao disparou. Reverter com: UPDATE ads SET commercial_model = NULL;`
+    );
+  }
   return {
     total: ads.length,
     derivable,
