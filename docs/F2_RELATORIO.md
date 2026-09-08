@@ -7,7 +7,7 @@ Banco de execução: snapshot de produção em Postgres 18.6 local (`localhost:5
 
 **Backend de cache (declaração exigida).** Testes: `memory` — `DISABLE_REDIS=true`, `policyCacheBackend()` devolve `"memory"` (`tests/search-policy/f2-scope-facets-relax.test.js:505`). Produção: `memory` — `/health` responde `redis: disabled` (mesmo estado do snapshot local em `f2-backend-snapshot-*`, e o registrado na F1 §2.5). `policy-cache.js` reutiliza o **mesmo** cliente de `src/infrastructure/cache/redis.js` que o `cache.middleware.js` usa (`src/modules/ads/search-policy/policy-cache.js:23`, `:68-70`); quando ele é `null`, LRU em processo com teto de **200** chaves (`:31`, evicção `:51`). Nenhum código assume Redis; `cache.middleware.js` e `redis.js` não foram tocados (`git diff main --stat` vazio para os dois).
 
-Releitura de `docs/Search_Policy_Engine_v2_1_Consolidado.md`: **ainda ausente** em `origin/main` (`git cat-file -e origin/main:docs/…` após `git fetch` em 2026-09-08; `origin/main = 64517384`). A releitura de 5 linhas sai assim que ele existir.
+Releitura de `docs/Search_Policy_Engine_v2_1_Consolidado.md`: **ainda ausente**. Verificado de novo em 2026-09-08 após a aprovação da F2, que o dava como presente: `git fetch origin` traz `origin/main = 64517384` (mesmo commit de antes), `git cat-file -e origin/main:docs/Search_Policy_Engine_v2_1_Consolidado.md` falha, e uma varredura de **todas** as branches remotas não acha nenhum arquivo com "onsolidad" no nome. A releitura de 5 linhas sai assim que o arquivo for empurrado.
 
 ---
 
@@ -45,7 +45,7 @@ Releitura de `docs/Search_Policy_Engine_v2_1_Consolidado.md`: **ainda ausente** 
 | `.claude/launch.json`                                                                                                                                                                                                                  | duas configs locais (`f2-backend-snapshot-shadow`, `f2-backend-snapshot-v1`) para o 8.10 ao vivo                                                                                                                                                |
 | `tests/search-policy/f2-resolvers.test.js` (21), `f2-scope-facets-relax.test.js` (27), `f2-engine.integration.test.js` (12), `f2-flag-off.test.js` (5), `f2-regions-guard.test.js` (4), `policy-config.test.js` (7, atualizado p/ 066) | testes desta fase                                                                                                                                                                                                                               |
 | `tests/search-policy/helpers/contexts.js`, `helpers/f2-fixture.js`, `__snapshots__/legacy-sql.golden.json`                                                                                                                             | 24 contextos fixos; fixture em Postgres real (8 cidades com coordenadas reais, memberships pelo builder da F1, estoque que espelha 2026-09-07 + cenários de ranking); golden de `main`                                                          |
-| `docs/F2_GATE_SQL.md` (cherry-pick), `docs/F2_EXPLAIN_ANALYZE.md`, `docs/F2_RELATORIO.md`                                                                                                                                              | gate aprovado ("SQL OK"), planos completos, este relatório                                                                                                                                                                                      |
+| `docs/F2_GATE_SQL.md` (cherry-pick), `docs/F2_EXPLAIN_ANALYZE.md`, `docs/F2_RELATORIO.md`, `docs/SCHEMA_DRIFT.md`                                                                                                                      | gate aprovado ("SQL OK"), planos completos, este relatório, drift de schema para F5                                                                                                                                                             |
 
 **Não tocado (confirmação de R2, por `git diff main --stat`):** `frontend/middleware.ts`, `frontend/lib/middleware/**`, canonical, sitemaps, H1, layout/shell 1600, drawer mobile, header, pagamentos, `src/shared/cache/cache.middleware.js`, `src/infrastructure/cache/redis.js`, `ads-filter.parser.js`, `ads-free-query.parser.js`, `ads.model`. Nenhuma coluna renomeada/removida/alterada de tipo. Fora do motor, o frontend mudou em **2 arquivos** e só para repassar/não reordenar (R8).
 
@@ -116,9 +116,15 @@ Releitura de `docs/Search_Policy_Engine_v2_1_Consolidado.md`: **ainda ausente** 
 
 ### 2.14 Migration 066 (aditiva, com uma ressalva — §5.1)
 
+Aplicada de ponta a ponta no snapshot **a partir do estado da 036** (constraint original restaurada antes do teste), não só em cima de um banco já estendido.
+
 1. `ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS payload JSONB NULL` (`:26`).
 2. `facets.always_open = ["price"]` em `platform_settings.search_policy`, só se a chave ainda não existir (`:30-35`); `policy-config.test.js` prova `065 + 066 == SEARCH_POLICY_DEFAULT`.
-3. CHECK `analytics_events_event_type_chk` (allowlist **fechada** da migration 036, sem `search.executed` — descoberto quando o teste 8.8 gravou 0 linhas): recriado como **superconjunto** da definição atual lida do catálogo (`regexp_matches(pg_get_constraintdef(…))`, `:57-60`), `NOT VALID` + `VALIDATE` para não segurar `ACCESS EXCLUSIVE` durante a varredura (`:68-73`); idempotente (sai se `'search.executed'` já consta); `RAISE` se não conseguir ler a lista — **nunca derruba a constraint sem a nova pronta**. Aplicada duas vezes no snapshot (segunda execução no-op) e validada por INSERT de prova; o banco descartável dos testes a recebe pelo runner real, e o teste 8.8 só passa com ela.
+3. CHECK `analytics_events_event_type_chk` (allowlist **fechada** da migration 036, sem `search.executed` — descoberto quando o teste 8.8 gravou 0 linhas): recriado como **superconjunto** da definição atual lida do catálogo (`regexp_matches(pg_get_constraintdef(…))`, `:70-71`), na ordem **ADD `_v2` NOT VALID → VALIDATE `_v2` → DROP a antiga → RENAME `_v2` para o nome original** (`:89-96`). Idempotente (sai se `'search.executed'` já consta) e limpa uma `_v2` órfã de execução manual interrompida (`:81-88`); `RAISE` se não conseguir ler a lista — nunca derruba às cegas.
+
+   **A tabela nunca fica sem CHECK de `event_type`.** Provado em banco descartável com um `EVENT TRIGGER` que conta as constraints ao fim de cada DDL do bloco: ADD → 2, VALIDATE → 2, DROP → 1 (`_v2`), RENAME → 1 (nome original); **momentos com zero CHECK: 0**. O mesmo teste cobre idempotência (2ª execução no-op), aceitação de `search.executed`, recusa de valor inválido (23514) e a limpeza da `_v2` órfã.
+
+   **Lock (correção).** O runner executa o arquivo inteiro dentro de **uma transação** (`src/database/migrate.js:247-251`: `BEGIN` → `client.query(sql)` → `COMMIT`). Logo o `ACCESS EXCLUSIVE` tomado pelo `ADD` só é liberado no `COMMIT`, e o par `NOT VALID` + `VALIDATE` **não alivia o lock** aqui — a varredura do `VALIDATE` acontece com a tabela já em `ACCESS EXCLUSIVE`. O que o par garante é a ordem segura acima. O custo é proporcional ao tamanho de `analytics_events`: no snapshot de produção, **10.979 linhas / 4.480 kB** (`pg_total_relation_size`), e o arquivo 066 inteiro aplicou em **10 ms** partindo do estado 036. O número de produção ao vivo sai da consulta do §7.1. Se a tabela crescer a ponto de a janela incomodar, rodar os quatro passos à mão fora do runner, cada um em sua transação.
 
 ### 2.15 "Só assume o que modela" — achados do 8.10 ao vivo, corrigidos nesta fase
 
@@ -221,8 +227,8 @@ DOM/sidebar: N/A nesta fase (F3).
 
 ## 5. Divergências em relação ao prompt
 
-1. **Migration 066 recria o CHECK `analytics_events_event_type_chk`** (`DROP CONSTRAINT` + `ADD … NOT VALID` + `VALIDATE`). É a única instrução fora da lista de R3 nesta fase e é obrigatória: a allowlist da 036 é fechada e o evento `search.executed` não entra nela (INSERT falha com 23514 — foi assim que o teste 8.8 pegou). A nova lista é **superconjunto** da atual, lida do catálogo (não hardcoded): nenhuma linha existente passa a violar, nenhum valor que só exista em produção é derrubado. Rollback em §7.
-2. **`cities.normalized_name` não é lida.** A coluna existe em produção mas **não vem de migration nenhuma** (`grep normalized_name src/database/migrations/` vazio; o banco descartável dos testes não a tem). O dicionário de cidades deriva a forma normalizada de `name` com o mesmo `normalizeText` aplicado ao `q` (`dictionaries.js:87-104`). Mesma categoria da função de search_vector não versionada achada na F1.
+1. **Migration 066 recria o CHECK `analytics_events_event_type_chk`** (`ADD _v2 NOT VALID` → `VALIDATE _v2` → `DROP` a antiga → `RENAME`, nessa ordem, sem janela sem CHECK — §2.14). É a única instrução fora da lista de R3 nesta fase e é obrigatória: a allowlist da 036 é fechada e o evento `search.executed` não entra nela (INSERT falha com 23514 — foi assim que o teste 8.8 pegou). A nova lista é **superconjunto** da atual, lida do catálogo (não hardcoded): nenhuma linha existente passa a violar, nenhum valor que só exista em produção é derrubado. Rollback em §7.
+2. **`cities.normalized_name` não é lida.** A coluna existe em produção mas **não vem de migration nenhuma** (`grep normalized_name src/database/migrations/` vazio; o banco descartável dos testes não a tem). O dicionário de cidades deriva a forma normalizada de `name` com o mesmo `normalizeText` aplicado ao `q` (`dictionaries.js:87-104`). Mesma categoria da função de search_vector não versionada achada na F1. As duas, mais o levantamento completo do drift de schema do snapshot (5 funções próprias, 3 triggers, 47 colunas em tabelas versionadas e 53 tabelas legadas sem migration), estão em **`docs/SCHEMA_DRIFT.md`**, para decisão em F5.
 3. **Telemetria se desliga sozinha** em erro de schema (§2.12) — o prompt pede best-effort; o desligamento com um único warn é o que evita um warn por busca em shadow se a 066 não tiver rodado.
 4. **Dicionário de marcas com loader próprio** (`dictionaries.js:33-47`): o `loadBrandDictionary` legado usa o pool global e ignoraria o banco passado pelos testes de integração. Mesmo SELECT (limite 300, guard de dados sujos).
 5. **Chaves legadas não modeladas ⇒ legado** e **`state=` sem origem ⇒ STATE** (§2.15). Não estão no prompt; sem elas o `v1` seria pior do que hoje em duas requisições reais do frontend atual.
@@ -236,7 +242,7 @@ DOM/sidebar: N/A nesta fase (F3).
 13. **Bugs Icó e "at" seguem vivos no caminho `off`** (parser legado intocado, D2) — pendência de F5. O resolvedor v1 não os tem (`f2-resolvers.test.js:104`, `:147`).
 14. **Dois arquivos do frontend tocados** (passthrough e não-reordenação, R8), quando o prompt reserva o frontend para F3: sem eles a resposta v1 perderia `search_policy` na BFF e seria reordenada no cliente contra o SQL do motor.
 15. **`.claude/launch.json` ganhou duas configs** locais (shadow/v1) para o 8.10 ao vivo — sem efeito em produção.
-16. **`docs/Search_Policy_Engine_v2_1_Consolidado.md`** continua ausente — releitura pendente.
+16. **`docs/Search_Policy_Engine_v2_1_Consolidado.md`** continua ausente em `origin/main` (reverificado em 2026-09-08, incluindo todas as branches remotas) — releitura pendente.
 
 Nenhuma divergência de comportamento nas superfícies de leitura com a flag `off`.
 
@@ -291,7 +297,19 @@ SELECT path, payload->>'profile' perfil, payload->>'geo_mode' geo, payload->>'ef
   FROM analytics_events
  WHERE event_type = 'search.executed' AND payload->>'flag_mode' = 'shadow'
  ORDER BY id DESC LIMIT 30;
+
+-- Volume e custo de armazenamento do evento (para F4 decidir retenção).
+SELECT COUNT(*) FILTER (WHERE event_type = 'search.executed')                       AS search_executed_total,
+       COUNT(*) FILTER (WHERE event_type = 'search.executed'
+                          AND occurred_at > NOW() - INTERVAL '1 day')               AS search_executed_24h,
+       COUNT(*)                                                                     AS eventos_todos,
+       pg_size_pretty(pg_total_relation_size('analytics_events'))                   AS tamanho_total,
+       pg_size_pretty(pg_relation_size('analytics_events'))                         AS heap,
+       pg_total_relation_size('analytics_events')                                   AS tamanho_bytes
+  FROM analytics_events;
 ```
+
+Baseline para comparar (snapshot de produção, antes do shadow): **10.979 linhas no total, 4.480 kB**, 0 eventos `search.executed`. Projeção da retenção em F4 = (`search_executed_24h` × dias) × bytes por linha; o `payload` do shadow tem ~20 campos.
 
 Critério de aceite do shadow (para F4): 0 timeouts sustentados, `shadow_ms_max` < 300, divergências explicáveis pelo raio automático (Bragança `1 → 34` é o esperado) e `pulados_legado` restrito a `highlight_only`/`city_slugs`/`model`.
 
@@ -306,10 +324,13 @@ Critério de aceite do shadow (para F4): 0 timeouts sustentados, `shadow_ms_max`
 
 ```sql
 DELETE FROM analytics_events WHERE event_type = 'search.executed';
-ALTER TABLE analytics_events DROP CONSTRAINT IF EXISTS analytics_events_event_type_chk;
-ALTER TABLE analytics_events ADD CONSTRAINT analytics_events_event_type_chk CHECK (event_type IN (
+-- Mesma ordem segura da 066: a nova entra validada antes de a antiga sair.
+ALTER TABLE analytics_events ADD CONSTRAINT analytics_events_event_type_chk_v0 CHECK (event_type IN (
   'page_view','ad_view','city_page_view','region_page_view','below_fipe_page_view','blog_view',
-  'whatsapp_click','phone_click','finance_click','search_performed','seller_store_view'));
+  'whatsapp_click','phone_click','finance_click','search_performed','seller_store_view')) NOT VALID;
+ALTER TABLE analytics_events VALIDATE CONSTRAINT analytics_events_event_type_chk_v0;
+ALTER TABLE analytics_events DROP CONSTRAINT analytics_events_event_type_chk;
+ALTER TABLE analytics_events RENAME CONSTRAINT analytics_events_event_type_chk_v0 TO analytics_events_event_type_chk;
 ALTER TABLE analytics_events DROP COLUMN IF EXISTS payload;
 UPDATE platform_settings SET value = value #- '{facets,always_open}', updated_at = NOW() WHERE key = 'search_policy';
 DELETE FROM schema_migrations WHERE filename = '066_search_policy_f2.sql';
