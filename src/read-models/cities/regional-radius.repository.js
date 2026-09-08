@@ -22,6 +22,12 @@ export async function getRadiusMembers(citySlug, radiusKm) {
     JOIN region_memberships rm ON rm.base_city_id = base.id
     JOIN cities m ON m.id = rm.member_city_id
     WHERE base.slug = $1
+      -- Guard de compatibilidade F1 (R4): layer <= 3 restringe a leitura ao
+      -- conjunto que existia ANTES do rebuild de 150 km. Linha nova (outra UF,
+      -- alem dos tetos legados, > 60 km) recebe layer 4 e e invisivel aqui;
+      -- so o motor novo (F2), que consulta por distance_km, a enxerga. Sem este
+      -- filtro o rebuild mudaria em silencio o resultado desta query.
+      AND rm.layer <= 3
       AND rm.distance_km IS NOT NULL
       AND rm.distance_km > 0
       AND rm.distance_km <= $2

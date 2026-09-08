@@ -8,10 +8,15 @@ import {
   buildAllMemberships,
   buildMembershipsForBase,
   classifyLegacyLayer,
+  hasAnyNeighborRow,
+  compareWithExisting,
   findMissingFromSuperset,
   haversineKm,
   LAYER_EXTENDED,
+  LAYER_EXTENDED as LAYER_EXTENDED_ALIAS,
+  layerMapFrom,
   LEGACY_LAYER_1_MAX_MEMBERS,
+  LEGACY_MAX_LAYER,
   MAX_DISTANCE_KM,
   pickLegacyRegionMembers,
   rollbackSql,
@@ -131,9 +136,21 @@ describe("buildMembershipsForBase — sem fronteira de UF, alcance 150 km, layer
     expect(row(fromBraganca, ATIBAIA.id).layer).toBe(1);
   });
 
-  it("Campinas (54 km, mesma UF) mantém layer 2; São Paulo (~65 km) layer 3", () => {
+  it("build do zero: Campinas (54 km) layer 2 e São Paulo (~65 km) layer 3 — regra antiga completa", () => {
+    // Base sem vizinhança gravada = build do zero: a regra antiga vale inteira,
+    // inclusive a banda 60–100 km (layer 3), que existe desde 2026-07 para os
+    // stops de 75/100 km do filtro de distância.
     expect(row(fromBraganca, CAMPINAS.id).layer).toBe(2);
     expect(row(fromBraganca, SAO_PAULO.id).layer).toBe(3);
+  });
+
+  it("base JÁ construída: a faixa 60–100 km vira layer 4, nunca 3", () => {
+    // É a regra 2. Sem ela, o rebuild daria layer 3 a milhares de bases que
+    // hoje não o têm e o guard layer <= 3 passaria a enxergar linhas novas.
+    const congelada = buildMembershipsForBase(BRAGANCA, ALL, { allowLegacyLayer3: false });
+    expect(row(congelada, SAO_PAULO.id).layer).toBe(LAYER_EXTENDED);
+    expect(row(congelada, CAMPINAS.id).layer).toBe(2);
+    expect(congelada.some((r) => r.layer === 3)).toBe(false);
   });
 
   it("Rio de Janeiro (> 150 km) não entra", () => {
@@ -212,11 +229,13 @@ describe("buildMembershipsForBase — sem fronteira de UF, alcance 150 km, layer
     );
   });
 
-  it("classifyLegacyLayer segue 30/60/100", () => {
+  it("classifyLegacyLayer: 30/60/100 no build do zero; sem layer 3 em base congelada", () => {
     expect(classifyLegacyLayer(30)).toBe(1);
     expect(classifyLegacyLayer(30.01)).toBe(2);
+    expect(classifyLegacyLayer(60)).toBe(2);
     expect(classifyLegacyLayer(60.01)).toBe(3);
     expect(classifyLegacyLayer(100.01)).toBeNull();
+    expect(classifyLegacyLayer(60.01, { includeLayer3: false })).toBeNull();
   });
 });
 
@@ -257,6 +276,69 @@ describe("buildAllMemberships + summarizeMemberships", () => {
   });
 });
 
+describe("preservação do layer gravado (regra 1 — guard layer <= 3 byte-a-byte)", () => {
+  it("linha existente mantém o layer, inclusive layer 3 que a regra nova não atribui", () => {
+    // Estado "antigo": Bragança→São Paulo já gravada como layer 3 (o build
+    // parcial de produção fez isso para 180 bases).
+    const existing = new Map([[`${BRAGANCA.id}:${SAO_PAULO.id}`, 3]]);
+    const rows = buildMembershipsForBase(BRAGANCA, ALL, {
+      existingLayerByKey: existing,
+      allowLegacyLayer3: false,
+    });
+    expect(row(rows, SAO_PAULO.id).layer).toBe(3);
+    // Sem o layer gravado, numa base congelada a mesma linha seria 4.
+    expect(
+      row(buildMembershipsForBase(BRAGANCA, ALL, { allowLegacyLayer3: false }), SAO_PAULO.id).layer
+    ).toBe(LAYER_EXTENDED);
+  });
+
+  it("o layer gravado vence a regra 2 (linha antiga de layer 4 não vira 1)", () => {
+    const existing = new Map([[`${BRAGANCA.id}:${ATIBAIA.id}`, LAYER_EXTENDED]]);
+    const rows = buildMembershipsForBase(BRAGANCA, ALL, {
+      existingLayerByKey: existing,
+      allowLegacyLayer3: false,
+    });
+    expect(row(rows, ATIBAIA.id).layer).toBe(LAYER_EXTENDED);
+  });
+
+  it("segundo build congela as bases já construídas: layer <= 3 não cresce nem muda", () => {
+    // Simula o rebuild real: o "estado atual" é o resultado de um build antigo,
+    // que só enxergava a mesma UF até 100 km (layer 1–3). O segundo build
+    // acrescenta as linhas de 150 km e cross-UF — e nenhuma delas pode entrar
+    // no conjunto que os leitores legados veem.
+    const primeiro = buildAllMemberships(ALL).rows;
+    const anterior = new Map(
+      primeiro
+        .filter((r) => r.layer <= LEGACY_MAX_LAYER)
+        .map((r) => [
+          `${r.base_city_id}:${r.member_city_id}`,
+          {
+            base_city_id: r.base_city_id,
+            member_city_id: r.member_city_id,
+            distance_km: r.distance_km,
+            layer: r.layer,
+          },
+        ])
+    );
+
+    const segundo = buildAllMemberships(ALL, {
+      existingLayerByKey: layerMapFrom(anterior),
+      freezeLegacyLayer3: hasAnyNeighborRow(anterior),
+    }).rows;
+
+    const cmp = compareWithExisting(anterior, segundo);
+    expect(cmp.missing).toEqual([]);
+    expect(cmp.layerChanged).toEqual([]);
+    expect(cmp.distanceChanged).toEqual([]);
+    // O conjunto visível aos leitores legados é EXATAMENTE o anterior.
+    const visiveis = segundo.filter((r) => r.layer <= LEGACY_MAX_LAYER);
+    expect(visiveis.length).toBe(anterior.size);
+    // E o build de fato cresceu (as linhas novas foram para layer 4).
+    expect(segundo.length).toBeGreaterThan(anterior.size);
+    expect(segundo.some((r) => r.layer === LAYER_EXTENDED_ALIAS)).toBe(true);
+  });
+});
+
 describe("superconjunto e rollback", () => {
   it("findMissingFromSuperset aponta chaves antigas ausentes", () => {
     const rows = [
@@ -265,6 +347,23 @@ describe("superconjunto e rollback", () => {
     ];
     expect(findMissingFromSuperset(new Set(["1:1", "1:2"]), rows)).toEqual([]);
     expect(findMissingFromSuperset(new Set(["1:1", "9:9"]), rows)).toEqual(["9:9"]);
+  });
+
+  it("compareWithExisting acusa linha ausente, layer alterado e distância alterada", () => {
+    const anterior = new Map([
+      ["1:2", { distance_km: 10, layer: 1 }],
+      ["1:3", { distance_km: 40, layer: 2 }],
+      ["1:9", { distance_km: 90, layer: 3 }],
+    ]);
+    const novos = [
+      { base_city_id: 1, member_city_id: 2, distance_km: 10, layer: 1 },
+      { base_city_id: 1, member_city_id: 3, distance_km: 40, layer: 4 },
+    ];
+    const cmp = compareWithExisting(anterior, novos);
+    expect(cmp.existing).toBe(3);
+    expect(cmp.missing).toEqual(["1:9"]);
+    expect(cmp.layerChanged).toEqual(["1:3"]);
+    expect(cmp.distanceChanged).toEqual([]);
   });
 
   it("rollbackSql restaura a partir do backup e rejeita identificador inválido", () => {

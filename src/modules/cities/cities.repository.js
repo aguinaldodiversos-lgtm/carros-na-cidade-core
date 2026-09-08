@@ -209,6 +209,12 @@ async function findRadiusDonor(cityId, radiusKm) {
       ON a.city_id = c.id
      AND a.status = 'active'
     WHERE rm.base_city_id = $1
+      -- Guard de compatibilidade F1 (R4): layer <= 3 restringe a leitura ao
+      -- conjunto que existia ANTES do rebuild de 150 km. Linha nova (outra UF,
+      -- alem dos tetos legados, > 60 km) recebe layer 4 e e invisivel aqui;
+      -- so o motor novo (F2), que consulta por distance_km, a enxerga. Sem este
+      -- filtro o rebuild mudaria em silencio o resultado desta query.
+      AND rm.layer <= 3
       AND rm.distance_km IS NOT NULL
       AND rm.distance_km > 0
       AND rm.distance_km <= $2
@@ -235,6 +241,12 @@ async function hasRegionMemberships(cityId) {
     SELECT 1
     FROM region_memberships
     WHERE base_city_id = $1
+      -- Guard de compatibilidade F1 (R4): layer <= 3 restringe a leitura ao
+      -- conjunto que existia ANTES do rebuild de 150 km. Linha nova (outra UF,
+      -- alem dos tetos legados, > 60 km) recebe layer 4 e e invisivel aqui;
+      -- so o motor novo (F2), que consulta por distance_km, a enxerga. Sem este
+      -- filtro o rebuild mudaria em silencio o resultado desta query.
+      AND layer <= 3
       AND distance_km IS NOT NULL
       AND distance_km > 0
     LIMIT 1

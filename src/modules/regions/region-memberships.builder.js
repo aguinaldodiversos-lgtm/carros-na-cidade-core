@@ -11,27 +11,48 @@
 //     `COUNT(*) WHERE b.state <> m.state` = 0). O motor de busca precisa do
 //     par para expandir por raio.
 //   • O alcance subiu de 100 para 150 km (teto do anel automático).
-//   • Os tetos por camada (12/18/40) NÃO limitam mais quais pares existem —
-//     todo par ≤ 150 km é gravado. O motor (F2) elege território por
-//     `distance_km`, não por `layer`.
+//   • Os tetos por camada NÃO limitam mais quais pares existem — todo par
+//     ≤ 150 km é gravado. O motor (F2) elege território por `distance_km`,
+//     não por `layer`.
 //
 // ────────────────────────────────────────────────────────────────────────────
-// COMPATIBILIDADE: A COLUNA `layer` SEGUE A REGRA ANTIGA
+// COMPATIBILIDADE (R4): `layer` É O CONTRATO DOS LEITORES LEGADOS
 // ────────────────────────────────────────────────────────────────────────────
-// A página regional (`regions.service.js`, `findMembersFromMemberships`) filtra
-// `rm.layer <= 2` e corta em `LIMIT 30` ordenando por layer/distância. Se as
-// linhas novas recebessem layer 1/2 por faixa de distância, uma base densa
-// (capital paulista tem dezenas de municípios a ≤30 km) passaria a devolver
-// outro conjunto de vizinhas — mudança de comportamento que a F1 não pode
-// introduzir.
+// Nenhum leitor fora do motor novo enxerga as linhas novas: a página regional
+// filtra `layer <= 2` e os leitores por distância receberam `layer <= 3` na F1
+// (getRadiusMembers, findRadiusDonor, hasRegionMemberships). Para esses
+// leitores serem byte a byte iguais ao pré-F1, o conjunto `layer <= 3` DEPOIS
+// do rebuild tem de ser EXATAMENTE o conjunto de linhas que existia ANTES.
+// Três regras garantem isso:
 //
-// Por isso `layer` 1, 2 e 3 são atribuídos EXATAMENTE como antes: mesma UF,
-// faixas 0–30 / 30–60 / 60–100 km, top 12 / 18 / 40 por distância. Toda linha
-// que o build antigo não produziria (outra UF, além dos tetos, 100–150 km)
-// recebe `layer = 4` (`LAYER_EXTENDED`). Assim:
-//   • `layer <= 2`  → mesmas linhas de antes (página regional intocada);
-//   • `layer > 0`   → continua verdadeiro para toda vizinha;
-//   • `distance_km` → é a única chave que o motor novo usa.
+//   1. Linha que já existe na tabela MANTÉM o `layer` gravado. A distância é
+//      recomputada pela mesma fórmula, logo dá o mesmo valor. Vale sobretudo
+//      para o layer 3: em produção ele só existe para 180 bases (o build
+//      antigo rodou parcialmente com essa banda). Reproduzir a "regra"
+//      (60–100 km, top 40) daria layer 3 a ~5.500 bases que hoje não o têm,
+//      e `layer <= 3` passaria a devolver outro conjunto.
+//   2. Sobre tabela JÁ POVOADA (`freezeLegacyLayer3`), linha nova recebe layer
+//      1 ou 2 só pela regra antiga (mesma UF, ≤30 / 30–60 km, top 12 / 18 por
+//      distância) — e NUNCA layer 3. Em produção nenhuma linha nova cai nos
+//      layers 1/2: eles já estavam completos (EXCEPT vazio nos dois sentidos).
+//      É o layer 3 que exige a trava: ele existe hoje para só 180 bases (a
+//      banda 60–100 km foi construída parcialmente), e reproduzir a regra
+//      daria layer 3 a milhares de bases, inflando `layer <= 3` de 101.909
+//      para ~339.000 linhas. Medido: mesmo a variante "só para base sem
+//      vizinhança" criava 283 linhas novas em 122 cidades isoladas, que
+//      passariam a ter vizinhança onde hoje não têm — mudando inclusive o
+//      caminho de código (`hasRegionMemberships`).
+//   3. Sobre tabela SEM nenhuma vizinha gravada (CI, instalação nova) não há
+//      "antes" a preservar: vale a regra antiga COMPLETA, inclusive o layer 3
+//      (60–100 km, top 40), introduzido em 2026-07 para os stops de 75/100 km
+//      do filtro de distância. É o que os testes de `pickRegionMembers` fixam.
+//   4. Toda outra linha nova (outra UF, além dos tetos, fora da faixa legada)
+//      recebe `layer = 4` (`LAYER_EXTENDED`).
+//
+// Consequência conhecida, registrada para a F3: cidade que ganhar coordenadas
+// DEPOIS deste rebuild recebe layer 4 na faixa 60–100 km, então aparece com
+// menos vizinhas em `?raio=75/100` do que o algoritmo antigo daria. É o lado
+// conservador (nunca mostra a mais) e some quando o motor novo assumir.
 //
 // A self-row (`base = member`, `layer 0`, `distance_km 0`) é gerada para TODA
 // cidade, com ou sem coordenadas — a migration 021 fazia isso no backfill e a
@@ -45,7 +66,7 @@ const EARTH_RADIUS_KM = 6371;
 /** Alcance máximo gravado (km). Anel automático máximo da política (§2). */
 export const MAX_DISTANCE_KM = 150;
 
-/** Camadas legadas — regra antiga, preservada byte a byte. */
+/** Faixas legadas — regra antiga, preservada. */
 export const LEGACY_LAYER_1_MAX_KM = 30;
 export const LEGACY_LAYER_2_MAX_KM = 60;
 export const LEGACY_LAYER_3_MAX_KM =
@@ -69,7 +90,10 @@ export const LEGACY_LAYER_3_MAX_MEMBERS = parsePositiveInt(
   40
 );
 
-/** Linha que o build antigo não produziria (outra UF, além do teto, >100 km). */
+/** Maior layer que os leitores legados enxergam (guard `layer <= 3` da F1). */
+export const LEGACY_MAX_LAYER = 3;
+
+/** Linha que o build antigo não produziria (outra UF, além dos tetos, fora das faixas legadas). */
 export const LAYER_EXTENDED = 4;
 
 /** Faixas usadas nos relatórios de contagem (km). */
@@ -94,11 +118,18 @@ export function roundKm(km) {
   return Number(km.toFixed(2));
 }
 
-/** Camada legada por distância (regra antiga). `null` = fora das faixas legadas. */
-export function classifyLegacyLayer(distanceKm) {
+/**
+ * Camada da regra antiga por distância. `null` = fora das faixas legadas.
+ *
+ * `includeLayer3`: o layer 3 (60–100 km) só é atribuível a base SEM vizinhança
+ * gravada (regra 3 do cabeçalho). Para base já construída, a faixa 60–100 km
+ * vira layer 4 — do contrário o guard `layer <= 3` passaria a enxergar
+ * milhares de linhas novas.
+ */
+export function classifyLegacyLayer(distanceKm, { includeLayer3 = true } = {}) {
   if (distanceKm <= LEGACY_LAYER_1_MAX_KM) return 1;
   if (distanceKm <= LEGACY_LAYER_2_MAX_KM) return 2;
-  if (distanceKm <= LEGACY_LAYER_3_MAX_KM) return 3;
+  if (includeLayer3 && distanceKm <= LEGACY_LAYER_3_MAX_KM) return 3;
   return null;
 }
 
@@ -114,6 +145,10 @@ function hasCoords(city) {
 
 function sameState(a, b) {
   return String(a.state || "").toUpperCase() === String(b.state || "").toUpperCase();
+}
+
+export function membershipKey(row) {
+  return `${row.base_city_id}:${row.member_city_id}`;
 }
 
 /**
@@ -134,10 +169,19 @@ function withinBoundingBox(base, candidate, maxKm) {
  *
  * @param {{id, state, latitude, longitude}} baseCity
  * @param {Array<{id, state, latitude, longitude}>} candidates todas as cidades
+ * @param {{ maxKm?: number, existingLayerByKey?: Map<string, number>, allowLegacyLayer3?: boolean }} [options]
+ *   `existingLayerByKey`: layer já gravado por chave `base:member` — preservado
+ *   (regra 1 do cabeçalho). `allowLegacyLayer3`: base sem vizinhança gravada
+ *   recebe a regra antiga completa, com layer 3 (regra 3); default `true`, que
+ *   é o comportamento do build do zero.
  * @returns {Array<{member_city_id:number, distance_km:number, layer:number}>}
  *   ordenado por distance_km ASC, member_city_id ASC.
  */
-export function buildMembershipsForBase(baseCity, candidates, { maxKm = MAX_DISTANCE_KM } = {}) {
+export function buildMembershipsForBase(
+  baseCity,
+  candidates,
+  { maxKm = MAX_DISTANCE_KM, existingLayerByKey = null, allowLegacyLayer3 = true } = {}
+) {
   if (!hasCoords(baseCity)) return [];
 
   const rows = [];
@@ -163,12 +207,14 @@ export function buildMembershipsForBase(baseCity, candidates, { maxKm = MAX_DIST
     });
   }
 
-  // Regra legada: mesma UF, faixas fixas, top-K por distância crua (o build
-  // antigo ordenava pelo valor não arredondado e gravava com 2 casas).
+  // Regras 2 e 3 — linha nova ganha layer pela regra antiga (mesma UF, faixas
+  // fixas, top-K por distância crua; o build antigo ordenava pelo valor não
+  // arredondado e gravava com 2 casas). O layer 3 só entra em base sem
+  // vizinhança gravada.
   const legacyBuckets = { 1: [], 2: [], 3: [] };
   for (const row of rows) {
     if (!row._sameState) continue;
-    const layer = classifyLegacyLayer(row._rawKm);
+    const layer = classifyLegacyLayer(row._rawKm, { includeLayer3: allowLegacyLayer3 });
     if (layer) legacyBuckets[layer].push(row);
   }
   const caps = {
@@ -181,6 +227,14 @@ export function buildMembershipsForBase(baseCity, candidates, { maxKm = MAX_DIST
     for (const row of legacyBuckets[layer].slice(0, caps[layer])) row.layer = layer;
   }
 
+  // Regra 1 — linha já existente mantém o layer gravado (vence a regra 2).
+  if (existingLayerByKey && existingLayerByKey.size) {
+    for (const row of rows) {
+      const existing = existingLayerByKey.get(`${baseCity.id}:${row.member_city_id}`);
+      if (existing != null) row.layer = Number(existing);
+    }
+  }
+
   rows.sort((a, b) => a.distance_km - b.distance_km || a.member_city_id - b.member_city_id);
   return rows.map(({ member_city_id, distance_km, layer }) => ({
     member_city_id,
@@ -191,10 +245,12 @@ export function buildMembershipsForBase(baseCity, candidates, { maxKm = MAX_DIST
 
 /**
  * Compatibilidade com o contrato antigo de `pickRegionMembers`: só as linhas
- * que o build legado produziria (layer 1–3). Usado pelos testes históricos.
+ * que os leitores legados enxergam (`layer <= 3`). Usado pelos testes históricos.
  */
-export function pickLegacyRegionMembers(baseCity, candidates) {
-  return buildMembershipsForBase(baseCity, candidates).filter((r) => r.layer !== LAYER_EXTENDED);
+export function pickLegacyRegionMembers(baseCity, candidates, options = {}) {
+  return buildMembershipsForBase(baseCity, candidates, options).filter(
+    (r) => r.layer <= LEGACY_MAX_LAYER
+  );
 }
 
 /**
@@ -203,7 +259,10 @@ export function pickLegacyRegionMembers(baseCity, candidates) {
  *
  * @returns {{ rows: Array<{base_city_id, member_city_id, distance_km, layer}>, stats }}
  */
-export function buildAllMemberships(cities) {
+export function buildAllMemberships(
+  cities,
+  { existingLayerByKey = null, freezeLegacyLayer3 = false } = {}
+) {
   const rows = [];
   let basesWithCoords = 0;
   let basesWithoutCoords = 0;
@@ -215,12 +274,35 @@ export function buildAllMemberships(cities) {
       continue;
     }
     basesWithCoords += 1;
-    for (const m of buildMembershipsForBase(base, cities)) {
+    for (const m of buildMembershipsForBase(base, cities, {
+      existingLayerByKey,
+      allowLegacyLayer3: !freezeLegacyLayer3,
+    })) {
       rows.push({ base_city_id: base.id, member_city_id: m.member_city_id, ...m });
     }
   }
 
-  return { rows, stats: { cities: cities.length, basesWithCoords, basesWithoutCoords } };
+  return {
+    rows,
+    stats: { cities: cities.length, basesWithCoords, basesWithoutCoords, freezeLegacyLayer3 },
+  };
+}
+
+/**
+ * A tabela já tem alguma vizinha gravada? Decide entre CONGELAR (regra 2) e
+ * aplicar a regra antiga completa (regra 3).
+ *
+ * A decisão é GLOBAL, não por base: bastaria uma cidade isolada receber uma
+ * linha de layer 3 nova para o conjunto `layer <= 3` deixar de ser o de antes.
+ * Medido no snapshot de produção: a versão por base criava 283 linhas de
+ * layer 3 em 122 cidades que hoje não têm vizinhança nenhuma — e essas cidades
+ * mudariam até de caminho de código (`hasRegionMemberships`).
+ */
+export function hasAnyNeighborRow(existingByKey) {
+  for (const row of existingByKey.values()) {
+    if (row.base_city_id !== row.member_city_id) return true;
+  }
+  return false;
 }
 
 /** Contagens para relatório (total, self, cross-UF, por faixa, por layer). */
@@ -230,6 +312,7 @@ export function summarizeMemberships(rows, cities) {
     total: rows.length,
     self: 0,
     crossUf: 0,
+    legacyVisible: 0,
     byLayer: {},
     byBand: {},
     maxDistanceKm: 0,
@@ -241,6 +324,7 @@ export function summarizeMemberships(rows, cities) {
   }
 
   for (const row of rows) {
+    if (Number(row.layer) <= LEGACY_MAX_LAYER) summary.legacyVisible += 1;
     if (row.base_city_id === row.member_city_id) {
       summary.self += 1;
       summary.byLayer[0] = (summary.byLayer[0] || 0) + 1;
@@ -262,6 +346,43 @@ export function summarizeMemberships(rows, cities) {
   return summary;
 }
 
+/**
+ * Prova de superconjunto LINHA A LINHA (não só contagem — R3/R4): para cada
+ * linha atual, existe no novo conjunto? com o mesmo layer? com a mesma
+ * distância?
+ *
+ * @param {Map<string, {distance_km:number, layer:number}>} existingByKey
+ * @param {Array} newRows
+ * @returns {{ existing:number, missing:string[], layerChanged:string[], distanceChanged:string[] }}
+ */
+export function compareWithExisting(existingByKey, newRows) {
+  const newByKey = new Map(newRows.map((r) => [membershipKey(r), r]));
+  const result = {
+    existing: existingByKey.size,
+    missing: [],
+    layerChanged: [],
+    distanceChanged: [],
+  };
+  for (const [key, old] of existingByKey) {
+    const next = newByKey.get(key);
+    if (!next) {
+      result.missing.push(key);
+      continue;
+    }
+    if (Number(next.layer) !== Number(old.layer)) result.layerChanged.push(key);
+    if (Number(next.distance_km) !== Number(old.distance_km ?? 0)) result.distanceChanged.push(key);
+  }
+  return result;
+}
+
+/** Compatibilidade: só as chaves atuais ausentes no novo conjunto. */
+export function findMissingFromSuperset(existingKeys, newRows) {
+  const newKeys = new Set(newRows.map(membershipKey));
+  const missing = [];
+  for (const key of existingKeys) if (!newKeys.has(key)) missing.push(key);
+  return missing;
+}
+
 // ─── Acesso a banco ──────────────────────────────────────────────────────────
 
 export async function loadCities(db) {
@@ -278,22 +399,33 @@ export async function loadCities(db) {
   }));
 }
 
-/** Chaves `base:member` já existentes — para provar o superconjunto (R3). */
+/** Linhas atuais por chave `base:member` → { distance_km, layer } (R3/R4). */
+export async function loadExistingMemberships(db) {
+  const { rows } = await db.query(
+    `SELECT base_city_id, member_city_id, distance_km, layer FROM region_memberships`
+  );
+  const byKey = new Map();
+  for (const r of rows) {
+    byKey.set(`${r.base_city_id}:${r.member_city_id}`, {
+      base_city_id: Number(r.base_city_id),
+      member_city_id: Number(r.member_city_id),
+      distance_km: r.distance_km == null ? 0 : Number(r.distance_km),
+      layer: Number(r.layer),
+    });
+  }
+  return byKey;
+}
+
+/** Chaves `base:member` já existentes (compatibilidade). */
 export async function loadExistingMembershipKeys(db) {
-  const { rows } = await db.query(`SELECT base_city_id, member_city_id FROM region_memberships`);
-  return new Set(rows.map((r) => `${r.base_city_id}:${r.member_city_id}`));
+  return new Set((await loadExistingMemberships(db)).keys());
 }
 
-export function membershipKey(row) {
-  return `${row.base_city_id}:${row.member_city_id}`;
-}
-
-/** Linhas atuais que o novo conjunto NÃO contém (deve ser vazio — R3). */
-export function findMissingFromSuperset(existingKeys, newRows) {
-  const newKeys = new Set(newRows.map(membershipKey));
-  const missing = [];
-  for (const key of existingKeys) if (!newKeys.has(key)) missing.push(key);
-  return missing;
+/** Map chave → layer, para `buildAllMemberships`/`buildMembershipsForBase`. */
+export function layerMapFrom(existingByKey) {
+  const map = new Map();
+  for (const [key, row] of existingByKey) map.set(key, row.layer);
+  return map;
 }
 
 const INSERT_BATCH_ROWS = 5000; // 4 params/linha → 20k params, abaixo dos 65k do protocolo.
@@ -426,11 +558,9 @@ export function rollbackSql(backupTable) {
  * Recomputa SÓ as linhas de uma cidade (como base e como membro) — usado
  * pelo worker `cities.geo-changed` quando latitude/longitude são preenchidas.
  *
- * Como base: regra completa (idêntica ao rebuild total).
- * Como membro de outra base B: camada legada se (mesma UF, faixa legada e
- * B ainda tem vaga no teto daquela camada); senão `LAYER_EXTENDED`. É a
- * melhor aproximação sem recomputar B inteira — e `layer` só importa para a
- * página regional; o motor usa `distance_km`.
+ * Mesmas três regras do cabeçalho: linha existente mantém o layer gravado;
+ * linha nova como base segue a regra legada 1/2; como membro de outra base B,
+ * layer 1/2 se (mesma UF, faixa legada e B ainda tem vaga no teto), senão 4.
  */
 export async function recomputeCityMemberships(pool, cityId) {
   const id = Number(cityId);
@@ -440,24 +570,39 @@ export async function recomputeCityMemberships(pool, cityId) {
   const city = cities.find((c) => c.id === id);
   if (!city) throw new Error(`cidade ${id} não existe`);
 
-  const asBase = buildMembershipsForBase(city, cities);
-
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const { rows: existingRows } = await client.query(
+      `SELECT base_city_id, member_city_id, layer FROM region_memberships
+       WHERE base_city_id = $1 OR member_city_id = $1`,
+      [id]
+    );
+    const existingLayerByKey = new Map(
+      existingRows.map((r) => [`${r.base_city_id}:${r.member_city_id}`, Number(r.layer)])
+    );
+    // Regra 3: a cidade já tinha vizinhança gravada? Se não (caso típico do
+    // worker — cidade que acabou de ganhar coordenadas), aplica a regra antiga
+    // completa, com layer 3.
+    const alreadyBuilt = existingRows.some(
+      (r) => Number(r.base_city_id) === id && Number(r.member_city_id) !== id
+    );
+    const asBase = buildMembershipsForBase(city, cities, {
+      existingLayerByKey,
+      allowLegacyLayer3: !alreadyBuilt,
+    });
+
     const { rows: capRows } = await client.query(
       `SELECT base_city_id, layer, COUNT(*)::int AS n
        FROM region_memberships
-       WHERE member_city_id <> $1 AND layer IN (1,2,3)
+       WHERE member_city_id <> $1 AND layer IN (1,2)
        GROUP BY base_city_id, layer`,
       [id]
     );
     const usage = new Map(capRows.map((r) => [`${r.base_city_id}:${r.layer}`, r.n]));
-    const caps = {
-      1: LEGACY_LAYER_1_MAX_MEMBERS,
-      2: LEGACY_LAYER_2_MAX_MEMBERS,
-      3: LEGACY_LAYER_3_MAX_MEMBERS,
-    };
+    const caps = { 1: LEGACY_LAYER_1_MAX_MEMBERS, 2: LEGACY_LAYER_2_MAX_MEMBERS };
+    // Como MEMBRO de outra base B: só layers 1/2 (nunca 3) — B já está
+    // construída, então nada novo pode entrar no que ela mostra em layer <= 3.
 
     await client.query(
       `DELETE FROM region_memberships WHERE base_city_id = $1 OR member_city_id = $1`,
@@ -468,16 +613,20 @@ export async function recomputeCityMemberships(pool, cityId) {
     for (const m of asBase) {
       rows.push({ base_city_id: id, ...m });
       const other = cities.find((c) => c.id === m.member_city_id);
-      let layer = LAYER_EXTENDED;
-      if (other && sameState(other, city)) {
-        const legacy = classifyLegacyLayer(m.distance_km);
-        if (legacy && (usage.get(`${other.id}:${legacy}`) || 0) < caps[legacy]) layer = legacy;
+      const reverseKey = `${m.member_city_id}:${id}`;
+      let layer = existingLayerByKey.get(reverseKey);
+      if (layer == null) {
+        layer = LAYER_EXTENDED;
+        if (other && sameState(other, city)) {
+          const legacy = classifyLegacyLayer(m.distance_km, { includeLayer3: false });
+          if (legacy && (usage.get(`${other.id}:${legacy}`) || 0) < caps[legacy]) layer = legacy;
+        }
       }
       rows.push({
         base_city_id: m.member_city_id,
         member_city_id: id,
         distance_km: m.distance_km,
-        layer,
+        layer: Number(layer),
       });
     }
     await insertRowsInBatches(client, "region_memberships", rows);

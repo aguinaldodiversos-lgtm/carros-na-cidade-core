@@ -225,6 +225,40 @@ describe.sequential("F1 — sentinelas de region_memberships (Postgres real)", (
         );
         expect(total1.length).toBeGreaterThan(cityCount[0].n);
 
+        // ── Guard de compatibilidade (R4): o que os leitores legados veem ────
+        //
+        // Nenhuma linha NOVA pode receber layer 3: em produção o layer 3 só
+        // existe para 180 bases, e atribuí-lo pela faixa 60–100 km faria
+        // `layer <= 3` devolver outro conjunto. A única linha de layer 3 aqui é
+        // a legada, inserida antes do build — e ela sobrevive com o MESMO layer
+        // e a MESMA distância (regra 1: linha existente mantém o layer).
+        const { rows: l3 } = await db.query(
+          `SELECT base_city_id, member_city_id, distance_km::float AS km FROM region_memberships WHERE layer = 3`
+        );
+        expect(l3).toEqual([{ base_city_id: rio[0].id, member_city_id: sp[0].id, km: 999.99 }]);
+
+        // A query REAL de getRadiusMembers (regional-radius.repository.js): com
+        // o guard, a vizinha cross-UF (Extrema-MG, 25 km, layer 4) NÃO aparece —
+        // exatamente como antes do rebuild. Sem o guard, apareceria.
+        const radiusSql = (guard) => `
+            SELECT m.slug
+            FROM cities base
+            JOIN region_memberships rm ON rm.base_city_id = base.id
+            JOIN cities m ON m.id = rm.member_city_id
+            WHERE base.slug = 'braganca-paulista-sp'
+              ${guard}
+              AND rm.distance_km IS NOT NULL
+              AND rm.distance_km > 0
+              AND rm.distance_km <= 100
+            ORDER BY rm.distance_km ASC`;
+        const comGuard = (await db.query(radiusSql("AND rm.layer <= 3"))).rows.map((r) => r.slug);
+        const semGuard = (await db.query(radiusSql(""))).rows.map((r) => r.slug);
+        expect(semGuard).toContain("extrema-mg");
+        expect(comGuard).not.toContain("extrema-mg");
+        expect(comGuard).not.toContain("camanducaia-mg");
+        expect(comGuard).toContain("atibaia-sp");
+        expect(semGuard.length).toBeGreaterThan(comGuard.length);
+
         // Idempotência: segundo build → mesmas linhas.
         await runScript("scripts/build-region-memberships.mjs", env, [
           "--backup-table=rm_backup_sentinel_2",

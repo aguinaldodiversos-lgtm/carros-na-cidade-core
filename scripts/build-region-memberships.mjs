@@ -35,12 +35,14 @@ import { fileURLToPath } from "node:url";
 import { pool, closeDatabasePool } from "../src/infrastructure/database/db.js";
 import {
   applyMemberships,
+  hasAnyNeighborRow,
   buildAllMemberships,
+  compareWithExisting,
   defaultBackupTableName,
-  findMissingFromSuperset,
   haversineKm,
+  layerMapFrom,
   loadCities,
-  loadExistingMembershipKeys,
+  loadExistingMemberships,
   MAX_DISTANCE_KM,
   pickLegacyRegionMembers,
   rollbackSql,
@@ -120,28 +122,38 @@ export async function buildRegionMemberships({ dryRun = false, backupTable = nul
     return { processed: 0 };
   }
 
-  const existingKeys = await loadExistingMembershipKeys(pool);
-  const { rows, stats } = buildAllMemberships(cities);
+  const existing = await loadExistingMemberships(pool);
+  // Tabela já povoada → congela: nada novo entra em layer <= 3 (R4).
+  const freezeLegacyLayer3 = hasAnyNeighborRow(existing);
+  const { rows, stats } = buildAllMemberships(cities, {
+    existingLayerByKey: layerMapFrom(existing),
+    freezeLegacyLayer3,
+  });
   const computeMs = Date.now() - started;
 
-  const currentSummary = await summarizeCurrent(cities);
+  const currentSummary = summarizeMemberships([...existing.values()], cities);
   const nextSummary = summarizeMemberships(rows, cities);
-  const missing = findMissingFromSuperset(existingKeys, rows);
+  const cmp = compareWithExisting(existing, rows);
 
   console.log(
-    `[regions:build] ${fmt(stats.cities)} cidades (${fmt(stats.basesWithCoords)} com coords, ${fmt(stats.basesWithoutCoords)} sem) → ${fmt(rows.length)} linhas calculadas em ${computeMs} ms (alcance ${MAX_DISTANCE_KM} km).`
+    `[regions:build] ${fmt(stats.cities)} cidades (${fmt(stats.basesWithCoords)} com coords, ${fmt(stats.basesWithoutCoords)} sem; layer legado ${freezeLegacyLayer3 ? "CONGELADO" : "regra completa"}) → ${fmt(rows.length)} linhas calculadas em ${computeMs} ms (alcance ${MAX_DISTANCE_KM} km).`
   );
   printSummary("ATUAL (tabela)", currentSummary);
   printSummary("NOVO (calculado)", nextSummary);
+  // Prova de superconjunto LINHA A LINHA (R3/R4), não só contagem.
+  const ex = (list) => (list.length ? ` (ex.: ${list.slice(0, 5).join(", ")})` : "");
   console.log(
-    `[regions:build] superconjunto: ${fmt(existingKeys.size)} linhas atuais, ${fmt(missing.length)} ausentes no novo conjunto${
-      missing.length ? ` (serão preservadas do backup; ex.: ${missing.slice(0, 5).join(", ")})` : ""
-    }.`
+    `[regions:build] superconjunto: ${fmt(cmp.existing)} linhas atuais → ${fmt(cmp.missing.length)} ausentes${ex(cmp.missing)}, ${fmt(cmp.layerChanged.length)} com layer diferente${ex(cmp.layerChanged)}, ${fmt(cmp.distanceChanged.length)} com distance_km diferente${ex(cmp.distanceChanged)}.`
+  );
+  const byteIdentical =
+    cmp.missing.length === 0 && cmp.layerChanged.length === 0 && cmp.distanceChanged.length === 0;
+  console.log(
+    `[regions:build] leitores legados (layer <= 3): ${byteIdentical ? "IDÊNTICOS ao estado atual" : "DIVERGEM do estado atual — revisar antes de gravar"}.`
   );
 
   if (dryRun) {
     console.log("[regions:build] --dry-run: nada gravado.");
-    return { processed: stats.cities, rows: rows.length, dryRun: true, missing: missing.length };
+    return { processed: stats.cities, rows: rows.length, dryRun: true, ...cmp, byteIdentical };
   }
 
   const backup = backupTable || defaultBackupTableName();
@@ -152,21 +164,6 @@ export async function buildRegionMemberships({ dryRun = false, backupTable = nul
   console.log(`[regions:build] backup: ${result.backupTable}`);
   console.log(`[regions:build] rollback:\n${rollbackSql(result.backupTable)}`);
   return { processed: stats.cities, ...result };
-}
-
-async function summarizeCurrent(cities) {
-  const { rows } = await pool.query(
-    `SELECT base_city_id, member_city_id, distance_km, layer FROM region_memberships`
-  );
-  return summarizeMemberships(
-    rows.map((r) => ({
-      base_city_id: Number(r.base_city_id),
-      member_city_id: Number(r.member_city_id),
-      distance_km: Number(r.distance_km ?? 0),
-      layer: Number(r.layer),
-    })),
-    cities
-  );
 }
 
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
