@@ -90,6 +90,25 @@ Só em produção: os triggers `trg_ads_search_vector_update` e `trigger_ads_sea
 
 **Nota sobre `SELECT *`.** Existem dois `SELECT * FROM users` (`src/modules/auth/auth.service.js:297`, `src/modules/auth/sessions/refreshToken.repository.js:94`). Em produção eles trazem `avatar_url`, `last_login_at`, `failed_login_attempts` e `alert_plan` como propriedades da linha; em banco novo, não. O código nunca lê essas propriedades, e — importante — **coluna ausente num `SELECT *` não levanta erro**, só devolve menos chaves. Então essa família de drift jamais quebraria o CI: falharia em silêncio, entregando `undefined`. É o padrão que já mordeu neste projeto em outras frentes.
 
+### `notification_queue`: código vivo grava colunas que não existem
+
+Apareceu ao auditar as duas colunas acima e é o achado mais afiado desta página, porque é o drift virando falha de execução. Duas cópias de `enqueueUpgradeOffers()` fazem:
+
+```sql
+INSERT INTO notification_queue (user_id, type, payload, status, created_at)
+```
+
+`src/brain/engines/growth-brain.engine.js:102` e `src/modules/growth/growth-brain-pipeline.js:96`, mais a leitura de `n.type` em `:118` e `:112`. A tabela **não tem `type` nem `payload`**: no snapshot ela é `id, user_id, alert_id, ad_id, channel, status, attempts, last_error, created_at`. Todo `INSERT` desses cairia em `42703 column "type" ... does not exist`.
+
+Alcance verificado:
+
+| Cópia                         | Chamada por                                                | Alcançável?                                                                                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `growth-brain.engine.js:99`   | `runGrowthBrainEngine():183` → `growth-brain.worker.js:17` | **sim, se ligado** — o worker está no registry com gate `RUN_WORKER_GROWTH_BRAIN`, `defaultValue: "false"` (`bootstrap.registry.js:95-102`)                                 |
+| `growth-brain-pipeline.js:93` | `runGrowthBrainPipeline():151`                             | **não** — nenhum chamador; `growth-autopilot.service.js` só reexporta e não tem importador. `runOpportunityScoringOnly()`, que o Opportunity Worker usa, não passa por aqui |
+
+Ou seja: a única coisa que separa esse caminho de um erro garantido é a flag estar desligada por padrão. E se alguém a ligar, o `try/catch` de `growth-brain.worker.js:18-19` engole a exceção num `logger.error` e aborta o resto do run — o padrão de falha silenciosa que já custou caro neste projeto. **Para F5:** decidir entre criar a tabela por migration com as colunas que o código espera, corrigir o SQL para as colunas que existem, ou remover o caminho morto. Não deixar como está.
+
 ### Tabelas sem migration
 
 58 de 108 pela sonda, mais `notification_queue`, que a sonda classificou errado: o nome dela aparece nas migrations **só num comentário** (`src/database/migrations/049_user_notifications.sql:6` e `:9`) — e esse comentário justamente declara que a tabela não é criada por migration nenhuma. Não há `CREATE TABLE notification_queue` em lugar algum do repositório; no snapshot ela existe com `id, user_id, alert_id, ad_id, channel, status, attempts, last_error, created_at`.
