@@ -2,337 +2,145 @@
   "braganca-paulista-sp|auto|none": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $2\n    OFFSET $3\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1\n  ",
-    "params": [
-      "braganca-paulista-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "braganca-paulista-sp"
-    ]
+    "params": ["braganca-paulista-sp", 50, 0],
+    "countParams": ["braganca-paulista-sp"]
   },
   "braganca-paulista-sp|auto|model": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n  ",
-    "params": [
-      "braganca-paulista-sp",
-      "%ONIX%",
-      50,
-      0
-    ],
-    "countParams": [
-      "braganca-paulista-sp",
-      "%ONIX%"
-    ]
+    "params": ["braganca-paulista-sp", "%ONIX%", 50, 0],
+    "countParams": ["braganca-paulista-sp", "%ONIX%"]
   },
   "braganca-paulista-sp|auto|manual-price": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $4\n    OFFSET $5\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n  ",
-    "params": [
-      "braganca-paulista-sp",
-      75000,
-      "%manual%",
-      50,
-      0
-    ],
-    "countParams": [
-      "braganca-paulista-sp",
-      75000,
-      "%manual%"
-    ]
+    "params": ["braganca-paulista-sp", 75000, "%manual%", 50, 0],
+    "countParams": ["braganca-paulista-sp", 75000, "%manual%"]
   },
   "braganca-paulista-sp|auto|q": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n    ORDER BY \n          text_rank DESC,\n          \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n          hybrid_score DESC,\n          a.created_at DESC\n        \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n  ",
-    "params": [
-      "onix",
-      "braganca-paulista-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "onix",
-      "braganca-paulista-sp"
-    ]
+    "params": ["onix", "braganca-paulista-sp", 50, 0],
+    "countParams": ["onix", "braganca-paulista-sp"]
   },
   "braganca-paulista-sp|manual50|none": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $2\n    OFFSET $3\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1\n  ",
-    "params": [
-      "braganca-paulista-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "braganca-paulista-sp"
-    ]
+    "params": ["braganca-paulista-sp", 50, 0],
+    "countParams": ["braganca-paulista-sp"]
   },
   "braganca-paulista-sp|manual50|model": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n  ",
-    "params": [
-      "braganca-paulista-sp",
-      "%ONIX%",
-      50,
-      0
-    ],
-    "countParams": [
-      "braganca-paulista-sp",
-      "%ONIX%"
-    ]
+    "params": ["braganca-paulista-sp", "%ONIX%", 50, 0],
+    "countParams": ["braganca-paulista-sp", "%ONIX%"]
   },
   "braganca-paulista-sp|manual50|manual-price": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $4\n    OFFSET $5\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n  ",
-    "params": [
-      "braganca-paulista-sp",
-      75000,
-      "%manual%",
-      50,
-      0
-    ],
-    "countParams": [
-      "braganca-paulista-sp",
-      75000,
-      "%manual%"
-    ]
+    "params": ["braganca-paulista-sp", 75000, "%manual%", 50, 0],
+    "countParams": ["braganca-paulista-sp", 75000, "%manual%"]
   },
   "braganca-paulista-sp|manual50|q": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n    ORDER BY \n          text_rank DESC,\n          \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n          hybrid_score DESC,\n          a.created_at DESC\n        \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n  ",
-    "params": [
-      "onix",
-      "braganca-paulista-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "onix",
-      "braganca-paulista-sp"
-    ]
+    "params": ["onix", "braganca-paulista-sp", 50, 0],
+    "countParams": ["onix", "braganca-paulista-sp"]
   },
   "atibaia-sp|auto|none": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $2\n    OFFSET $3\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1\n  ",
-    "params": [
-      "atibaia-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "atibaia-sp"
-    ]
+    "params": ["atibaia-sp", 50, 0],
+    "countParams": ["atibaia-sp"]
   },
   "atibaia-sp|auto|model": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n  ",
-    "params": [
-      "atibaia-sp",
-      "%ONIX%",
-      50,
-      0
-    ],
-    "countParams": [
-      "atibaia-sp",
-      "%ONIX%"
-    ]
+    "params": ["atibaia-sp", "%ONIX%", 50, 0],
+    "countParams": ["atibaia-sp", "%ONIX%"]
   },
   "atibaia-sp|auto|manual-price": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $4\n    OFFSET $5\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n  ",
-    "params": [
-      "atibaia-sp",
-      75000,
-      "%manual%",
-      50,
-      0
-    ],
-    "countParams": [
-      "atibaia-sp",
-      75000,
-      "%manual%"
-    ]
+    "params": ["atibaia-sp", 75000, "%manual%", 50, 0],
+    "countParams": ["atibaia-sp", 75000, "%manual%"]
   },
   "atibaia-sp|auto|q": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n    ORDER BY \n          text_rank DESC,\n          \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n          hybrid_score DESC,\n          a.created_at DESC\n        \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n  ",
-    "params": [
-      "onix",
-      "atibaia-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "onix",
-      "atibaia-sp"
-    ]
+    "params": ["onix", "atibaia-sp", 50, 0],
+    "countParams": ["onix", "atibaia-sp"]
   },
   "atibaia-sp|manual50|none": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $2\n    OFFSET $3\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1\n  ",
-    "params": [
-      "atibaia-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "atibaia-sp"
-    ]
+    "params": ["atibaia-sp", 50, 0],
+    "countParams": ["atibaia-sp"]
   },
   "atibaia-sp|manual50|model": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n  ",
-    "params": [
-      "atibaia-sp",
-      "%ONIX%",
-      50,
-      0
-    ],
-    "countParams": [
-      "atibaia-sp",
-      "%ONIX%"
-    ]
+    "params": ["atibaia-sp", "%ONIX%", 50, 0],
+    "countParams": ["atibaia-sp", "%ONIX%"]
   },
   "atibaia-sp|manual50|manual-price": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $4\n    OFFSET $5\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n  ",
-    "params": [
-      "atibaia-sp",
-      75000,
-      "%manual%",
-      50,
-      0
-    ],
-    "countParams": [
-      "atibaia-sp",
-      75000,
-      "%manual%"
-    ]
+    "params": ["atibaia-sp", 75000, "%manual%", 50, 0],
+    "countParams": ["atibaia-sp", 75000, "%manual%"]
   },
   "atibaia-sp|manual50|q": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n    ORDER BY \n          text_rank DESC,\n          \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n          hybrid_score DESC,\n          a.created_at DESC\n        \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n  ",
-    "params": [
-      "onix",
-      "atibaia-sp",
-      50,
-      0
-    ],
-    "countParams": [
-      "onix",
-      "atibaia-sp"
-    ]
+    "params": ["onix", "atibaia-sp", 50, 0],
+    "countParams": ["onix", "atibaia-sp"]
   },
   "extrema-mg|auto|none": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $2\n    OFFSET $3\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1\n  ",
-    "params": [
-      "extrema-mg",
-      50,
-      0
-    ],
-    "countParams": [
-      "extrema-mg"
-    ]
+    "params": ["extrema-mg", 50, 0],
+    "countParams": ["extrema-mg"]
   },
   "extrema-mg|auto|model": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n  ",
-    "params": [
-      "extrema-mg",
-      "%ONIX%",
-      50,
-      0
-    ],
-    "countParams": [
-      "extrema-mg",
-      "%ONIX%"
-    ]
+    "params": ["extrema-mg", "%ONIX%", 50, 0],
+    "countParams": ["extrema-mg", "%ONIX%"]
   },
   "extrema-mg|auto|manual-price": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $4\n    OFFSET $5\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n  ",
-    "params": [
-      "extrema-mg",
-      75000,
-      "%manual%",
-      50,
-      0
-    ],
-    "countParams": [
-      "extrema-mg",
-      75000,
-      "%manual%"
-    ]
+    "params": ["extrema-mg", 75000, "%manual%", 50, 0],
+    "countParams": ["extrema-mg", 75000, "%manual%"]
   },
   "extrema-mg|auto|q": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n    ORDER BY \n          text_rank DESC,\n          \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n          hybrid_score DESC,\n          a.created_at DESC\n        \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n  ",
-    "params": [
-      "onix",
-      "extrema-mg",
-      50,
-      0
-    ],
-    "countParams": [
-      "onix",
-      "extrema-mg"
-    ]
+    "params": ["onix", "extrema-mg", 50, 0],
+    "countParams": ["onix", "extrema-mg"]
   },
   "extrema-mg|manual50|none": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $2\n    OFFSET $3\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1\n  ",
-    "params": [
-      "extrema-mg",
-      50,
-      0
-    ],
-    "countParams": [
-      "extrema-mg"
-    ]
+    "params": ["extrema-mg", 50, 0],
+    "countParams": ["extrema-mg"]
   },
   "extrema-mg|manual50|model": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.model ILIKE $2\n  ",
-    "params": [
-      "extrema-mg",
-      "%ONIX%",
-      50,
-      0
-    ],
-    "countParams": [
-      "extrema-mg",
-      "%ONIX%"
-    ]
+    "params": ["extrema-mg", "%ONIX%", 50, 0],
+    "countParams": ["extrema-mg", "%ONIX%"]
   },
   "extrema-mg|manual50|manual-price": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      0 AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (0)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n    ORDER BY \n        \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n        hybrid_score DESC,\n        a.created_at DESC\n      \n    LIMIT $4\n    OFFSET $5\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND c.slug = $1 AND a.price <= $2 AND (COALESCE(a.transmission, a.gearbox, a.cambio, '') ILIKE $3)\n  ",
-    "params": [
-      "extrema-mg",
-      75000,
-      "%manual%",
-      50,
-      0
-    ],
-    "countParams": [
-      "extrema-mg",
-      75000,
-      "%manual%"
-    ]
+    "params": ["extrema-mg", 75000, "%manual%", 50, 0],
+    "countParams": ["extrema-mg", 75000, "%manual%"]
   },
   "extrema-mg|manual50|q": {
     "dataQuery": "\n    SELECT\n      a.*,\n      c.slug AS city_slug,\n      adv.name         AS seller_name,\n      adv.company_name AS dealership_name,\n      adv.id           AS dealership_id,\n      u.document_type  AS account_type,\n      COALESCE(adv.whatsapp, adv.mobile_phone, adv.phone) AS whatsapp_number,\n      COALESCE(m.views, 0) AS views,\n      COALESCE(m.clicks, 0) AS clicks,\n      COALESCE(m.leads, 0) AS leads,\n      COALESCE(m.ctr, 0) AS ctr,\n      \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n AS priority_tier,\n      \n  (\n    a.below_fipe = true\n    AND a.fipe_reference_value IS NOT NULL\n    AND a.fipe_reference_value > 0\n    AND a.price IS NOT NULL\n    AND a.price > 0\n    AND a.price <= a.fipe_reference_value * 0.9\n  )\n AS opportunity,\n      ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) AS text_rank,\n      \n    (\n      (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) * 125\n      + ((COALESCE(sp.priority_level, 12) * 0.32))\n      + (LEAST(48, COALESCE(cm.demand_score, 0) * 0.28))\n      + (COALESCE(a.priority, 1) * 10)\n      + (COALESCE(m.ctr, 0) * 52)\n      + (COALESCE(m.leads, 0) * 2)\n      + (28.0 / (1.0 + (EXTRACT(EPOCH FROM (NOW() - a.created_at)) / 86400.0)))\n      + (ts_rank(a.search_vector, plainto_tsquery('portuguese', $1)) * 50)\n      + (0)\n    )\n   AS hybrid_score\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    LEFT JOIN ad_metrics m ON m.ad_id = a.id\n    LEFT JOIN city_metrics cm ON cm.city_id = a.city_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n    ORDER BY \n          text_rank DESC,\n          \n  GREATEST(\n    (CASE WHEN a.highlight_until > NOW() THEN 4 ELSE 0 END),\n    COALESCE(sp.weight, 1)\n  )\n DESC,\n          hybrid_score DESC,\n          a.created_at DESC\n        \n    LIMIT $3\n    OFFSET $4\n  ",
     "countQuery": "\n    SELECT COUNT(*)::int AS total\n    FROM ads a\n    LEFT JOIN cities c ON c.id = a.city_id\n    LEFT JOIN advertisers adv ON adv.id = a.advertiser_id\n    LEFT JOIN users u ON u.id = adv.user_id\n    LEFT JOIN subscription_plans sp ON sp.id = u.plan_id\n    WHERE a.status = 'active' AND a.search_vector @@ plainto_tsquery('portuguese', $1) AND c.slug = $2\n  ",
-    "params": [
-      "onix",
-      "extrema-mg",
-      50,
-      0
-    ],
-    "countParams": [
-      "onix",
-      "extrema-mg"
-    ]
+    "params": ["onix", "extrema-mg", 50, 0],
+    "countParams": ["onix", "extrema-mg"]
   }
 }
