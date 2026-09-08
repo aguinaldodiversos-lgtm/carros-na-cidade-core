@@ -235,7 +235,14 @@ export async function loadRegionalCatalogData(
   // `baseCityBoostExpr`. Este sort garante a regra "tier domina,
   // cidade-base só desempata dentro do tier" mesmo se um cache antigo
   // do BFF servir resultados com tier inconsistente.
-  const sortedData = sortAdsByPriorityAndProximity(filteredData, region.base, region.members);
+  // F2 (§4.5): quando a resposta traz `search_policy`, o SQL do motor v1 já
+  // ordenou por peso comercial → distância real → recência. Reordenar aqui
+  // pela lista de membros da região desfaria isso para cidades fora dessa
+  // lista (que o motor conhece e a região legada não). Sem o bloco, o caminho
+  // é o de sempre.
+  const sortedData = initialResults.search_policy
+    ? filteredData
+    : sortAdsByPriorityAndProximity(filteredData, region.base, region.members);
 
   initialResults = {
     ...initialResults,

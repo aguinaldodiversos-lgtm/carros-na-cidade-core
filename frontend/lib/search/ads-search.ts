@@ -143,6 +143,13 @@ export interface AdsSearchResponse {
   data: AdItem[];
   pagination: AdsPagination;
   error?: string | null;
+  /**
+   * Search Policy Engine v2.1 (F2): presente SÓ quando o backend respondeu
+   * pelo motor v1. O render dos campos é F3; aqui é passthrough opaco. A
+   * presença do bloco é o sinal de que o SQL já ordenou por território, e o
+   * loader regional não deve reordenar em JS (§4.5).
+   */
+  search_policy?: Record<string, unknown>;
 }
 
 /**
@@ -378,6 +385,9 @@ function normalizeSearchPayload(json: unknown, filters: AdsSearchFilters): AdsSe
         : undefined,
     data,
     pagination,
+    ...(payload.search_policy && typeof payload.search_policy === "object"
+      ? { search_policy: payload.search_policy as Record<string, unknown> }
+      : {}),
     error: toNullableText(payload.error),
   };
 }

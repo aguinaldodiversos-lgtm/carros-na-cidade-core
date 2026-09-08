@@ -262,6 +262,31 @@ export const adsFilterQueryBase = z.object({
 
   /** Filtra anúncios do mesmo anunciante (loja) — busca pública. */
   advertiser_id: intParam(1, 2147483647).optional(),
+
+  /**
+   * Search Policy Engine v2.1 (F2, §7.1) — lidos SÓ pelo motor (flag
+   * SEARCH_POLICY_ENGINE ≠ off). Com a flag off o caminho legado os ignora.
+   *   origem      slug da cidade-origem da busca
+   *   origem_src  user | geo | session | page (D1: ausente ⇒ CITY_PAGE)
+   *   raio        0 | 25 | 50 | 75 (rings_manual); 0 = só a cidade
+   *   escopo      uf | brasil
+   *   commercial_model  modelo comercial (rótulo, ex.: "Onix"); igualdade
+   *                     case-insensitive na coluna da F1
+   */
+  origem: z.preprocess(
+    emptyToUndef,
+    z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(ADS_FILTER_LIMITS.CITY_SLUG_MAX_LENGTH)
+      .regex(/^[a-z0-9-]+$/)
+      .optional()
+  ),
+  origem_src: z.preprocess(emptyToUndef, z.enum(["user", "geo", "session", "page"]).optional()),
+  raio: intParam(0, 150).optional(),
+  escopo: z.preprocess(emptyToUndef, z.enum(["uf", "brasil"]).optional()),
+  commercial_model: optionalTrimmedStringMax(ADS_FILTER_LIMITS.MODEL_MAX_LENGTH),
 });
 
 /* =========================================================

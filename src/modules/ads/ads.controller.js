@@ -11,6 +11,9 @@ import { invalidateAdsCachesAfterMutation } from "./ads.mutation-cache.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { getPublicationOptions } from "./ads.publication-options.service.js";
+import { logger } from "../../shared/logger.js";
+import { FLAG_SHADOW, FLAG_V1, getSearchPolicyFlag } from "./search-policy/flag.js";
+import { runSearchPolicyEngineIfAllowed, runShadowComparison } from "./search-policy/engine.js";
 
 /**
  * Upload de fotos do wizard de publicação → Cloudflare R2 (mesmo pipeline que veículos).
@@ -81,6 +84,27 @@ export async function list(req, res, next) {
 
 export async function search(req, res, next) {
   try {
+    // Search Policy Engine v2.1 (F2, §4.9). Com a flag `off` este bloco é
+    // inerte e o resto da função é o código de sempre, byte a byte (R4).
+    const mode = getSearchPolicyFlag();
+    if (mode === FLAG_V1) {
+      try {
+        const engine = await runSearchPolicyEngineIfAllowed(req.query, { path: req.originalUrl });
+        if (engine) {
+          res.json({ success: true, ...engine });
+          return;
+        }
+        // origem fora da allowlist → comportamento off para esta requisição.
+      } catch (err) {
+        // Falha inesperada do motor nunca pode ser pior do que hoje: loga e
+        // responde pelo caminho legado.
+        logger.error(
+          { err: err?.message || String(err), query: req.query },
+          "[search-policy] motor v1 falhou — respondendo pelo caminho legado"
+        );
+      }
+    }
+
     const filters = await parseAdsFilters(req.query, "public_global");
     const result = await adsService.search(filters, "public_global", {
       safeMode: true,
@@ -90,6 +114,12 @@ export async function search(req, res, next) {
       success: true,
       ...result,
     });
+
+    // shadow: depois de enviar a resposta, o motor calcula scope/count/primeiro
+    // id e grava telemetria (timeout 300 ms). Nada disso toca a resposta.
+    if (mode === FLAG_SHADOW) {
+      runShadowComparison(req.query, result, { path: req.originalUrl }).catch(() => {});
+    }
   } catch (err) {
     next(err);
   }

@@ -3,6 +3,16 @@ import { logger } from "../../shared/logger.js";
 import { getRegionalRadiusKm } from "../admin/regional-settings/admin-regional-settings.service.js";
 import { getSetting } from "../platform/settings.service.js";
 import { commercialLayerExpr } from "../ads/filters/ads-ranking.sql.js";
+import { FLAG_V1, getSearchPolicyFlag, isOriginAllowed } from "../ads/search-policy/flag.js";
+
+/**
+ * F2 (§4.5): o guard `rm.layer <= 2` sai SÓ quando o motor v1 está ligado para
+ * esta cidade-base. Com a flag off/shadow, ou base fora da allowlist, a query é
+ * byte a byte a de antes.
+ */
+function legacyLayerGuardFor(baseSlug) {
+  return !(getSearchPolicyFlag() === FLAG_V1 && isOriginAllowed(baseSlug));
+}
 
 /**
  * Cap de membros retornados pela API regional.
@@ -65,7 +75,7 @@ async function findBaseCity(slug) {
  * tabela não tiver linhas de layer 3, o filtro não remove nada (linhas não-self
  * já são 1 ou 2); passa a valer no rebuild que popula o layer 3.
  */
-async function findMembersFromMemberships(baseCityId) {
+async function findMembersFromMemberships(baseCityId, { legacyLayerGuard = true } = {}) {
   const result = await pool.query(
     `
     SELECT
@@ -79,7 +89,7 @@ async function findMembersFromMemberships(baseCityId) {
     JOIN cities c ON c.id = rm.member_city_id
     WHERE rm.base_city_id = $1
       AND rm.member_city_id != $1
-      AND rm.layer <= 2
+      ${legacyLayerGuard ? "AND rm.layer <= 2" : ""}
     ORDER BY rm.layer ASC, rm.distance_km ASC NULLS LAST, c.name ASC
     LIMIT $2
     `,
@@ -198,7 +208,9 @@ export async function getRegionByBaseSlug(slug) {
   const base = await findBaseCity(slug);
   if (!base) return null;
 
-  const rows = await findMembersFromMemberships(base.id);
+  const rows = await findMembersFromMemberships(base.id, {
+    legacyLayerGuard: legacyLayerGuardFor(base.slug),
+  });
 
   return {
     base: {
@@ -272,7 +284,9 @@ export async function getRegionByBaseSlugDynamic(slug) {
       { slug: base.slug, radius_km: radius, hasCoords: base.latitude != null },
       "[regions] servindo via region_memberships"
     );
-    rows = await findMembersFromMemberships(base.id);
+    rows = await findMembersFromMemberships(base.id, {
+      legacyLayerGuard: legacyLayerGuardFor(base.slug),
+    });
   }
 
   return {
