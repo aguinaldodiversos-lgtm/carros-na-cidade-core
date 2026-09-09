@@ -270,6 +270,8 @@ Sem dúvidas bloqueantes.
 | 2   | `npm run ads:verify-commercial-model`                                                    | **PROSSIGA** — 2026-09-09, 17:07 UTC |
 | 3   | `docs/Search_Policy_Engine_v2_1_Consolidado.md` em `origin/main` + releitura de 5 linhas | **pendente** — arquivo ausente       |
 
+**Merge feito em 2026-09-09 com a condição 3 em aberto**, pela decisão registrada abaixo. O código está publicado e a 066 executada; o motor segue `off`, e a **etapa 2 continua bloqueada** até a releitura.
+
 **Saídas literais das duas verificações — A COLAR.** Os vereditos e horários acima foram relatados; o texto integral ainda não chegou a esta sessão (o que veio nas mensagens anteriores foram os marcadores `[saída de regions:verify]` e `[saída de ads:verify-commercial-model]`). Colar aqui, sem edição, quando disponível — é o que dá rastreabilidade a R6 para as contagens que os scripts imprimem:
 
 ```text
@@ -284,7 +286,7 @@ Sem dúvidas bloqueantes.
 
 **Mas o shadow fica bloqueado até a releitura do Consolidado.** Ligar `SEARCH_POLICY_ENGINE=shadow` (etapa 2) é o primeiro momento em que código novo passa a executar contra tráfego real, e a releitura existe justamente para conferir o motor contra a especificação consolidada antes disso. Merge e deploy podem ir; a flag continua `off`.
 
-**Registro do falso deploy (2026-09-08).** Até 2026-09-09, o merge nunca aconteceu. Confirmado por conteúdo, não por suposição: `origin/main` continua em `64517384`, os commits `09ce5258`, `a923399b` e `31a24a0f` aparecem só em `origin/f2/nucleo` (`git branch -r --contains`), e `git cat-file -e origin/main:src/database/migrations/066_search_policy_f2.sql` falha. Os dois deploys de 2026-09-08 reconstruíram o código anterior à F2 — nada desta fase chegou a produção, e a 066 não rodou. É o episódio que originou a etapa 0 abaixo.
+**Registro do falso deploy (2026-09-08) — já superado.** Nos dois dias anteriores ao merge real, dois deploys reconstruíram o código **anterior** à F2. Na época a checagem por conteúdo mostrava `origin/main` parada em `64517384`, os commits da fase só em `origin/f2/nucleo` (`git branch -r --contains`) e `git cat-file -e origin/main:src/database/migrations/066_search_policy_f2.sql` falhando — nada da F2 em produção, 066 não executada. É o episódio que originou a etapa 0 abaixo, e ele **não descreve o estado atual**: o merge real (`3bc67f72`) e a execução da 066 estão registrados no resultado das etapas 0 e 1, mais adiante nesta seção.
 
 ### Procedimento — após "APROVADO F2", pelo pipeline
 
@@ -322,8 +324,9 @@ node q.cjs
 ```
 
 - `schema_migrations` tem as colunas **`id, filename, executed_at, checksum`** — **não** `version`.
+- **`git log` abre o pager e trava o shell.** Usar sempre `git --no-pager log --oneline -1`. Vale para qualquer subcomando que pagina (`log`, `show`, `diff`, `branch`).
 
-#### Etapa 0 — provar que o deploy subiu o commit certo (antes de olhar o banco)
+#### Etapa 0 — provar que o deploy subiu o commit certo (CONCLUÍDA em 2026-09-09)
 
 **Lição do falso deploy (2026-09-08).** Dois deploys reconstruíram o código **anterior** à F2, e o sintoma foi **indistinguível de sucesso**: a CHECK aparecia com o nome esperado e `convalidated = true`, e os contadores estavam zerados — exatamente o que se veria se a 066 tivesse rodado numa tabela sem eventos novos. Só a **definição** da constraint e o `git log` do container revelaram que nada havia subido. Por isso a verificação começa pelo artefato construído, nunca pelo catálogo.
 
@@ -332,7 +335,7 @@ Depois do **merge** do PR `f2/nucleo` → `main` e do deploy (a 066 roda no boot
 1. **HEAD do container** — tem que bater com o HEAD esperado da `main`:
 
 ```bash
-cd ~/project/src && git log --oneline -1
+cd ~/project/src && git --no-pager log --oneline -1
 ```
 
 2. **O arquivo da migration está na imagem?**
@@ -350,7 +353,7 @@ SELECT filename, executed_at FROM schema_migrations ORDER BY executed_at DESC LI
 
 Se qualquer um dos três falhar, **parar**: o deploy não subiu o que se pensa, e nenhuma leitura de catálogo depois disso significa o que parece significar.
 
-#### Etapa 1 — estado do catálogo (só depois da etapa 0)
+#### Etapa 1 — estado do catálogo (CONCLUÍDA em 2026-09-09)
 
 ```sql
 SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'analytics_events_event_type_chk';
@@ -361,9 +364,32 @@ SELECT value->'facets'->'always_open' FROM platform_settings WHERE key = 'search
 
 Para a 066, o teste que distingue é a **definição**, não `conname` nem `convalidated`: uma constraint com esse nome e válida existe desde a 036. O que prova que a 066 rodou é **`'search.executed'` aparecer na lista** (e `search_performed`, da lista original, continuar lá — é superconjunto).
 
+#### Resultado das etapas 0 e 1 — a F2 entrou em produção
+
+**Fechamento da frente de deploy, 2026-09-09.** As duas etapas passaram integralmente.
+
+| Item                   | Valor                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Merge em `origin/main` | `3bc67f72` (`Merge branch 'f2/nucleo' into main`; pais `64517384` + `39a4ee53`)                                                        |
+| Pod do deploy          | `6d79f9c7b9-7l92s`                                                                                                                     |
+| Migration              | `066_search_policy_f2.sql`, executada em **2026-09-09 19:12:29 UTC**, **uma** linha em `schema_migrations`                             |
+| Flag no serviço web    | `SEARCH_POLICY_ENGINE` **ausente** do ambiente, verificado antes do merge — ausência é `off` (`flag.js:21`), então o motor está inerte |
+
+**A prova por conteúdo que a etapa 0 exige: a lista da CHECK passou de 11 para 12 valores.** A allowlist da migration 036 tem exatamente **11** literais (conferível em `src/database/migrations/036_analytics_events.sql`); depois da 066 são **12**, com `'search.executed'` acrescentado e os 11 originais preservados — inclusive `search_performed`, que é o vizinho de nome parecido e não deve ser confundido com o evento novo. É esse **12 contra 11** que distingue "a migration rodou" de "a constraint sempre esteve aí": nome e `convalidated` seriam idênticos nos dois casos, que foi exatamente a armadilha de 2026-09-08.
+
+**Saída literal do `pos.cjs` — A COLAR.** Não chegou a esta sessão (veio o marcador `[cole aqui a saída completa do pos.cjs…]`). Colar aqui sem edição, do `3bc67f7 (grafted, HEAD…` até a tabela de `payload`:
+
+```text
+<saída literal pendente>
+```
+
+**Atenção para quem repetir a etapa 0 depois.** O HEAD esperado **não é mais `3bc67f72`**: este próprio fechamento é um commit de documentação mergeado em `main`, e o push dispara um novo deploy. É inofensivo — só documentação, a 066 já está registrada e o runner a pula por já constar em `schema_migrations` — mas o container passa a servir outro commit. Antes de comparar, obtenha o HEAD corrente com `git rev-parse --short origin/main` na sua máquina (ou `git --no-pager log --merges -1 --oneline`, que mostra o merge mais recente) e confronte com o `git --no-pager log --oneline -1` do pod. O que a etapa 0 verifica é **igualdade entre os dois**, nunca um hash fixo escrito aqui.
+
 #### Etapa 2 — ligar o shadow (BLOQUEADA até a releitura do Consolidado)
 
 > **Não executar ainda.** Condição 3 pendente: enquanto `docs/Search_Policy_Engine_v2_1_Consolidado.md` não estiver em `origin/main` e a releitura de 5 linhas não sair, a flag permanece `off`. O merge e o deploy da etapa 0 podem acontecer sem isso; esta etapa, não.
+>
+> **Estado em 2026-09-09, com a F2 já em produção:** `SEARCH_POLICY_ENGINE` continua **ausente** do ambiente do serviço web (verificado antes do merge). Ausente é `off` (`src/modules/ads/search-policy/flag.js:21`), e `off` é o caminho legado byte a byte — o código da F2 está publicado e **inerte**. Nada a fazer aqui até a releitura.
 
 No Render, `SEARCH_POLICY_ENGINE=shadow` (e `SEARCH_POLICY_ENGINE_CITIES=braganca-paulista-sp,atibaia-sp`, que só vale para o v1 em F4). Restart. `/health` continua `redis: disabled` — backend de cache `memory`.
 
