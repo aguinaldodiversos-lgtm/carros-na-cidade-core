@@ -7,7 +7,7 @@ Banco de execução: snapshot de produção em Postgres 18.6 local (`localhost:5
 
 **Backend de cache (declaração exigida).** Testes: `memory` — `DISABLE_REDIS=true`, `policyCacheBackend()` devolve `"memory"` (`tests/search-policy/f2-scope-facets-relax.test.js:505`). Produção: `memory` — `/health` responde `redis: disabled` (mesmo estado do snapshot local em `f2-backend-snapshot-*`, e o registrado na F1 §2.5). `policy-cache.js` reutiliza o **mesmo** cliente de `src/infrastructure/cache/redis.js` que o `cache.middleware.js` usa (`src/modules/ads/search-policy/policy-cache.js:23`, `:68-70`); quando ele é `null`, LRU em processo com teto de **200** chaves (`:31`, evicção `:51`). Nenhum código assume Redis; `cache.middleware.js` e `redis.js` não foram tocados (`git diff main --stat` vazio para os dois).
 
-Releitura de `docs/Search_Policy_Engine_v2_1_Consolidado.md`: **ainda ausente**. Verificado de novo em 2026-09-08 após a aprovação da F2, que o dava como presente: `git fetch origin` traz `origin/main = 64517384` (mesmo commit de antes), `git cat-file -e origin/main:docs/Search_Policy_Engine_v2_1_Consolidado.md` falha, e uma varredura de **todas** as branches remotas não acha nenhum arquivo com "onsolidad" no nome. A releitura de 5 linhas sai assim que o arquivo for empurrado.
+Releitura de `docs/Search_Policy_Engine_v2_1_Consolidado.md`: **ainda ausente**. Verificado de novo em 2026-09-08 após a aprovação da F2, que o dava como presente: `git fetch origin` traz `origin/main = 64517384` (mesmo commit de antes), `git cat-file -e origin/main:docs/Search_Policy_Engine_v2_1_Consolidado.md` falha, e uma varredura de **todas** as branches remotas não acha nenhum arquivo com "onsolidad" no nome. Reverificado em 2026-09-09, com o mesmo resultado. A releitura de 5 linhas sai assim que o arquivo for empurrado — e, por decisão registrada no §7, ela é o que destrava a etapa 2 (ligar o shadow), embora não bloqueie o merge.
 
 ---
 
@@ -262,9 +262,29 @@ Sem dúvidas bloqueantes.
 
 ## 7. Execução em produção, como desligar e como reverter
 
-**Pré-requisito (instrução sua):** só depois de você colar aqui o `PROSSIGA` de `npm run regions:verify -- --backup-table=<nome>` e de `npm run ads:verify-commercial-model` rodados no shell do Render. Até lá: **nada é mergeado nem deployado**; a branch fica em `f2/nucleo` com PR aberto.
+### Condições da aprovação — situação em 2026-09-09
 
-**Estado em 2026-09-09: o merge nunca aconteceu.** Confirmado por conteúdo, não por suposição: `origin/main` continua em `64517384`, os commits `09ce5258`, `a923399b` e `31a24a0f` aparecem só em `origin/f2/nucleo` (`git branch -r --contains`), e `git cat-file -e origin/main:src/database/migrations/066_search_policy_f2.sql` falha. Os dois deploys de 2026-09-08 reconstruíram o código anterior à F2 — nada desta fase está em produção, e a 066 não rodou. É o episódio que originou a etapa 0 abaixo.
+| #   | Condição                                                                                 | Situação                             |
+| --- | ---------------------------------------------------------------------------------------- | ------------------------------------ |
+| 1   | `npm run regions:verify -- --backup-table=region_memberships_backup_prod_f1`             | **PROSSIGA** — 2026-09-09, 17:03 UTC |
+| 2   | `npm run ads:verify-commercial-model`                                                    | **PROSSIGA** — 2026-09-09, 17:07 UTC |
+| 3   | `docs/Search_Policy_Engine_v2_1_Consolidado.md` em `origin/main` + releitura de 5 linhas | **pendente** — arquivo ausente       |
+
+**Saídas literais das duas verificações — A COLAR.** Os vereditos e horários acima foram relatados; o texto integral ainda não chegou a esta sessão (o que veio nas mensagens anteriores foram os marcadores `[saída de regions:verify]` e `[saída de ads:verify-commercial-model]`). Colar aqui, sem edição, quando disponível — é o que dá rastreabilidade a R6 para as contagens que os scripts imprimem:
+
+```text
+(1) regions:verify — 2026-09-09 17:03 UTC
+<saída literal pendente>
+
+(2) ads:verify-commercial-model — 2026-09-09 17:07 UTC
+<saída literal pendente>
+```
+
+**Decisão explícita: o merge sai com a condição 3 pendente.** As duas verificações que protegem os **dados** de produção passaram, e é delas que o merge dependia de fato; o Consolidado é documento de referência e não altera nem migration nem código. Decisão sua, registrada aqui para não virar precedente silencioso.
+
+**Mas o shadow fica bloqueado até a releitura do Consolidado.** Ligar `SEARCH_POLICY_ENGINE=shadow` (etapa 2) é o primeiro momento em que código novo passa a executar contra tráfego real, e a releitura existe justamente para conferir o motor contra a especificação consolidada antes disso. Merge e deploy podem ir; a flag continua `off`.
+
+**Registro do falso deploy (2026-09-08).** Até 2026-09-09, o merge nunca aconteceu. Confirmado por conteúdo, não por suposição: `origin/main` continua em `64517384`, os commits `09ce5258`, `a923399b` e `31a24a0f` aparecem só em `origin/f2/nucleo` (`git branch -r --contains`), e `git cat-file -e origin/main:src/database/migrations/066_search_policy_f2.sql` falha. Os dois deploys de 2026-09-08 reconstruíram o código anterior à F2 — nada desta fase chegou a produção, e a 066 não rodou. É o episódio que originou a etapa 0 abaixo.
 
 ### Procedimento — após "APROVADO F2", pelo pipeline
 
@@ -274,19 +294,31 @@ Levantado em 2026-09-08/09, depois de várias tentativas perdidas:
 
 - O repositório fica em **`~/project/src`**, e é lá que está o `node_modules` — **não** em `~/project`. Fazer `cd ~/project/src` antes de tudo.
 - **Não existe `psql` no container.** A leitura do banco é por script Node com o driver do próprio projeto.
-- O projeto é **ESM**, então um `.js` com `require` falha. A forma que funciona é um **`.cjs`**:
+- O projeto é **ESM**, então um `.js` com `require` falha: a extensão tem de ser **`.cjs`**.
+- **O arquivo tem de ser criado dentro de `~/project/src`**, não em `/tmp`. O Node resolve `require("pg")` a partir do diretório do script para cima; um `.cjs` em `/tmp` não enxerga o `node_modules` do projeto e morre em `MODULE_NOT_FOUND`.
+- A conexão precisa de **`ssl: { rejectUnauthorized: false }`**.
+- **Nunca colar SQL no prompt do bash** — nem como argumento, nem inline. O SQL vai **dentro** do heredoc, no corpo do script; para trocar a consulta, reescreva o `q.cjs`. Passar a query por `process.argv` é o que embaralha aspas e acentos.
+
+Literal que funcionou:
 
 ```bash
-cd ~/project/src && cat > /tmp/q.cjs <<'EOF'
+cd ~/project/src
+cat > q.cjs <<'EOF'
 const { Client } = require("pg");
 (async () => {
-  const c = new Client({ connectionString: process.env.DATABASE_URL });
+  const c = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
   await c.connect();
-  console.log(JSON.stringify((await c.query(process.argv[2])).rows, null, 1));
+  const r = await c.query(`
+    SELECT filename, executed_at FROM schema_migrations ORDER BY executed_at DESC LIMIT 5
+  `);
+  console.log(JSON.stringify(r.rows, null, 1));
   await c.end();
 })();
 EOF
-node /tmp/q.cjs "SELECT 1 AS ok"
+node q.cjs
 ```
 
 - `schema_migrations` tem as colunas **`id, filename, executed_at, checksum`** — **não** `version`.
@@ -295,7 +327,7 @@ node /tmp/q.cjs "SELECT 1 AS ok"
 
 **Lição do falso deploy (2026-09-08).** Dois deploys reconstruíram o código **anterior** à F2, e o sintoma foi **indistinguível de sucesso**: a CHECK aparecia com o nome esperado e `convalidated = true`, e os contadores estavam zerados — exatamente o que se veria se a 066 tivesse rodado numa tabela sem eventos novos. Só a **definição** da constraint e o `git log` do container revelaram que nada havia subido. Por isso a verificação começa pelo artefato construído, nunca pelo catálogo.
 
-Depois do **merge** do PR `f2/nucleo` → `main` e do deploy (a 066 roda no boot, `RUN_MIGRATIONS=true`):
+Depois do **merge** do PR `f2/nucleo` → `main` e do deploy (a 066 roda no boot; **`RUN_MIGRATIONS=true` verificado ao vivo no serviço web em 2026-09-09** — não é suposição do `render.yaml`):
 
 1. **HEAD do container** — tem que bater com o HEAD esperado da `main`:
 
@@ -329,7 +361,9 @@ SELECT value->'facets'->'always_open' FROM platform_settings WHERE key = 'search
 
 Para a 066, o teste que distingue é a **definição**, não `conname` nem `convalidated`: uma constraint com esse nome e válida existe desde a 036. O que prova que a 066 rodou é **`'search.executed'` aparecer na lista** (e `search_performed`, da lista original, continuar lá — é superconjunto).
 
-#### Etapa 2 — ligar o shadow
+#### Etapa 2 — ligar o shadow (BLOQUEADA até a releitura do Consolidado)
+
+> **Não executar ainda.** Condição 3 pendente: enquanto `docs/Search_Policy_Engine_v2_1_Consolidado.md` não estiver em `origin/main` e a releitura de 5 linhas não sair, a flag permanece `off`. O merge e o deploy da etapa 0 podem acontecer sem isso; esta etapa, não.
 
 No Render, `SEARCH_POLICY_ENGINE=shadow` (e `SEARCH_POLICY_ENGINE_CITIES=braganca-paulista-sp,atibaia-sp`, que só vale para o v1 em F4). Restart. `/health` continua `redis: disabled` — backend de cache `memory`.
 
@@ -372,7 +406,26 @@ SELECT COUNT(*) FILTER (WHERE event_type = 'search.executed')                   
 | Snapshot de produção | 2026-09-07 | 10.979 |                 4.480 kB |                                   0 |
 | Produção ao vivo     | 2026-09-09 | 10.987 |                 5.216 kB | 0 (esperado — o código nunca subiu) |
 
-**Ressalva para a F4: não dimensione retenção por linha × tamanho.** Em dois dias a tabela ganhou **8 linhas e 736 kB**. É desproporcional por ordens de grandeza e quase certamente **bloat de índice ou churn de autovacuum**, não dado: 736 kB para 8 linhas daria ~92 kB por evento, o que nenhum `payload` de ~20 campos justifica. Antes de projetar custo, isolar o heap dos índices (`pg_relation_size` vs `pg_indexes_size`) e, se preciso, medir depois de um `VACUUM (ANALYZE)`. A projeção honesta é (`search_executed_24h` × dias) × **bytes por linha medidos no heap**, não pela variação do tamanho total.
+**Ressalva para a F4: não dimensione retenção por linha × tamanho.** Entre as duas leituras a tabela aparece com **8 linhas e 736 kB a mais**. É desproporcional por ordens de grandeza e quase certamente **bloat de índice ou churn de autovacuum**, não dado: 736 kB para 8 linhas daria ~92 kB por evento, o que nenhum `payload` de ~20 campos justifica.
+
+E há um segundo motivo para não tratar isso como crescimento: **as duas linhas da tabela acima não são comparáveis em tamanho.** O snapshot foi **restaurado**, e restauração reconstrói os índices do zero, sem bloat e com fator de preenchimento ótimo; a tabela viva carrega o acúmulo de updates, deletes e páginas parcialmente ocupadas que o autovacuum ainda não recuperou. Comparar `pg_total_relation_size` de um banco restaurado com o de um banco em uso mede sobretudo a diferença entre índice novo e índice usado. As **contagens de linhas** são comparáveis; os **tamanhos**, não.
+
+Antes de projetar custo, isolar o heap dos índices (`pg_relation_size` vs `pg_indexes_size`) e, se preciso, medir depois de um `VACUUM (ANALYZE)`. A projeção honesta é (`search_executed_24h` × dias) × **bytes por linha medidos no heap da tabela viva**, não pela variação do tamanho total nem por comparação com o snapshot.
+
+**`occurred_at` é confiável para o recorte de 24 h — mas reconferir depois do shadow.** As consultas acima filtram por `occurred_at > NOW() - INTERVAL '1 day'`, então elas só valem se a coluna estiver sempre preenchida. Verificado ao vivo em 2026-09-09: **10.987 linhas, todas com `occurred_at` preenchida, zero divergência em relação a `created_at`**. O motivo é que ninguém a escreve explicitamente — vale o `DEFAULT NOW()` da migration 036, e o `INSERT` da telemetria da F2 também não a informa (`src/modules/ads/search-policy/telemetry.js:66-67` lista só `event_type, path, entity_type, city_slug, city_name, state, payload`).
+
+Ainda assim, **refazer essa conferência na leitura de 24 h**: o dado de hoje é 100 % do coletor público, e o emissor novo é outro caminho de código. Basta comparar as duas colunas dentro do recorte:
+
+```sql
+SELECT COUNT(*) AS total,
+       COUNT(occurred_at) AS com_occurred_at,
+       COUNT(*) FILTER (WHERE occurred_at IS DISTINCT FROM created_at) AS divergentes
+  FROM analytics_events
+ WHERE event_type = 'search.executed';
+-- esperado: total = com_occurred_at, divergentes = 0
+```
+
+Se `divergentes` for diferente de zero, o recorte por `occurred_at` passa a esconder ou duplicar eventos, e os números do shadow deixam de fechar.
 
 Critério de aceite do shadow (para F4): 0 timeouts sustentados, `shadow_ms_max` < 300, divergências explicáveis pelo raio automático (Bragança `1 → 34` é o esperado) e `pulados_legado` restrito a `highlight_only`/`city_slugs`/`model`.
 
