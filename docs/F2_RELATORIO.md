@@ -124,7 +124,7 @@ Aplicada de ponta a ponta no snapshot **a partir do estado da 036** (constraint 
 
    **A tabela nunca fica sem CHECK de `event_type`.** Provado em banco descartável com um `EVENT TRIGGER` que conta as constraints ao fim de cada DDL do bloco: ADD → 2, VALIDATE → 2, DROP → 1 (`_v2`), RENAME → 1 (nome original); **momentos com zero CHECK: 0**. O mesmo teste cobre idempotência (2ª execução no-op), aceitação de `search.executed`, recusa de valor inválido (23514) e a limpeza da `_v2` órfã.
 
-   **Lock (correção).** O runner executa o arquivo inteiro dentro de **uma transação** (`src/database/migrate.js:247-251`: `BEGIN` → `client.query(sql)` → `COMMIT`). Logo o `ACCESS EXCLUSIVE` tomado pelo `ADD` só é liberado no `COMMIT`, e o par `NOT VALID` + `VALIDATE` **não alivia o lock** aqui — a varredura do `VALIDATE` acontece com a tabela já em `ACCESS EXCLUSIVE`. O que o par garante é a ordem segura acima. O custo é proporcional ao tamanho de `analytics_events`: no snapshot de produção, **10.979 linhas / 4.480 kB** (`pg_total_relation_size`), e o arquivo 066 inteiro aplicou em **10 ms** partindo do estado 036. O número de produção ao vivo sai da consulta do §7.1. Se a tabela crescer a ponto de a janela incomodar, rodar os quatro passos à mão fora do runner, cada um em sua transação.
+   **Lock (correção).** O runner executa o arquivo inteiro dentro de **uma transação** (`src/database/migrate.js:247-251`: `BEGIN` → `client.query(sql)` → `COMMIT`). Logo o `ACCESS EXCLUSIVE` tomado pelo `ADD` só é liberado no `COMMIT`, e o par `NOT VALID` + `VALIDATE` **não alivia o lock** aqui — a varredura do `VALIDATE` acontece com a tabela já em `ACCESS EXCLUSIVE`. O que o par garante é a ordem segura acima. O custo é proporcional ao tamanho de `analytics_events`: no snapshot de produção, **10.979 linhas / 4.480 kB** (`pg_total_relation_size`), e o arquivo 066 inteiro aplicou em **10 ms** partindo do estado 036. Em produção ao vivo, leitura de 2026-09-09 (ainda pré-066): **10.987 linhas / 5.216 kB** — mesma ordem de grandeza, mesma janela desprezível. Se a tabela crescer a ponto de a janela incomodar, rodar os quatro passos à mão fora do runner, cada um em sua transação.
 
 ### 2.15 "Só assume o que modela" — achados do 8.10 ao vivo, corrigidos nesta fase
 
@@ -264,9 +264,61 @@ Sem dúvidas bloqueantes.
 
 **Pré-requisito (instrução sua):** só depois de você colar aqui o `PROSSIGA` de `npm run regions:verify -- --backup-table=<nome>` e de `npm run ads:verify-commercial-model` rodados no shell do Render. Até lá: **nada é mergeado nem deployado**; a branch fica em `f2/nucleo` com PR aberto.
 
+**Estado em 2026-09-09: o merge nunca aconteceu.** Confirmado por conteúdo, não por suposição: `origin/main` continua em `64517384`, os commits `09ce5258`, `a923399b` e `31a24a0f` aparecem só em `origin/f2/nucleo` (`git branch -r --contains`), e `git cat-file -e origin/main:src/database/migrations/066_search_policy_f2.sql` falha. Os dois deploys de 2026-09-08 reconstruíram o código anterior à F2 — nada desta fase está em produção, e a 066 não rodou. É o episódio que originou a etapa 0 abaixo.
+
 ### Procedimento — após "APROVADO F2", pelo pipeline
 
-1. **Merge** do PR `f2/nucleo` → `main`; deploy. A 066 roda no boot (`RUN_MIGRATIONS=true`); conferir no log do boot a linha da `066_search_policy_f2.sql` e, no shell do Render (leitura):
+#### Ambiente do shell do Render (anotar antes de qualquer comando)
+
+Levantado em 2026-09-08/09, depois de várias tentativas perdidas:
+
+- O repositório fica em **`~/project/src`**, e é lá que está o `node_modules` — **não** em `~/project`. Fazer `cd ~/project/src` antes de tudo.
+- **Não existe `psql` no container.** A leitura do banco é por script Node com o driver do próprio projeto.
+- O projeto é **ESM**, então um `.js` com `require` falha. A forma que funciona é um **`.cjs`**:
+
+```bash
+cd ~/project/src && cat > /tmp/q.cjs <<'EOF'
+const { Client } = require("pg");
+(async () => {
+  const c = new Client({ connectionString: process.env.DATABASE_URL });
+  await c.connect();
+  console.log(JSON.stringify((await c.query(process.argv[2])).rows, null, 1));
+  await c.end();
+})();
+EOF
+node /tmp/q.cjs "SELECT 1 AS ok"
+```
+
+- `schema_migrations` tem as colunas **`id, filename, executed_at, checksum`** — **não** `version`.
+
+#### Etapa 0 — provar que o deploy subiu o commit certo (antes de olhar o banco)
+
+**Lição do falso deploy (2026-09-08).** Dois deploys reconstruíram o código **anterior** à F2, e o sintoma foi **indistinguível de sucesso**: a CHECK aparecia com o nome esperado e `convalidated = true`, e os contadores estavam zerados — exatamente o que se veria se a 066 tivesse rodado numa tabela sem eventos novos. Só a **definição** da constraint e o `git log` do container revelaram que nada havia subido. Por isso a verificação começa pelo artefato construído, nunca pelo catálogo.
+
+Depois do **merge** do PR `f2/nucleo` → `main` e do deploy (a 066 roda no boot, `RUN_MIGRATIONS=true`):
+
+1. **HEAD do container** — tem que bater com o HEAD esperado da `main`:
+
+```bash
+cd ~/project/src && git log --oneline -1
+```
+
+2. **O arquivo da migration está na imagem?**
+
+```bash
+cd ~/project/src && ls src/database/migrations/ | tail -3
+```
+
+3. **A migration foi registrada, com `executed_at` dentro da janela deste deploy:**
+
+```sql
+SELECT filename, executed_at FROM schema_migrations ORDER BY executed_at DESC LIMIT 5;
+-- esperado: 066_search_policy_f2.sql, executed_at dentro da janela do deploy
+```
+
+Se qualquer um dos três falhar, **parar**: o deploy não subiu o que se pensa, e nenhuma leitura de catálogo depois disso significa o que parece significar.
+
+#### Etapa 1 — estado do catálogo (só depois da etapa 0)
 
 ```sql
 SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'analytics_events_event_type_chk';
@@ -275,9 +327,13 @@ SELECT value->'facets'->'always_open' FROM platform_settings WHERE key = 'search
 -- esperado: ["price"]
 ```
 
-2. **Shadow**: no Render, `SEARCH_POLICY_ENGINE=shadow` (e `SEARCH_POLICY_ENGINE_CITIES=braganca-paulista-sp,atibaia-sp`, que só vale para o v1 em F4). Restart. `/health` continua `redis: disabled` — backend de cache `memory`.
+Para a 066, o teste que distingue é a **definição**, não `conname` nem `convalidated`: uma constraint com esse nome e válida existe desde a 036. O que prova que a 066 rodou é **`'search.executed'` aparecer na lista** (e `search_performed`, da lista original, continuar lá — é superconjunto).
 
-3. **Leitura após 24 h** (shell do Render, somente leitura):
+#### Etapa 2 — ligar o shadow
+
+No Render, `SEARCH_POLICY_ENGINE=shadow` (e `SEARCH_POLICY_ENGINE_CITIES=braganca-paulista-sp,atibaia-sp`, que só vale para o v1 em F4). Restart. `/health` continua `redis: disabled` — backend de cache `memory`.
+
+#### Etapa 3 — leitura após 24 h (shell do Render, somente leitura)
 
 ```sql
 SELECT payload->>'flag_mode' AS modo,
@@ -309,7 +365,14 @@ SELECT COUNT(*) FILTER (WHERE event_type = 'search.executed')                   
   FROM analytics_events;
 ```
 
-Baseline para comparar (snapshot de produção, antes do shadow): **10.979 linhas no total, 4.480 kB**, 0 eventos `search.executed`. Projeção da retenção em F4 = (`search_executed_24h` × dias) × bytes por linha; o `payload` do shadow tem ~20 campos.
+**Baseline para comparar** — duas leituras, ambas **pré-066** (o código da F2 nunca chegou a produção):
+
+| Origem               | Data       | Linhas | `pg_total_relation_size` |                   `search.executed` |
+| -------------------- | ---------- | -----: | -----------------------: | ----------------------------------: |
+| Snapshot de produção | 2026-09-07 | 10.979 |                 4.480 kB |                                   0 |
+| Produção ao vivo     | 2026-09-09 | 10.987 |                 5.216 kB | 0 (esperado — o código nunca subiu) |
+
+**Ressalva para a F4: não dimensione retenção por linha × tamanho.** Em dois dias a tabela ganhou **8 linhas e 736 kB**. É desproporcional por ordens de grandeza e quase certamente **bloat de índice ou churn de autovacuum**, não dado: 736 kB para 8 linhas daria ~92 kB por evento, o que nenhum `payload` de ~20 campos justifica. Antes de projetar custo, isolar o heap dos índices (`pg_relation_size` vs `pg_indexes_size`) e, se preciso, medir depois de um `VACUUM (ANALYZE)`. A projeção honesta é (`search_executed_24h` × dias) × **bytes por linha medidos no heap**, não pela variação do tamanho total.
 
 Critério de aceite do shadow (para F4): 0 timeouts sustentados, `shadow_ms_max` < 300, divergências explicáveis pelo raio automático (Bragança `1 → 34` é o esperado) e `pulados_legado` restrito a `highlight_only`/`city_slugs`/`model`.
 
