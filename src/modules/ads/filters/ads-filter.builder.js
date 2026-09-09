@@ -118,7 +118,9 @@ const DIRTY_TEST_AD_GUARD_SQL = `
 
 export { DIRTY_TEST_AD_GUARD_SQL };
 
-function shouldApplyDirtyAdGuard() {
+// Exportada para o Search Policy Engine (F2) aplicar EXATAMENTE a mesma regra
+// no CandidateScope. Só o export mudou; a função e seus callers não.
+export function shouldApplyDirtyAdGuard() {
   const explicit = String(process.env.PUBLIC_TEST_AD_FILTER || "")
     .trim()
     .toLowerCase();

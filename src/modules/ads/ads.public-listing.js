@@ -147,11 +147,17 @@ const LISTING_BLOCKED_FIELDS = Object.freeze([
  * 1) Mantem so campos em LISTING_ALLOWED_FIELDS.
  * 2) Trunca `images` para no maximo IMAGES_LISTING_LIMIT URLs.
  */
-export function serializeAdForListing(ad) {
+export function serializeAdForListing(ad, { extraAllowedFields = [] } = {}) {
   if (!ad || typeof ad !== "object") return ad;
 
   const out = {};
-  for (const field of LISTING_ALLOWED_FIELDS) {
+  // `extraAllowedFields`: campos que um caller específico libera (F2: o motor
+  // v1 acrescenta explain/distance_km/commercial_model). O default vazio
+  // mantém o contrato slim byte a byte para o caminho legado (R4).
+  const allowed = extraAllowedFields.length
+    ? [...LISTING_ALLOWED_FIELDS, ...extraAllowedFields]
+    : LISTING_ALLOWED_FIELDS;
+  for (const field of allowed) {
     if (Object.prototype.hasOwnProperty.call(ad, field)) {
       out[field] = ad[field];
     }
@@ -164,9 +170,9 @@ export function serializeAdForListing(ad) {
   return out;
 }
 
-export function serializeAdsForListing(ads) {
+export function serializeAdsForListing(ads, options = {}) {
   if (!Array.isArray(ads)) return [];
-  return ads.map((ad) => serializeAdForListing(ad));
+  return ads.map((ad) => serializeAdForListing(ad, options));
 }
 
 // Export interno para testes auditarem o contrato.

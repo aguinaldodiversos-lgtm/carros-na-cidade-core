@@ -32,6 +32,8 @@ export const SEARCH_POLICY_DEFAULT = Object.freeze({
   facets: {
     open_max: 3,
     min_options_to_render: 2,
+    // D6 (F2): preço abre sempre; open_max inclui as always_open.
+    always_open: ["price"],
     price_buckets: [40000, 60000, 80000, 100000, 150000, 200000, 300000],
     always_available_in_more_filters: [
       "brand",

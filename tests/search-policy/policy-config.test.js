@@ -31,6 +31,7 @@ const MIGRATION = path.resolve(
   here,
   "../../src/database/migrations/065_search_policy_settings.sql"
 );
+const MIGRATION_066 = path.resolve(here, "../../src/database/migrations/066_search_policy_f2.sql");
 
 function jsonFromMigration() {
   const sql = fs.readFileSync(MIGRATION, "utf8");
@@ -38,7 +39,14 @@ function jsonFromMigration() {
   const end = sql.indexOf("}'::jsonb", start);
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
-  return JSON.parse(sql.slice(start + 1, end + 1));
+  const base = JSON.parse(sql.slice(start + 1, end + 1));
+  // Migration 066 (F2, D6): jsonb_set(value, {facets,always_open}, ["price"]).
+  // O que o banco tem depois de 065 + 066 é o que a constante precisa espelhar.
+  const patched = fs.readFileSync(MIGRATION_066, "utf8");
+  expect(patched).toContain("'{facets,always_open}'");
+  expect(patched).toContain("'[\"price\"]'::jsonb");
+  base.facets.always_open = ["price"];
+  return base;
 }
 
 describe("search_policy — migration 065 × SEARCH_POLICY_DEFAULT", () => {

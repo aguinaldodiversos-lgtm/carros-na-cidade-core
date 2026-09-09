@@ -76,6 +76,13 @@ export const ADS_ALLOWED_QUERY_KEYS = Object.freeze([
   "advertiser_id",
   // Busca textual
   "q",
+  // Search Policy Engine v2.1 (F2, §7.1). Só o motor os lê; sem eles na key,
+  // ?origem=x&raio=25 e ?origem=x&raio=0 colidiriam no mesmo HIT.
+  "origem",
+  "origem_src",
+  "raio",
+  "escopo",
+  "commercial_model",
 ]);
 
 const AUTOCOMPLETE_ALLOWED_QUERY_KEYS = Object.freeze(["q", "limit", "current_city_slug"]);
