@@ -264,23 +264,79 @@ Sem dúvidas bloqueantes.
 
 ### Condições da aprovação — situação em 2026-09-09
 
-| #   | Condição                                                                                 | Situação                             |
-| --- | ---------------------------------------------------------------------------------------- | ------------------------------------ |
-| 1   | `npm run regions:verify -- --backup-table=region_memberships_backup_prod_f1`             | **PROSSIGA** — 2026-09-09, 17:03 UTC |
-| 2   | `npm run ads:verify-commercial-model`                                                    | **PROSSIGA** — 2026-09-09, 17:07 UTC |
-| 3   | `docs/Search_Policy_Engine_v2_1_Consolidado.md` em `origin/main` + releitura de 5 linhas | **pendente** — arquivo ausente       |
+| #   | Condição                                                                                 | Situação                                |
+| --- | ---------------------------------------------------------------------------------------- | --------------------------------------- |
+| 1   | `npm run ads:verify-commercial-model`                                                    | **PROSSIGA** — 2026-09-09, 17:03:51 UTC |
+| 2   | `npm run regions:verify -- --backup-table=region_memberships_backup_prod_f1`             | **PROSSIGA** — 2026-09-09, 17:07:42 UTC |
+| 3   | `docs/Search_Policy_Engine_v2_1_Consolidado.md` em `origin/main` + releitura de 5 linhas | **pendente** — arquivo ausente          |
 
 **Merge feito em 2026-09-09 com a condição 3 em aberto**, pela decisão registrada abaixo. O código está publicado e a 066 executada; o motor segue `off`, e a **etapa 2 continua bloqueada** até a releitura.
 
-**Saídas literais das duas verificações — A COLAR.** Os vereditos e horários acima foram relatados; o texto integral ainda não chegou a esta sessão (o que veio nas mensagens anteriores foram os marcadores `[saída de regions:verify]` e `[saída de ads:verify-commercial-model]`). Colar aqui, sem edição, quando disponível — é o que dá rastreabilidade a R6 para as contagens que os scripts imprimem:
+**Saídas literais das duas verificações** (shell do Render, banco `carros_na_cidade_db`, sessão somente leitura). Coladas sem edição — é o que dá rastreabilidade R6 às contagens.
 
 ```text
-(1) regions:verify — 2026-09-09 17:03 UTC
-<saída literal pendente>
+> carros-na-cidade-core@2.1.0 ads:verify-commercial-model
+> node scripts/ads-verify-commercial-model.mjs
 
-(2) ads:verify-commercial-model — 2026-09-09 17:07 UTC
-<saída literal pendente>
+SESSAO_SOMENTE_LEITURA = on [OK]
+BANCO = carros_na_cidade_db [OK]
+
+COLUNA ads.commercial_model = existe [OK]
+INDICE idx_ads_commercial_model_status = existe [OK]
+FUNCAO ads_search_vector_refresh contem commercial_model = sim [OK]
+FUNCAO ads_search_vector_update contem commercial_model = sim [OK]
+TRIGGER ads_search_vector_trigger = ads_search_vector_refresh [OK]
+TRIGGER trg_ads_search_vector_update = ads_search_vector_update [OK]
+TRIGGER trigger_ads_search_vector = ads_search_vector_update [OK]
+ANUNCIOS_TOTAL = 55 [OK]
+COM_COMMERCIAL_MODEL = 49 [OK]
+ATIVOS_COM_MODELO = 34 de 34 [OK]
+NULL_ENTRE_NAO_DELETADOS = 0 de 35 (0.0 %) [OK]
+SEARCH_VECTOR_NULO = 0 [OK]
+VETOR_SEM_O_MODELO = 0 [OK]
+LISTA_NULL (6): id | status | brand | model
+  2 | deleted | NULL | NULL
+  3 | deleted | NULL | NULL
+  4 | deleted | NULL | NULL
+  5 | deleted | NULL | NULL
+  6 | deleted | NULL | NULL
+  7 | deleted | NULL | NULL
+PROVA_PESO_A anuncio 84 (Onix) = casa em peso A [OK]
+
+PROSSIGA
+{"level":30,"time":"2026-09-09T17:03:51.610Z","service":"carros-na-cidade-core","env":"production","msg":"[db] pool encerrado"}
 ```
+
+```text
+> carros-na-cidade-core@2.1.0 regions:verify
+> node scripts/regions-verify.mjs --backup-table=region_memberships_backup_prod_f1
+
+SESSAO_SOMENTE_LEITURA = on [OK]
+BANCO = carros_na_cidade_db [OK]
+
+SENTINELA braganca-paulista-sp|extrema-mg = 25.44 km (layer 4) [OK]
+SENTINELA atibaia-sp|extrema-mg = 38.10 km (layer 4) [OK]
+SENTINELA atibaia-sp|braganca-paulista-sp = 18.34 km (layer 1) [OK]
+CROSS_UF = 182410 [OK]
+TOTAL = 696746 [OK]
+LAYER_LE_3 = 107481 [OK]
+SELF_ROWS = 5572 [OK]
+SELF_ROWS_IGUAL_CIDADES = 5572 de 5572 [OK]
+BACKUP region_memberships_backup_prod_f1 = 107481 linhas [OK]
+EXCEPT_NOVO_MENOS_BACKUP = 0 [OK]
+EXCEPT_BACKUP_MENOS_NOVO = 0 [OK]
+
+PROSSIGA
+{"level":30,"time":"2026-09-09T17:07:42.673Z","service":"carros-na-cidade-core","env":"production","msg":"[db] pool encerrado"}
+```
+
+**Correção que só a saída literal permitiu.** Uma versão anterior desta tabela dava `regions:verify` às 17:03 e `ads:verify-commercial-model` às 17:07. É o inverso: os carimbos de encerramento do pool mostram `ads` às **17:03:51** e `regions` às **17:07:42**. Corrigido acima.
+
+**O que as duas saídas confirmam além do veredito:**
+
+- **Produção bate com o snapshot, linha a linha.** `TOTAL = 696746` e `LAYER_LE_3 = 107481` são exatamente os números do snapshot local usado em toda a F2 — e os `EXCEPT` nos dois sentidos deram **0** contra o backup `region_memberships_backup_prod_f1`, que é a prova de superconjunto exigida na F1. As três sentinelas mantêm distância e `layer` (25,44 / 38,10 km em layer 4; 18,34 km em layer 1).
+- **Os 6 `commercial_model` NULL são todos `deleted`**, com `brand` e `model` também NULL — nenhum anúncio vivo sem modelo (`ATIVOS_COM_MODELO = 34 de 34`, `NULL_ENTRE_NAO_DELETADOS = 0 de 35`). É o que a F1 decidiu deixar como está, agora confirmado em produção.
+- **Os três triggers de `search_vector` existem mesmo em produção**, com o mapeamento previsto: `ads_search_vector_trigger` → `ads_search_vector_refresh()`, e `trg_ads_search_vector_update` + `trigger_ads_search_vector` → `ads_search_vector_update()`. Isso eleva o achado do §1 de `docs/SCHEMA_DRIFT.md` de "observado no snapshot" para **confirmado em produção**.
 
 **Decisão explícita: o merge sai com a condição 3 pendente.** As duas verificações que protegem os **dados** de produção passaram, e é delas que o merge dependia de fato; o Consolidado é documento de referência e não altera nem migration nem código. Decisão sua, registrada aqui para não virar precedente silencioso.
 
@@ -377,11 +433,41 @@ Para a 066, o teste que distingue é a **definição**, não `conname` nem `conv
 
 **A prova por conteúdo que a etapa 0 exige: a lista da CHECK passou de 11 para 12 valores.** A allowlist da migration 036 tem exatamente **11** literais (conferível em `src/database/migrations/036_analytics_events.sql`); depois da 066 são **12**, com `'search.executed'` acrescentado e os 11 originais preservados — inclusive `search_performed`, que é o vizinho de nome parecido e não deve ser confundido com o evento novo. É esse **12 contra 11** que distingue "a migration rodou" de "a constraint sempre esteve aí": nome e `convalidated` seriam idênticos nos dois casos, que foi exatamente a armadilha de 2026-09-08.
 
-**Saída literal do `pos.cjs` — A COLAR.** Não chegou a esta sessão (veio o marcador `[cole aqui a saída completa do pos.cjs…]`). Colar aqui sem edição, do `3bc67f7 (grafted, HEAD…` até a tabela de `payload`:
+**Saída literal do `pos.cjs`** (etapas 0.1 a 0.3 e etapa 1, no pod `6d79f9c7b9-7l92s`), colada sem edição:
 
 ```text
-<saída literal pendente>
+3bc67f7 (grafted, HEAD, origin/main, origin/HEAD, main) Merge branch 'f2/nucleo' into main
+065_search_policy_settings.sql
+066_search_policy_f2.sql
+
+=== etapa 0.3 ===
+┌─────────┬──────────────────────────────────┬──────────────────────────┐
+│ (index) │ filename                         │ executed_at              │
+├─────────┼──────────────────────────────────┼──────────────────────────┤
+│ 0       │ '066_search_policy_f2.sql'       │ 2026-09-09T19:12:29.505Z │
+│ 1       │ '065_search_policy_settings.sql' │ 2026-09-08T01:11:34.791Z │
+│ 2       │ '064_ads_commercial_model.sql'   │ 2026-09-08T01:11:34.776Z │
+└─────────┴──────────────────────────────────┴──────────────────────────┘
+
+=== etapa 1 - CHECK ===
+CHECK ((event_type = ANY (ARRAY['page_view'::text, 'ad_view'::text, 'city_page_view'::text, 'region_page_view'::text, 'below_fipe_page_view'::text, 'blog_view'::text, 'whatsapp_click'::text, 'phone_click'::text, 'finance_click'::text, 'search_performed'::text, 'seller_store_view'::text, 'search.executed'::text])))
+
+=== etapa 1 - settings ===
+always_open: [ 'price' ]
+
+=== etapa 1 - payload ===
+column_name: 'payload'
 ```
+
+**Leitura da saída, item a item:**
+
+- **0.1** — `3bc67f7` no pod é o merge `Merge branch 'f2/nucleo' into main`, igual ao `origin/main` do momento. Igualdade verificada, que é o ponto da etapa.
+- **0.2** — `066_search_policy_f2.sql` presente na imagem.
+- **0.3** — a 066 tem **uma** linha, `2026-09-09T19:12:29.505Z`, dentro da janela do deploy; as 064 e 065 continuam com o carimbo antigo (`2026-09-08T01:11:34`), o que também mostra que o runner **não** as reexecutou.
+- **Etapa 1, CHECK** — a lista tem **12** valores, terminando em `'search.executed'`, com os **11** originais preservados, `search_performed` inclusive. É a prova por conteúdo: nome e `convalidated` seriam idênticos sem a migration; a lista, não.
+- **Etapa 1, settings e coluna** — `always_open: [ 'price' ]` e `column_name: 'payload'`, as outras duas mudanças da 066.
+
+**Detalhe operacional do pod: o clone é `grafted`** (raso). O `git --no-pager log` mostra só a ponta — não dá para caminhar no histórico nem rodar `git log <hash1>..<hash2>` lá dentro. Para a etapa 0 isso basta, porque o que se compara é o HEAD; qualquer investigação de histórico tem de ser feita na sua máquina.
 
 **Atenção para quem repetir a etapa 0 depois.** O HEAD esperado **não é mais `3bc67f72`**: este próprio fechamento é um commit de documentação mergeado em `main`, e o push dispara um novo deploy. É inofensivo — só documentação, a 066 já está registrada e o runner a pula por já constar em `schema_migrations` — mas o container passa a servir outro commit. Antes de comparar, obtenha o HEAD corrente com `git rev-parse --short origin/main` na sua máquina (ou `git --no-pager log --merges -1 --oneline`, que mostra o merge mais recente) e confronte com o `git --no-pager log --oneline -1` do pod. O que a etapa 0 verifica é **igualdade entre os dois**, nunca um hash fixo escrito aqui.
 
