@@ -45,6 +45,16 @@ Ou seja: as **funções** são criadas incondicionalmente (um banco novo termina
 
 Só em produção: os triggers `trg_ads_search_vector_update` e `trigger_ads_search_vector`, e a função `ads_set_search_vector`. Só em banco novo: nada.
 
+**Confirmado no banco de produção, não só no snapshot.** A coluna "produção" acima foi levantada no snapshot restaurado; em 2026-09-09 o `npm run ads:verify-commercial-model` rodou contra `carros_na_cidade_db` e imprimiu o mesmo mapeamento (saída literal no §7 de `docs/F2_RELATORIO.md`):
+
+```text
+TRIGGER ads_search_vector_trigger = ads_search_vector_refresh [OK]
+TRIGGER trg_ads_search_vector_update = ads_search_vector_update [OK]
+TRIGGER trigger_ads_search_vector = ads_search_vector_update [OK]
+```
+
+Os três triggers existem mesmo no banco vivo, com as mesmas funções. O item deixa de ser inferência sobre um snapshot e passa a ser fato de produção — o que só reforça a decisão pendente para F5.
+
 **Conclusões:**
 
 1. **O CI não tem o mesmo emaranhado.** Continua sendo **drift** (objeto que existe só em produção), não "versionado errado". A prioridade do item em F5 não muda por esse lado.
