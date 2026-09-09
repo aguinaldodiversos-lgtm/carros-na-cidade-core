@@ -8,7 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *   - generateMetadata produz title/description literais do briefing.
  *   - canonical APONTA PARA self (/carros-usados/[uf]), sem query string.
  *   - UF inválida retorna metadata `noindex` e a Page chama `notFound()`.
- *   - Filtros restritivos (brand/model/q/...) emitem `robots: noindex`.
+ *   - Página Estadual é SEMPRE `noindex,follow` — pelada OU filtrada
+ *     (estratégia hiperlocal 2026-07-05: não competir em genérico de estado).
  *   - Page resolve via `loadStateCatalogData` e bloqueia em UF inválida.
  */
 
@@ -123,7 +124,15 @@ describe("/carros-usados/[uf] — generateMetadata", () => {
     );
   });
 
-  it("filtros restritivos (brand/model/q) emitem robots noindex mas mantêm canonical limpo", async () => {
+  it("página pelada (sem filtros) é noindex,follow — estratégia hiperlocal 2026-07-05", async () => {
+    // A estadual não compete em genérico ("carros usados são paulo"). Antes
+    // desta mudança a pelada era indexável; agora é sempre noindex,follow.
+    const md = await pageModule.generateMetadata({ params: { uf: "sp" } });
+    expect(md.robots).toMatchObject({ index: false, follow: true });
+    expect(md.alternates?.canonical).toBe("/carros-usados/sp");
+  });
+
+  it("filtros restritivos (brand/model/q) também emitem robots noindex + canonical limpo", async () => {
     const md = await pageModule.generateMetadata({
       params: { uf: "sp" },
       searchParams: { brand: "Honda", model: "Civic" },
