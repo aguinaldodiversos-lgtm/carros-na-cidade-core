@@ -2,10 +2,10 @@
 
 **STATUS:** NORMATIVA — especificação vigente
 **Data:** 2026-09-09
+**Última sincronização normativa:** 2026-09-10
 **Fontes:** `docs/Search_Policy_Decisions_2026-09.md` @ 893c0f39 (DEC-01…DEC-15, DEC-17…DEC-25, ADI-01…ADI-03, MET-01) · `docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md` (histórico, não normativo). Por DEC-25, `docs/F2_GATE_SQL.md` @ 978c6715 deixou de ser fonte normativa e permanece apenas como evidência histórica.
 **Método:** MET-01 — escrita sem consultar código, testes ou relatórios da F2. Cada seção declara sua proveniência.
 **Substitui:** a "v2.1 Consolidado", que nunca existiu, e a v2.0 nos pontos em que o registro de decisões a alterou.
-**Sincronização:** 2026-09-10 — DEC-22, DEC-23, DEC-24 e DEC-25 incorporadas.
 
 ---
 
