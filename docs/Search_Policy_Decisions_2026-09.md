@@ -3,6 +3,7 @@
 Fonte de primeira mão: decisões do dono do produto, posteriores à especificação v2.0
 (`docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md`). Onde este registro contradiz a v2.0,
 este registro vence. Onde a v2.0 não é citada, a decisão é nova.
+A partir de DEC-25, docs/F2_GATE_SQL.md não é fonte normativa; é evidência histórica.
 
 Este arquivo é fonte normativa para a v3 (`docs/Search_Policy_Engine_v3_Consolidado.md`). Os relatórios F1/F2 são evidência de implementação,
 não fonte de norma, mesmo onde reproduzem estas decisões.
@@ -94,6 +95,31 @@ DEC-20 — A avaliação de liquidez territorial usa contagens de candidatos agr
 DEC-21 — Guided Relaxation procura, para cada dimensão relaxável ativa, a menor concessão útil que efetivamente acrescenta resultados conhecidos, em vez de aplicar cegamente um percentual ou degrau fixo quando o estoque permite uma concessão menor. Para preço, procura o menor novo teto que desbloqueia candidatos e o apresenta com arredondamento amigável configurável que continue incluindo o candidato que justificou a sugestão; para ano, procura o ano imediatamente menos restritivo que acrescenta candidatos; para quilometragem, procura o menor limite superior útil, também sujeito a arredondamento amigável configurável; para distância, procura o primeiro anel permitido acima do território atual que acrescenta resultados, podendo chegar a 150 km; para câmbio, pode remover a restrição quando isso acrescentar candidatos. Uma alternativa cujo delta conhecido seja zero não é apresentada, conforme DEC-14. · Nova; detalha DEC-11 e DEC-14. · Vigente · 2026-09.
 
 As relaxações não são ordenadas apenas por delta_count. Cada alternativa recebe uma avaliação determinística de benefício versus custo da concessão (relaxation_score conceitual), considerando pelo menos o número de resultados acrescentados e a magnitude relativa da mudança pedida ao comprador. Custos, arredondamentos e pesos são configuração versionável de política, não lógica espalhada pelo frontend. Uma concessão grande, como 25 → 150 km, não vence automaticamente uma concessão pequena apenas por acrescentar mais veículos. O sistema apresenta no máximo as melhores opções definidas pela política — inicialmente até três — e nenhuma é aplicada sem ação explícita do usuário. Modelo alternativo continua fora deste mecanismo, conforme DEC-12. Nenhum modelo de linguagem participa desse cálculo. · Nova; complementa DEC-11/DEC-12. · Vigente · 2026-09.
+
+### DEC-22
+
+DEC-22 — Preço é filtro primário permanente. A dimensão de preço permanece disponível no conjunto principal de filtros independentemente de entropia, ganho de informação ou poder discriminativo calculado para o SearchContext. A política adaptativa pode determinar quais outras dimensões ocupam os filtros principais e quais ficam em "Mais filtros", mas não pode rebaixar preço por esse critério. Counts, faixas e disponibilidade continuam derivados do CandidateScope e sujeitos a DEC-13/DEC-14. · Decide o que o gate deixou em aberto em D6. · Vigente · 2026-09.
+
+### DEC-23
+
+DEC-23 — AUTO abaixo do alvo termina no último território que acrescenta candidatos. Quando nenhum anel automático normal (0/25/50/75) atinge o LiquidityTarget, required_distance_km = null. O effective_radius_km não é elevado ao teto de 75 km por ter sido avaliado: corresponde ao menor anel que contém integralmente o conjunto final de candidatos, isto é, o último anel cuja inclusão efetivamente acrescentou candidatos. Anéis posteriores com delta zero não ampliam o território efetivo. Se nenhum anel externo acrescenta nada, effective_radius_km = 0. Em seguida, o SearchContext entra em Guided Relaxation. · Substitui a proposta do gate (D5) que exemplificava raio efetivo no teto sem atingir o alvo. Refina DEC-03 e DEC-20. · Vigente · 2026-09.
+
+### DEC-24
+
+DEC-24 — Faixa válida de raio explícito. Um raio explícito válido é um inteiro de quilômetros entre 0 e 150, inclusive; o máximo corresponde à cobertura pré-computada de region_memberships (v2.0 §10). Valores de 1 a 150 produzem MANUAL_RADIUS e preservam exatamente a medida informada, sem snap para anéis de UX. raio=0 é escolha geográfica explícita e produz EXACT_CITY com user_geo_explicit = true e expansão automática bloqueada. Valores negativos, não numéricos, fracionários ou superiores a 150 não são raios manuais válidos e nunca são silenciosamente arredondados para um valor aceito; o tratamento de UX/API do valor inválido não é definido nesta decisão. Com raio explícito válido presente, DEC-18 não se aplica: vale DEC-24 e DEC-05. · Delimita DEC-19; refina v2.0 §7 e §13. · Vigente · 2026-09.
+
+### DEC-25
+
+DEC-25 — Disposição normativa das propostas D1–D8 do gate (docs/F2_GATE_SQL.md @ 978c6715). Não existiu aprovação em bloco ("SQL OK") das oito; esta decisão as ratifica ou substitui uma a uma, e a partir dela o gate deixa de ser fonte normativa, permanecendo apenas como evidência.
+D1 (origem= sem procedência → USER_SELECTED): não ratificada. A presença de origem= numa URL não prova ação manual; a precedência USER_SELECTED exige marcador de procedência. Pendente — a definir antes da F3, que é quem gera as URLs.
+D2 (evitar casamento por substring): ratificado o comportamento — casamento locativo/semântico respeita fronteiras de palavra e não interpreta substrings acidentais. A parte "corrigir no caminho novo e manter o parser legado intacto" é estratégia de compatibilidade (ADI-03), não regra da política.
+D3 (forma do CandidateScope): ratificado o princípio (DEC-08); a forma SQL é implementação, não norma.
+D4 (preço +15% arredondado): superada por DEC-21.
+D5 (SEARCH_MODEL automático até 150): superada por DEC-11, DEC-18 e DEC-23.
+D6 (preço por entropia): superada por DEC-22.
+D7 (liquidez agregada por cidade): ratificada a semântica por DEC-20; a forma SQL não é norma.
+D8 (deltas do snapshot +3/+1/R$87k): não normativo; superado por DEC-21.
+· Encerra a pendência de aprovação do gate. · Vigente · 2026-09.
 
 ---
 
