@@ -101,7 +101,7 @@ ADI-03 — O re-sort no cliente após paginação continua existindo com a flag 
 
 ### MET-01
 
-MET-01 — A v3 é escrita sem consultar o código da F2, os testes da F2 e os relatórios F2/F2.1. Fontes permitidas: este registro, `docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md`, e, na tarefa específica de elaboração da v3, somente as partes de `docs/F2_GATE_SQL.md` comprovadamente anteriores à implementação. Cada seção da v3 carrega a proveniência (`v2.0 §N`, `DEC-NN`, `gate`). A comparação da F2 contra a v3 só começa depois de a v3 estar fechada e commitada. · 2026-09.
+MET-01 — A v3 é escrita sem consultar o código da F2, os testes da F2 e os relatórios da F2 (`docs/F2_RELATORIO.md`, `docs/F2_EXPLAIN_ANALYZE.md`). Fontes permitidas: este registro, `docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md`, e, na tarefa específica de elaboração da v3, somente as partes de `docs/F2_GATE_SQL.md` comprovadamente anteriores à implementação. Cada seção da v3 carrega a proveniência (`v2.0 §N`, `DEC-NN`, `gate`). A comparação da F2 contra a v3 só começa depois de a v3 estar fechada e commitada. · 2026-09.
 
 ---
 

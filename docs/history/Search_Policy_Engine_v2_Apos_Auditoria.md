@@ -1,7 +1,7 @@
 > **STATUS: HISTÓRICO — NÃO NORMATIVO**
 >
 > Este documento registra o estado das decisões em 07/09/2026, antes da implementação das fases F1 e F2.
-> Existia apenas fora do git até 2026-09-10. Algumas regras foram posteriormente substituídas — inclusive o
+> Existia apenas fora do git até 2026-09-09. Algumas regras foram posteriormente substituídas — inclusive o
 > comportamento inicial da página de cidade (§12–13) e a política de descoberta e relaxação (§17–18).
 > As substituições estão em `docs/Search_Policy_Decisions_2026-09.md`.
 > A futura especificação normativa será a v3. Até sua criação e commit, este documento permanece apenas
