@@ -4,7 +4,7 @@ Fonte de primeira mão: decisões do dono do produto, posteriores à especifica�
 (`docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md`). Onde este registro contradiz a v2.0,
 este registro vence. Onde a v2.0 não é citada, a decisão é nova.
 
-Este arquivo é fonte normativa para a futura v3. Os relatórios F1/F2 são evidência de implementação,
+Este arquivo é fonte normativa para a v3 (`docs/Search_Policy_Engine_v3_Consolidado.md`). Os relatórios F1/F2 são evidência de implementação,
 não fonte de norma, mesmo onde reproduzem estas decisões.
 
 Formato de cada entrada: enunciado · relação com a v2.0 · status · data.
