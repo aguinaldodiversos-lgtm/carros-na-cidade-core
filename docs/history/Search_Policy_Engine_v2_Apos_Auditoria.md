@@ -6,7 +6,7 @@
 > As substituições estão em `docs/Search_Policy_Decisions_2026-09.md`.
 > A especificação normativa vigente é a v3, em `docs/Search_Policy_Engine_v3_Consolidado.md`. Este documento permanece apenas
 > como fonte histórica para a consolidação.
-> Não utilizar como especificação de implementação. Não editar: correções vão na futura v3.
+> Não utilizar como especificação de implementação. Não editar: correções vão na especificação vigente, `docs/Search_Policy_Engine_v3_Consolidado.md`.
 
 # Carros na Cidade — Search Policy Engine v2.0
 ## Especificação revisada após auditoria do HEAD
