@@ -2,15 +2,16 @@
 
 **STATUS:** NORMATIVA — especificação vigente
 **Data:** 2026-09-09
-**Fontes:** `docs/Search_Policy_Decisions_2026-09.md` @ dd258e1fd09367ca0784bd1fd2965c45d32f4349 · divergências D1–D8 de `docs/F2_GATE_SQL.md` @ 978c6715 · `docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md` (histórico, não normativo)
+**Fontes:** `docs/Search_Policy_Decisions_2026-09.md` @ 893c0f39 (DEC-01…DEC-15, DEC-17…DEC-25, ADI-01…ADI-03, MET-01) · `docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md` (histórico, não normativo). Por DEC-25, `docs/F2_GATE_SQL.md` @ 978c6715 deixou de ser fonte normativa e permanece apenas como evidência histórica.
 **Método:** MET-01 — escrita sem consultar código, testes ou relatórios da F2. Cada seção declara sua proveniência.
 **Substitui:** a "v2.1 Consolidado", que nunca existiu, e a v2.0 nos pontos em que o registro de decisões a alterou.
+**Sincronização:** 2026-09-10 — DEC-22, DEC-23, DEC-24 e DEC-25 incorporadas.
 
 ---
 
 ## Como ler este documento
 
-**Precedência e rótulos.** Três fontes sustentam este texto, em ordem decrescente de autoridade. `DEC-NN`, `ADI-NN` e `MET-NN` são decisões de primeira mão do dono do produto, registradas em `docs/Search_Policy_Decisions_2026-09.md`; vencem qualquer outra fonte. `gate DN` é a resolução de uma das oito divergências D1–D8 do gate de interpretação aprovado antes do código, e tem autoridade apenas nos temas que a divergência resolve. `v2.0 §N` é a especificação histórica de 07/09/2026, independente do código por construção, e vale onde nenhuma fonte superior a substitui. `gate §X (evidência)` marca o restante do gate — SQL, contagens, planos e escolhas de implementação: pode ilustrar uma regra que já tem fonte, nunca criar regra de produto. `pendente` marca um ponto sem fonte independente; onde aparece, não há norma, e nenhum conteúdo afirmativo o acompanha. Quando duas fontes se contradizem, a de precedência mais alta vence, a perdedora permanece no texto como evidência de que o conflito foi visto, e a seção registra a resolução na forma `Conflito: … Vale …`.
+**Precedência e rótulos.** Duas fontes sustentam este texto, em ordem decrescente de autoridade. `DEC-NN`, `ADI-NN` e `MET-NN` são decisões de primeira mão do dono do produto, registradas em `docs/Search_Policy_Decisions_2026-09.md`; vencem qualquer outra fonte. `v2.0 §N` é a especificação histórica de 07/09/2026, independente do código por construção, e vale onde nenhuma decisão a substitui. O gate de interpretação **não** é mais fonte: DEC-25 dispôs uma a uma das suas oito propostas D1–D8, ratificando algumas e substituindo as demais, e a partir dela o gate é evidência histórica. Onde uma proposta do gate aparece neste documento, ela vem rotulada `gate DN (evidência)` e o que a sustenta é a DEC que a ratificou — nunca o gate por si. `gate §X (evidência)` marca o restante do gate — SQL, contagens, planos e escolhas de implementação: pode ilustrar uma regra que já tem fonte, nunca criar regra de produto. `pendente` marca um ponto sem fonte independente; onde aparece, não há norma, e nenhum conteúdo afirmativo o acompanha. Quando duas fontes se contradizem, a de precedência mais alta vence, a perdedora permanece no texto como evidência de que o conflito foi visto, e a seção registra a resolução na forma `Conflito: … Vale …`.
 
 **Normativo e Futuro.** As seções 1 a 21 e 23 são normativas: obrigatórias para qualquer implementação a partir de agora. A seção 22 reúne o que a v2.0 previu como evolução e que este documento **não** exige das próximas fases — v2.0 §21, §22, §25, §27, §45, §47, §48, §57 e a parte do §46 que admite IA auxiliar em linguagem natural e recomendações. A restrição do §46 de que nenhum modelo de linguagem decide elegibilidade territorial, peso comercial, paginação, expiração de Destaque ou regras de cidade, e de que o núcleo deve ser determinístico, explicável, testável e reproduzível, **não** é futuro: é norma, e está na seção 1.
 
@@ -56,11 +57,11 @@ A origem da busca pode vir de mais de uma fonte simultaneamente. A precedência 
 
 Uma fonte de menor prioridade nunca deve sobrescrever silenciosamente uma fonte de maior prioridade. Em particular, a cidade inferida do texto livre não deve sobrescrever a cidade da rota.
 
-**Resolução do gate D1.** Um parâmetro de origem presente na URL, mesmo sem um marcador que declare sua procedência, deve ser tratado como `USER_SELECTED`: o parâmetro só existe porque alguém o escolheu. Isso resolve a origem, não o modo geográfico — uma origem `USER_SELECTED` sem raio ou escopo manual continua entrando em `AUTO_RADIUS` pela seção 8.
+**Procedência da origem — em aberto.** A proposta do gate D1 (evidência) era tratar como `USER_SELECTED` um parâmetro de origem presente na URL mesmo sem marcador que declarasse sua procedência. DEC-25 **não a ratificou**: a presença do parâmetro não prova ação manual, e a precedência `USER_SELECTED` exige marcador de procedência. Como a decisão está adiada para antes da F3, que é quem gera as URLs, este documento não fixa qual precedência recebe uma origem sem marcador. `pendente`.
 
-**Resolução do gate D2.** O casamento de localização a partir de texto livre não deve identificar cidade por substring de outra palavra, e o mesmo vale para sinônimos de dimensões de produto. O gate registra dois defeitos verificados nessa forma de casamento: uma consulta de produto sem intenção geográfica resolvendo para uma cidade cujo nome é substring de outra palavra da frase, e um sinônimo de câmbio de duas letras casando por substring dentro de nomes de cidade e de marca. A correção deve viver no caminho novo; o caminho legado, servido com a flag desligada, permanece intocado (ADI-03).
+**Casamento de localização no texto livre.** DEC-25 ratifica o comportamento: o casamento locativo ou semântico deve respeitar fronteiras de palavra e não deve interpretar substrings acidentais. Isso vale tanto para nomes de cidade quanto para sinônimos de dimensões de produto. A proposta do gate D2 (evidência) registrava dois defeitos verificados nessa forma de casamento: uma consulta de produto sem intenção geográfica resolvendo para uma cidade cujo nome é substring de outra palavra da frase, e um sinônimo de câmbio de duas letras casando por substring dentro de nomes de cidade e de marca. A parte da proposta que mandava corrigir no caminho novo mantendo o caminho legado intacto é **estratégia de compatibilidade** (ADI-03), não regra desta política.
 
-**Proveniência:** v2.0 §5 · gate D1 · gate D2 · ADI-03.
+**Proveniência:** v2.0 §5 · DEC-25 · ADI-03 · gate D1 (evidência) · gate D2 (evidência) · `pendente` (precedência de origem sem marcador, até a F3).
 
 ---
 
@@ -82,13 +83,15 @@ O motor deve possuir cinco modos geográficos explícitos, e todo contexto de bu
 
 **Raio manual arbitrário.** Um raio informado pelo usuário e válido para a política é sempre intenção manual e deve manter sua medida exata, mesmo quando não corresponde a um dos degraus oferecidos. Um valor como 40 km significa `MANUAL_RADIUS` de 40 km: não deve ser arredondado para 50, não deve ser ignorado e nunca deve voltar silenciosamente para `AUTO_RADIUS`. A interface principal pode continuar oferecendo apenas 0/25/50/75; isso não altera a semântica de um valor manual válido já recebido. Guided Relaxation pode oferecer uma ampliação posterior, mas nunca aplicá-la sem ação explícita. _Refina v2.0 §7: os degraus são presets de UX, não o conjunto dos valores válidos._
 
+**Faixa válida do raio explícito.** Um raio explícito válido é um inteiro de quilômetros entre 0 e 150, inclusive; o máximo corresponde à cobertura pré-computada de `region_memberships`. Valores de 1 a 150 produzem `MANUAL_RADIUS` e preservam exatamente a medida informada, sem conversão para os anéis de UX. Um raio explícito de 0 é escolha geográfica explícita e produz `EXACT_CITY`, com marca de escolha geográfica explícita e expansão automática bloqueada. Valores negativos, não numéricos, fracionários ou superiores a 150 **não** são raios manuais válidos e nunca devem ser silenciosamente arredondados para um valor aceito. O tratamento de UX e de API do valor inválido não é definido por nenhuma fonte normativa: `pendente`. _Delimita DEC-19 e refina v2.0 §7 e §13._
+
 **O degrau de 150 km.** _Conflito: v2.0 §17 e §18 tratam 150 km como degrau de expansão automática especial para buscas de produto de baixa liquidez, com teto automático em 150; DEC-11 retira o 150 da expansão automática e o converte em uma concessão de distância oferecida ao usuário como as demais. Vale DEC-11._ O 150 km só deve ser alcançado por Guided Relaxation, nunca por decisão automática do motor. A parte sobrevivente de v2.0 §18 é a proibição de virar Brasil silenciosamente: só ação explícita transforma a busca em `NATIONAL`.
 
 **Cross-UF.** O raio geográfico deve atravessar fronteira de UF. A UF é atributo administrativo e não deve funcionar como barreira em `AUTO_RADIUS` ou `MANUAL_RADIUS`. A inclusão territorial é decidida por `distance_km <= effective_radius_km`, usando `region_memberships.distance_km` como verdade geográfica; `layer` pode permanecer por compatibilidade ou otimização, mas não deve ser critério funcional de inclusão.
 
 **Distância cidade-a-cidade.** A distância de um anúncio, para fins de descoberta territorial e de ordenação, é a distância entre a cidade de origem e a cidade do anúncio. Não deve haver cálculo geográfico por anúncio.
 
-**Proveniência:** DEC-06 · DEC-11 · DEC-19 · v2.0 §6 · v2.0 §7 · v2.0 §8 · v2.0 §9 · v2.0 §11 · v2.0 §17 · v2.0 §18.
+**Proveniência:** DEC-06 · DEC-11 · DEC-19 · DEC-24 · v2.0 §6 · v2.0 §7 · v2.0 §8 · v2.0 §9 · v2.0 §11 · v2.0 §13 · v2.0 §17 · v2.0 §18 · `pendente` (tratamento do raio explícito inválido).
 
 ---
 
@@ -100,9 +103,9 @@ A política pode calcular um **Specificity Score** a partir das dimensões de pr
 
 Os perfis nomeados pela fonte normativa são `BROWSE_CITY`, `BROWSE_CATEGORY`, `SEARCH_BRAND`, `SEARCH_MODEL`, `SEARCH_MODEL_YEAR` e `SEARCH_VERSION`. Seus alvos estão na seção 6.
 
-**Teto automático por perfil.** O gate D5 define que a interface deve listar apenas os anéis menores ou iguais ao teto automático do perfil, porque oferecer um anel que o motor não honraria é um clique morto; e registra `BROWSE_CITY` com teto 75 e `SEARCH_MODEL` com teto 150. _Conflito: gate D5 admite 150 km como teto automático de `SEARCH_MODEL`; DEC-11 retira o 150 da expansão automática e DEC-18 limita o baseline aos anéis 0/25/50/75. Vale DEC-11 e DEC-18: o teto automático de qualquer perfil é 75 km._ A parte sobrevivente do D5 é a regra de UX: não listar como anel automático um valor que o motor não honra.
+**Teto automático por perfil.** O teto automático de **qualquer** perfil é 75 km: os anéis automáticos são 0/25/50/75, e o 150 km só existe como concessão de Guided Relaxation. A interface não deve listar como anel automático um valor que o motor não honraria. A proposta do gate D5 (evidência) admitia `SEARCH_MODEL` com teto automático de 150 km; DEC-25 a declara **superada** por DEC-11, DEC-18 e DEC-23. O que sobrevive dela é apenas a observação de UX — não oferecer um clique que o motor não cumpre —, e essa observação passa a se apoiar em DEC-11 e DEC-18, não no gate.
 
-**Proveniência:** DEC-11 · DEC-17 · DEC-18 · gate D5 · v2.0 §12 · v2.0 §20.
+**Proveniência:** DEC-11 · DEC-17 · DEC-18 · DEC-23 · DEC-25 · gate D5 (evidência) · v2.0 §12 · v2.0 §20.
 
 ---
 
@@ -131,9 +134,9 @@ _Conflito: v2.0 §19 sugere faixas mais altas (24–40 para "qualquer veículo",
 
 **Teto do automático.** O motor nunca deve transformar uma busca em `NATIONAL` por conta própria. Alcançado o maior anel automático permitido sem atingir o alvo, o motor para de expandir e entra em Guided Relaxation (seção 9).
 
-**Sem fonte independente para este ponto:** qual é o `effective_radius_km` quando o `required_distance_km` excede o maior anel automático permitido — o próprio teto, ou o último anel que acrescentou resultados. DEC-03 descreve a parada no primeiro anel que atinge o alvo e DEC-11 descreve a entrada em Guided Relaxation, mas nenhuma das duas fixa o raio efetivo no caso em que nenhum anel atinge o alvo. `pendente`.
+**Quando nenhum anel automático atinge o alvo.** O `required_distance_km` deve ser **nulo**: não existe distância em que o acumulado atinja o alvo. O `effective_radius_km` **não** deve ser elevado ao teto de 75 km apenas por esse teto ter sido avaliado. Ele deve corresponder ao menor anel que contém integralmente o conjunto final de candidatos — isto é, ao último anel cuja inclusão efetivamente acrescentou candidatos. Anéis posteriores com delta zero não ampliam o território efetivo. Se nenhum anel externo à cidade-base acrescenta nada, o `effective_radius_km` deve ser 0. Em seguida, o contexto entra em Guided Relaxation (seção 9). _Refina DEC-03 e DEC-20, e substitui a proposta do gate D5 (evidência), que exemplificava raio efetivo no teto sem atingir o alvo._
 
-**Proveniência:** DEC-03 · DEC-04 · DEC-11 · DEC-17 · DEC-20 · v2.0 §16 · v2.0 §18 · v2.0 §19 · v2.0 §56 · `pendente` (raio efetivo quando nenhum anel atinge o alvo).
+**Proveniência:** DEC-03 · DEC-04 · DEC-11 · DEC-17 · DEC-20 · DEC-23 · DEC-25 · gate D5 (evidência) · v2.0 §16 · v2.0 §18 · v2.0 §19 · v2.0 §56.
 
 ---
 
@@ -147,9 +150,9 @@ Isso **não** altera a existência da cidade (seção 1), o canonical nem a iden
 
 _Conflito: v2.0 §12 manda a intenção GEO_FORTE abrir em `EXACT_CITY` com raio efetivo 0, e v2.0 §13 descreve a abertura da página de cidade como "0 km implícito" que só migra para `AUTO_RADIUS` quando o usuário inicia uma busca de produto; DEC-03 faz a página nascer em `AUTO_RADIUS`. Vale DEC-03._ Como consequência, o estado "0 km implícito" deixa de existir como estado inicial: o 0 km inicial passa a ser um resultado possível do automático, não um pressuposto.
 
-**O 0 km explícito continua.** Quando o usuário escolhe "apenas esta cidade", existe intenção manual e o modo passa a ser `EXACT_CITY` com marca de escolha explícita. A partir daí, nem um filtro de produto nem o automático podem ampliar o território: escolha manual sempre vence o automático, e o usuário pode retomar o controle em qualquer ponto.
+**O 0 km explícito continua.** Quando o usuário escolhe "apenas esta cidade", existe intenção manual e o modo passa a ser `EXACT_CITY` com marca de escolha explícita. Um raio explícito de 0 recebido pela URL tem exatamente o mesmo efeito (seção 4). A partir daí, nem um filtro de produto nem o automático podem ampliar o território: escolha manual sempre vence o automático, e o usuário pode retomar o controle em qualquer ponto.
 
-**Proveniência:** DEC-03 · DEC-05 · v2.0 §12 · v2.0 §13.
+**Proveniência:** DEC-03 · DEC-05 · DEC-24 · v2.0 §12 · v2.0 §13.
 
 ---
 
@@ -163,15 +166,17 @@ Quando uma busca de produto chega diretamente a `/comprar` com origem conhecida 
 
 O baseline deve ser construído **antes** de permitir que as preferências explícitas de produto provoquem qualquer expansão territorial. O motor não deve ampliar silenciosamente além do baseline.
 
+**Quando não se aplica.** Havendo um raio explícito válido (seção 4), esta seção **não** se aplica: o raio explícito é intenção manual e vence o automático, de modo que o território é o raio informado e não um baseline calculado. Isso vale inclusive para o raio explícito de 0, que produz `EXACT_CITY`.
+
 _Refina v2.0 §12 (intenção PRODUTO sem escolha geográfica manual → `AUTO_RADIUS`) e v2.0 §14–§15 (a busca principal iniciada em uma página de cidade migra para `/comprar` preservando consulta, origem, modo automático e fonte da localização): DEC-18 precisa a ordem das operações — o território-base é construído pela política de navegação da cidade, e só depois o produto é aplicado. A migração descrita em §14–§15 continua válida; o que DEC-18 acrescenta é que o resultado dessa migração não autoriza expansão territorial dirigida pelo produto._
 
-**Proveniência:** DEC-18 · v2.0 §12 · v2.0 §14 · v2.0 §15.
+**Proveniência:** DEC-05 · DEC-18 · DEC-24 · v2.0 §12 · v2.0 §14 · v2.0 §15.
 
 ---
 
 ## 9. Guided Relaxation
 
-**O que dispara.** Quando o resultado fica abaixo do alvo de liquidez depois de o automático ter construído o território inicial útil (seções 6, 7 e 8), o motor **não deve** expandir mais sozinho. Ele deve entrar em Guided Relaxation.
+**O que dispara.** Quando o resultado fica abaixo do alvo de liquidez depois de o automático ter construído o território inicial útil (seções 6, 7 e 8), o motor **não deve** expandir mais sozinho. Ele deve entrar em Guided Relaxation. Isso inclui o caso em que nenhum anel automático atinge o alvo: o território de partida das concessões é o `effective_radius_km` definido pela seção 6 — o último anel que acrescentou candidatos —, não o teto de 75 km.
 
 **Limite das preferências explícitas.** Preferências explícitas do usuário — preço, ano, câmbio, quilometragem, modelo — não autorizam o motor a fazer concessões silenciosas ilimitadas para atingir o alvo.
 
@@ -187,7 +192,7 @@ _Refina v2.0 §12 (intenção PRODUTO sem escolha geográfica manual → `AUTO_R
 
 **Valores da política.** As fontes independentes não fixam os pesos, os custos por dimensão nem os quantums de arredondamento amigável. Valor inicial: `pendente`. DEC-21 proíbe supri-los por invenção.
 
-_Conflito: gate D4 resolve o degrau de preço pela fórmula fixa `ceil(price_max × 1,15 / 1000) × 1000`, e gate D8 fixa números de teste derivados dela; DEC-21 exige a menor concessão útil real, com arredondamento amigável configurável, e proíbe o degrau fixo quando o estoque permite uma concessão menor. Vale DEC-21._ A fórmula de +15% permanece registrada aqui como a resolução anterior do gate, não como norma.
+_Conflito: a proposta do gate D4 (evidência) resolvia o degrau de preço pela fórmula fixa `ceil(price_max × 1,15 / 1000) × 1000`, e a do gate D8 (evidência) fixava números de teste derivados dela; DEC-21 exige a menor concessão útil real, com arredondamento amigável configurável, e proíbe o degrau fixo quando o estoque permite uma concessão menor. Vale DEC-21, e DEC-25 declara as duas propostas superadas._ A fórmula de +15% permanece registrada aqui como a proposta anterior do gate, não como norma.
 
 **O que o motor não faz.** Nenhuma alternativa deve ser aplicada sem ação explícita do usuário. Nenhum modelo de linguagem participa do cálculo ou da ordenação. Uma alternativa cujo delta conhecido seja zero não deve ser apresentada (seção 13). O motor deve apresentar no máximo as melhores opções definidas pela política — inicialmente até três.
 
@@ -195,7 +200,7 @@ _Conflito: gate D4 resolve o degrau de preço pela fórmula fixa `ceil(price_max
 
 _Conflito: v2.0 §17–§18 fazem o automático expandir até o teto de 150 km antes de parar; DEC-11 encerra a expansão automática no território inicial útil e transforma o 150 em concessão oferecida. Vale DEC-11._
 
-**Proveniência:** DEC-10 · DEC-11 · DEC-12 · DEC-14 · DEC-21 · gate D4 · gate D8 · v2.0 §17 · v2.0 §18 · v2.0 §28 · `pendente` (pesos, custos e quantums de arredondamento).
+**Proveniência:** DEC-10 · DEC-11 · DEC-12 · DEC-14 · DEC-21 · DEC-23 · DEC-25 · gate D4 (evidência) · gate D8 (evidência) · v2.0 §17 · v2.0 §18 · v2.0 §28 · `pendente` (pesos, custos e quantums de arredondamento).
 
 ---
 
@@ -219,9 +224,9 @@ O `CandidateScope` é a fonte única de verdade da busca: grid, contagem total e
 
 As projeções derivadas — facetas self-excluding e cálculo de relaxações — podem remover deliberadamente **uma única** restrição para responder à sua própria pergunta. Essa remoção controlada é parte do contrato, não uma exceção a ele: o que fica proibido é construir um escopo independente.
 
-**Resolução do gate D3.** O território deve ser materializado como um conjunto explícito de cidades elegíveis, derivado de `region_memberships` por `distance_km <= raio`, e esse mesmo conjunto deve ser compartilhado por todas as consultas do ciclo (grid, contagem, facetas e relaxações). O gate mediu 82 cidades para 75 km e 223 para 150 km a partir de uma origem piloto — `gate D3 (evidência)` para dimensionamento, não norma.
+**Forma do escopo.** O território deve ser materializado como um conjunto de cidades elegíveis derivado de `region_memberships` por `distance_km <= raio`, e esse mesmo conjunto deve ser compartilhado por todas as consultas do ciclo (grid, contagem, facetas e relaxações). DEC-25 ratifica **o princípio** da proposta do gate D3 pela via de DEC-08: a unicidade do escopo é norma; a forma SQL de passá-lo às consultas é implementação, não norma. O gate D3 (evidência) mediu 82 cidades para 75 km e 223 para 150 km a partir de uma origem piloto — número útil para dimensionamento, não regra.
 
-**Proveniência:** DEC-08 · gate D3 · v2.0 §39.
+**Proveniência:** DEC-08 · DEC-25 · gate D3 (evidência) · v2.0 §39.
 
 ---
 
@@ -255,13 +260,13 @@ As facetas devem ser guiadas pelo estoque e derivadas das mesmas regras do `Cand
 
 **Zero conhecido, regra geral.** A interface não deve oferecer filtro, valor de faceta, expansão territorial ou concessão que o motor já sabe produzir zero resultados adicionais. Restrições e chips já ativos permanecem visíveis mesmo em estado zero, pelo mesmo motivo. Estados zero causados por URL antiga, mudança de estoque, cache ou condição concorrente **não** devem ser tratados como impossíveis: entram no fluxo de recuperação e no Guided Relaxation.
 
-**Facetas de baixo poder discriminativo.** Podem permanecer recolhidas em "Mais filtros", sem deixar de estar disponíveis ao usuário quando possuírem opções reais.
+**Facetas de baixo poder discriminativo.** Podem permanecer recolhidas em "Mais filtros", sem deixar de estar disponíveis ao usuário quando possuírem opções reais. Preço é a exceção: ver abaixo.
 
-**Resolução do gate D6.** O gate resolve que a escolha de quais facetas abrem por padrão segue a regra de maior poder discriminativo, e registra que, com o estoque medido, preço fica recolhido em "Mais filtros" por perder para modelo, marca e ano. DEC-13 confirma esse desenho. O próprio gate levanta a alternativa — se preço deve abrir sempre, isso é regra de produto — e essa alternativa não foi decidida por nenhuma fonte normativa: ver seção 11 do relatório de perguntas.
+**Preço é filtro primário permanente.** A dimensão de preço deve permanecer disponível no conjunto principal de filtros **independentemente** de entropia, ganho de informação ou poder discriminativo calculado para o contexto de busca. A política adaptativa pode determinar quais **outras** dimensões ocupam os filtros principais e quais ficam em "Mais filtros", mas não pode rebaixar preço por esse critério. Isso não isenta preço das demais regras: seus counts, faixas e disponibilidade continuam derivados do `CandidateScope` e sujeitos às regras de zero conhecido acima. _A proposta do gate D6 (evidência) deixava preço recolhido por perder em entropia para modelo, marca e ano, e registrava a pergunta como regra de produto em aberto; DEC-22 a decide e DEC-25 declara a proposta superada._
 
-**Instrução E2.** Sem fonte independente; a única fonte conhecida é o relatório da F2, que esta tarefa não pode consultar. `pendente`.
+**Instrução E2.** Sem fonte independente; a única fonte conhecida é o relatório da F2, que esta especificação não pode consultar (MET-01). `pendente`.
 
-**Proveniência:** DEC-13 · DEC-14 · gate D6 · v2.0 §39 · v2.0 §40 · `pendente` (E2).
+**Proveniência:** DEC-13 · DEC-14 · DEC-22 · DEC-25 · gate D6 (evidência) · v2.0 §39 · v2.0 §40 · `pendente` (E2).
 
 ---
 
@@ -325,13 +330,13 @@ A rota territorial é `/carros-em/[cidade]`; a superfície transacional é `/com
 
 Parâmetros transacionais — consulta, raio, ordenação, filtros e escopo — **não** devem criar automaticamente novas landings indexáveis. A política de canonical e noindex existente deve ser preservada e apenas estendida para reconhecer os parâmetros novos.
 
-O parâmetro de raio é transacional nesse sentido e, ao mesmo tempo, tem seu valor honrado exatamente: `raio=40` não cria landing e também não é arredondado para 50 (seção 4).
+O parâmetro de raio é transacional nesse sentido e, ao mesmo tempo, tem seu valor honrado exatamente quando válido: `raio=40` não cria landing e também não é arredondado para 50. A faixa de validade é um inteiro entre 0 e 150, inclusive; fora dela o valor não é raio manual válido e não deve ser arredondado para um valor aceito (seção 4).
 
 A rota regional legada não deve ser dependência deste sistema. Ela pode permanecer temporariamente por compatibilidade, não deve ser apagada sem auditoria de referências externas, não deve ser usada como núcleo da nova navegação, e mantém noindex e canonical atuais até estratégia posterior.
 
 A nomenclatura real dos parâmetros deve ser definida contra a política de URL existente; este documento fixa a semântica, não os nomes.
 
-**Proveniência:** DEC-19 · v2.0 §51 · v2.0 §53 · v2.0 §54.
+**Proveniência:** DEC-19 · DEC-24 · v2.0 §51 · v2.0 §53 · v2.0 §54.
 
 ---
 
@@ -347,71 +352,71 @@ Em particular, a regra de existência é reafirmada como invariável: cidade com
 
 ## 20. Divergências D1–D8 do gate
 
-O gate `978c6715` levantou oito divergências entre o prompt que o originou e o que seu autor propunha fazer. Cada uma é registrada abaixo com o tema, a resolução do gate e o efeito de decisões posteriores.
+O gate `978c6715` levantou oito divergências entre o prompt que o originou e o que seu autor propunha fazer. Nunca houve aprovação em bloco dessas oito propostas. DEC-25 as dispôs **uma a uma** — ratificando algumas, substituindo as demais — e, a partir dela, o gate deixou de ser fonte normativa e passou a evidência histórica. Esta seção registra, para cada divergência, o tema, o que o gate propunha e a disposição de DEC-25. Nada aqui é norma por si: a norma é a DEC citada em cada caso.
 
 ### D1 — origem na URL sem marcador de procedência
 
 **Tema.** O prompt definia `USER_SELECTED` como a origem acompanhada de um marcador explícito de que o frontend a colocou ali.
-**Resolução do gate.** Tratar a origem sozinha como `USER_SELECTED`: o parâmetro só existe porque alguém o escolheu.
-**Decisões posteriores.** Nenhuma DEC altera. DEC-18 esclarece o alcance: a origem ser `USER_SELECTED` não implica raio manual, e por isso não impede o baseline automático.
-**Onde entra:** seção 3.
+**Proposta do gate.** Tratar a origem sozinha como `USER_SELECTED`: o parâmetro só existe porque alguém o escolheu.
+**Disposição (DEC-25).** **Não ratificada.** A presença do parâmetro numa URL não prova ação manual, e a precedência `USER_SELECTED` exige marcador de procedência. Pendente, a definir antes da F3 — que é quem gera as URLs.
+**Onde entra:** seção 3, como `pendente`.
 
 ### D2 — casamento de localização por substring no texto livre
 
 **Tema.** O prompt mandava corrigir o parser compartilhado de busca livre.
-**Resolução do gate.** Corrigir dentro do caminho novo, deixando o caminho legado intocado, porque corrigir no parser compartilhado mudaria o comportamento servido com a flag desligada. Os dois defeitos são reais e verificados: uma consulta de produto sem intenção geográfica resolvia para uma cidade cujo nome é substring de outra palavra da frase, e um sinônimo de câmbio de duas letras casava por substring dentro de nomes de cidade e de marca.
-**Decisões posteriores.** ADI-03 confirma o princípio de que o caminho legado com a flag desligada é preservado.
+**Proposta do gate.** Corrigir dentro do caminho novo, deixando o caminho legado intocado, porque corrigir no parser compartilhado mudaria o comportamento servido com a flag desligada. Os dois defeitos são reais e verificados: uma consulta de produto sem intenção geográfica resolvia para uma cidade cujo nome é substring de outra palavra da frase, e um sinônimo de câmbio de duas letras casava por substring dentro de nomes de cidade e de marca.
+**Disposição (DEC-25).** **Ratificado o comportamento**: o casamento locativo ou semântico respeita fronteiras de palavra e não interpreta substrings acidentais. A parte "corrigir no caminho novo e manter o parser legado intacto" é estratégia de compatibilidade (ADI-03), **não** regra da política.
 **Onde entra:** seção 3.
 
 ### D3 — como o território chega às consultas
 
 **Tema.** Passar o território como conjunto explícito de cidades ou como subconsulta sobre `region_memberships`.
-**Resolução do gate.** Manter o conjunto explícito, medindo o custo: 82 cidades para 75 km e 223 para 150 km a partir da origem piloto. O gate registra a alternativa por subconsulta como troca possível.
-**Decisões posteriores.** DEC-08 acrescenta o requisito de que o conjunto seja o **mesmo** para grid, contagem, facetas e relaxações — a forma de passá-lo é implementação; a unicidade é norma.
+**Proposta do gate.** Manter o conjunto explícito, medindo o custo: 82 cidades para 75 km e 223 para 150 km a partir da origem piloto. O gate registra a alternativa por subconsulta como troca possível.
+**Disposição (DEC-25).** **Ratificado o princípio**, por DEC-08: o escopo é único e compartilhado por grid, contagem, facetas e relaxações. A forma SQL é implementação, não norma.
 **Onde entra:** seção 11.
 
 ### D4 — degrau de preço na relaxação
 
 **Tema.** O prompt dava uma fórmula de degrau fixo e, em outro ponto, um valor que não sai dela.
-**Resolução do gate.** Seguir a fórmula `ceil(price_max × 1,15 / 1000) × 1000`.
-**Decisões posteriores.** _Conflito: DEC-21 exige a menor concessão útil real, com arredondamento amigável configurável que continue incluindo o candidato que a justificou, e proíbe aplicar percentual ou degrau fixo quando o estoque permite concessão menor. Vale DEC-21._
+**Proposta do gate.** Seguir a fórmula `ceil(price_max × 1,15 / 1000) × 1000`.
+**Disposição (DEC-25).** **Superada por DEC-21**, que exige a menor concessão útil real, com arredondamento amigável configurável que continue incluindo o candidato que a justificou, e proíbe aplicar percentual ou degrau fixo quando o estoque permite concessão menor.
 **Onde entra:** seção 9.
 
 ### D5 — quais anéis a interface lista
 
 **Tema.** Quais degraus oferecer ao usuário.
-**Resolução do gate.** Listar apenas os anéis menores ou iguais ao teto automático do perfil, porque oferecer um anel que o motor não honra é um clique morto; com `BROWSE_CITY` em 75 e `SEARCH_MODEL` em 150.
-**Decisões posteriores.** _Conflito: DEC-11 retira o 150 km da expansão automática e DEC-18 limita o baseline a 0/25/50/75. Vale DEC-11 e DEC-18._ A regra de UX do D5 sobrevive; o teto de 150 para perfis de busca, não.
-**Onde entra:** seções 4 e 5.
+**Proposta do gate.** Listar apenas os anéis menores ou iguais ao teto automático do perfil, porque oferecer um anel que o motor não honra é um clique morto; com `BROWSE_CITY` em 75 e `SEARCH_MODEL` em 150.
+**Disposição (DEC-25).** **Superada por DEC-11, DEC-18 e DEC-23**: o 150 km sai da expansão automática, o baseline fica em 0/25/50/75 e o raio efetivo abaixo do alvo não sobe ao teto. A observação de UX — não oferecer um clique que o motor não cumpre — sobrevive apoiada em DEC-11 e DEC-18, não no gate.
+**Onde entra:** seções 4, 5 e 6.
 
 ### D6 — preço recolhido em "Mais filtros"
 
 **Tema.** Quais facetas abrem por padrão.
-**Resolução do gate.** Cumprir a regra de maior poder discriminativo, registrando que, com o estoque medido, preço perde para modelo, marca e ano e fica recolhido. O gate deixa a pergunta aberta: se preço deve abrir sempre, é regra de produto.
-**Decisões posteriores.** DEC-13 confirma o desenho — baixo poder discriminativo pode ficar em "Mais filtros", desde que disponível quando houver opções reais. A pergunta aberta do gate não foi decidida por nenhuma fonte normativa.
+**Proposta do gate.** Cumprir a regra de maior poder discriminativo, registrando que, com o estoque medido, preço perde para modelo, marca e ano e fica recolhido. O gate deixa a pergunta aberta: se preço deve abrir sempre, é regra de produto.
+**Disposição (DEC-25).** **Superada por DEC-22**, que responde a pergunta aberta: preço é filtro primário permanente e não pode ser rebaixado por entropia. DEC-13 continua valendo para as demais dimensões.
 **Onde entra:** seção 13.
 
 ### D7 — forma da consulta de liquidez
 
 **Tema.** Contagem de liquidez inline por junção externa ou agregada por cidade.
-**Resolução do gate.** Subconsulta agregada por cidade, porque o guard de anúncio inválido depende de um dado que não está disponível na condição da junção externa — o mesmo modo de falha de um defeito anterior conhecido do projeto.
-**Decisões posteriores.** DEC-20 torna a forma agregada por cidade parte da norma, e não apenas escolha de implementação: a avaliação de liquidez usa contagens agrupadas por cidade associadas ao `distance_km` exato.
+**Proposta do gate.** Subconsulta agregada por cidade, porque o guard de anúncio inválido depende de um dado que não está disponível na condição da junção externa — o mesmo modo de falha de um defeito anterior conhecido do projeto.
+**Disposição (DEC-25).** **Ratificada a semântica**, por DEC-20: a avaliação de liquidez agrupa candidatos por cidade, com o `distance_km` exato de cada uma. A forma SQL não é norma.
 **Onde entra:** seção 6.
 
 ### D8 — números fixados no teste de relaxação
 
 **Tema.** Os deltas esperados no cenário de aceitação.
-**Resolução do gate.** Fixar o teste nos valores medidos no snapshot, incluindo o teto de preço derivado da fórmula do D4.
-**Decisões posteriores.** _Conflito: os números de preço herdam a fórmula fixa do D4, superada por DEC-21. Vale DEC-21; os deltas de preço do D8 deixam de ser esperados normativos._ O delta de câmbio, que não depende da fórmula, não é afetado.
+**Proposta do gate.** Fixar o teste nos valores medidos no snapshot, incluindo o teto de preço derivado da fórmula do D4.
+**Disposição (DEC-25).** **Não normativo; superado por DEC-21.** Os deltas medidos no snapshot são evidência de uma medição pontual, não esperados normativos.
 **Onde entra:** seções 9 e 23.
 
-**Proveniência:** ADI-03 · DEC-08 · DEC-11 · DEC-13 · DEC-18 · DEC-20 · DEC-21 · gate D1 · gate D2 · gate D3 · gate D4 · gate D5 · gate D6 · gate D7 · gate D8.
+**Proveniência:** ADI-03 · DEC-08 · DEC-11 · DEC-13 · DEC-18 · DEC-20 · DEC-21 · DEC-22 · DEC-23 · DEC-25 · gate D1–D8 (evidência).
 
 ---
 
 ## 21. Instruções A e E1–E4
 
-Estas instruções pertencem à aprovação do gate da F2 e à mensagem "SQL OK", que não foram anexadas a esta tarefa.
+Estas instruções pertencem à aprovação do gate da F2 e à mensagem "SQL OK". DEC-25 registra que **não existiu aprovação em bloco** das oito propostas do gate; o texto das instruções A e E1–E4 continua sem fonte independente conhecida. O `pendente` abaixo, portanto, não é a espera de um anexo que exista em algum lugar: é a constatação de que a única fonte conhecida é o relatório da F2, vedado por MET-01.
 
 ### Instrução A — cache
 
@@ -471,19 +476,19 @@ Os pontos abaixo estão previstos como evolução. Não são exigidos das próxi
 
 Os cenários funcionais da v2.0 §59 e os testes técnicos da v2.0 §60 permanecem, com as revisões abaixo.
 
-| v2.0                                                        | Situação na v3                                                                                                                                                                                                                                                                                                                          |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §59 A — cidade pura mostra só a própria cidade              | _Conflito: §59 A espera a página abrir somente com a cidade; DEC-03 faz a página nascer em `AUTO_RADIUS`. Vale DEC-03._ O cenário passa a esperar o menor território útil, com 0 km apenas quando o estoque próprio já atinge o alvo, e declaração do raio quando maior que 0                                                           |
-| §59 B — 25 km manual                                        | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §59 C — 50 km manual inclui cidade de outra UF              | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §59 D — produto sem raio manual usa automático              | Mantido, com o baseline de `/comprar` da seção 8                                                                                                                                                                                                                                                                                        |
-| §59 E — produto com "apenas a cidade" explícito não expande | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §59 F — Destaque distante vence Pró local                   | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §59 G — mesmo peso, local primeiro                          | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §59 H — anúncio fora do raio nunca entra                    | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §59 I — poucos resultados até 150 km não vira nacional      | Mantido quanto a não virar nacional; o caminho até 150 km deixa de ser automático e passa por Guided Relaxation (DEC-11)                                                                                                                                                                                                                |
-| §59 J — modelo errado com peso maior não entra              | Mantido                                                                                                                                                                                                                                                                                                                                 |
-| §60 — lista de testes técnicos                              | Mantida, com três ajustes: "filtro manual impede AUTO" ganha o caso de raio manual arbitrário (DEC-19); "AUTO usa menor raio útil" ganha a distinção `required_distance_km` × `effective_radius_km` (DEC-20); "AUTO respeita teto" passa a significar teto 75 km com entrega a Guided Relaxation, não expansão até 150 (DEC-11, DEC-18) |
+| v2.0                                                        | Situação na v3                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §59 A — cidade pura mostra só a própria cidade              | _Conflito: §59 A espera a página abrir somente com a cidade; DEC-03 faz a página nascer em `AUTO_RADIUS`. Vale DEC-03._ O cenário passa a esperar o menor território útil, com 0 km apenas quando o estoque próprio já atinge o alvo, e declaração do raio quando maior que 0                                                                                                                                                            |
+| §59 B — 25 km manual                                        | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §59 C — 50 km manual inclui cidade de outra UF              | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §59 D — produto sem raio manual usa automático              | Mantido, com o baseline de `/comprar` da seção 8                                                                                                                                                                                                                                                                                                                                                                                         |
+| §59 E — produto com "apenas a cidade" explícito não expande | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §59 F — Destaque distante vence Pró local                   | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §59 G — mesmo peso, local primeiro                          | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §59 H — anúncio fora do raio nunca entra                    | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §59 I — poucos resultados até 150 km não vira nacional      | Mantido quanto a não virar nacional; o caminho até 150 km deixa de ser automático e passa por Guided Relaxation (DEC-11)                                                                                                                                                                                                                                                                                                                 |
+| §59 J — modelo errado com peso maior não entra              | Mantido                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| §60 — lista de testes técnicos                              | Mantida, com três ajustes: "filtro manual impede AUTO" ganha o caso de raio manual arbitrário (DEC-19); "AUTO usa menor raio útil" ganha a distinção `required_distance_km` × `effective_radius_km` (DEC-20); "AUTO respeita teto" passa a significar teto 75 km com entrega a Guided Relaxation, não expansão até 150 (DEC-11, DEC-18), e o raio efetivo abaixo do alvo é o último anel que acrescentou candidatos, não o teto (DEC-23) |
 
 **Não reproduzido.** A v2.0 §61 (governança de branch antes de implementar) está obsoleta: a governança foi resolvida na F0, em sentido diferente do descrito lá. Não integra esta especificação.
 
@@ -497,81 +502,90 @@ Os cenários funcionais da v2.0 §59 e os testes técnicos da v2.0 §60 permanec
 
 Cada invariante é um requisito atômico, testável por um único caso.
 
-| ID         | Enunciado                                                                                                                               | Proveniência               |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| V3-INV-001 | Cidade com 0 `ACTIVE` próprio responde 404 na rota territorial                                                                          | DEC-02                     |
-| V3-INV-002 | Anúncios de cidades vizinhas nunca criam nem mantêm a existência de uma cidade                                                          | DEC-01                     |
-| V3-INV-003 | `/carros-em/[cidade]` inicia em perfil `BROWSE_CITY` com modo `AUTO_RADIUS`                                                             | DEC-03                     |
-| V3-INV-004 | Raio efetivo maior que 0 é declarado no copy da página territorial                                                                      | DEC-03                     |
-| V3-INV-005 | O automático escolhe o menor anel permitido que atinge o alvo                                                                           | DEC-04                     |
-| V3-INV-006 | Um raio manual de N km permanece exatamente N, sem arredondar para anel                                                                 | DEC-19                     |
-| V3-INV-007 | `required_distance_km` e `effective_radius_km` são grandezas distintas e ambas observáveis                                              | DEC-20                     |
-| V3-INV-008 | Cidade de outra UF entra se `distance_km <= effective_radius_km`                                                                        | DEC-06                     |
-| V3-INV-009 | Filtro explícito de produto não provoca expansão territorial silenciosa                                                                 | DEC-10                     |
-| V3-INV-010 | O anel de 150 km só é alcançado por Guided Relaxation, nunca automaticamente                                                            | DEC-11                     |
-| V3-INV-011 | Nenhuma concessão de Guided Relaxation é aplicada sem ação explícita do usuário                                                         | DEC-21                     |
-| V3-INV-012 | Concessão com delta conhecido igual a zero não é apresentada                                                                            | DEC-14 · DEC-21            |
-| V3-INV-013 | A menor concessão útil precede qualquer percentual ou degrau fixo                                                                       | DEC-21                     |
-| V3-INV-014 | No máximo três concessões são apresentadas por vez                                                                                      | DEC-21                     |
-| V3-INV-015 | Modelo alternativo nunca aparece como relaxação; aparece como recomendação separada                                                     | DEC-12                     |
-| V3-INV-016 | Entrada direta em `/comprar` constrói o território-base antes de aplicar as dimensões de produto                                        | DEC-18                     |
-| V3-INV-017 | Dentro do território, o peso comercial vence a distância                                                                                | DEC-07                     |
-| V3-INV-018 | Anúncio fora do território nunca entra, qualquer que seja o seu peso                                                                    | DEC-07                     |
-| V3-INV-019 | Grid, contagem total e facetas saem do mesmo `CandidateScope`                                                                           | DEC-08                     |
-| V3-INV-020 | A faceta ativa é calculada removendo apenas a própria restrição                                                                         | DEC-13                     |
-| V3-INV-021 | Opção de faceta com `count = 0` não é oferecida como nova escolha                                                                       | DEC-14                     |
-| V3-INV-022 | A opção ativa com `count = 0` permanece visível e removível                                                                             | DEC-13 · DEC-14            |
-| V3-INV-023 | No caminho novo, a ordenação completa ocorre antes de `LIMIT`/`OFFSET`                                                                  | v2.0 §37 · ADI-03          |
-| V3-INV-024 | A paginação é estável: a página 2 não repete card da página 1                                                                           | v2.0 §38                   |
-| V3-INV-025 | Nenhum modelo de linguagem participa de elegibilidade, peso, paginação, expiração de Destaque, regras de cidade ou relaxação            | v2.0 §46 · DEC-21          |
-| V3-INV-026 | O limiar de indexação SEO é regra separada da existência da cidade e não é alterado por esta política                                   | v2.0 §2.2                  |
-| V3-INV-027 | Mudar o raio não altera canonical, H1 nem identidade da página territorial                                                              | v2.0 §2.3 · DEC-03         |
-| V3-INV-028 | Uma fonte de localização de menor precedência não sobrescreve uma de maior                                                              | v2.0 §5                    |
-| V3-INV-029 | Origem presente na URL sem marcador de procedência resolve como `USER_SELECTED`                                                         | gate D1                    |
-| V3-INV-030 | O texto livre não move a origem por casamento de substring dentro de outra palavra                                                      | gate D2                    |
-| V3-INV-031 | A correção do casamento de texto vive no caminho novo; o legado com a flag desligada fica intocado                                      | gate D2 · ADI-03           |
-| V3-INV-032 | Todo contexto de busca carrega exatamente um dos cinco modos geográficos                                                                | v2.0 §6                    |
-| V3-INV-033 | `STATE` e `NATIONAL` só são alcançados por ação explícita do usuário                                                                    | v2.0 §6 · v2.0 §18         |
-| V3-INV-034 | A distância de um anúncio é a distância entre a cidade de origem e a cidade do anúncio                                                  | v2.0 §11                   |
-| V3-INV-035 | A inclusão territorial é decidida por `distance_km`, nunca por `layer`                                                                  | DEC-06 · v2.0 §9           |
-| V3-INV-036 | Com 0 km explícito, um filtro de produto não amplia o território                                                                        | DEC-05 · v2.0 §13          |
-| V3-INV-037 | O usuário pode voltar de `MANUAL_RADIUS` para `AUTO_RADIUS` por ação explícita                                                          | DEC-05 · v2.0 §50          |
-| V3-INV-038 | Os alvos de liquidez vêm de `platform_settings`, não de constante no código                                                             | DEC-17                     |
-| V3-INV-039 | Os alvos iniciais são 20/16/16/12/8/4 para os seis perfis nomeados                                                                      | DEC-17                     |
-| V3-INV-040 | A interface não lista um anel acima do teto automático do perfil                                                                        | gate D5 · DEC-11           |
-| V3-INV-041 | `commercial_model` é faceta e filtro por igualdade case-insensitive, com peso A no vetor de busca                                       | DEC-09                     |
-| V3-INV-042 | A descrição FIPE completa é preservada e não é usada como modelo comercial                                                              | v2.0 §23                   |
-| V3-INV-043 | A busca textual continua sobre o vetor de busca e não é substituída por `ILIKE`                                                         | v2.0 §26                   |
-| V3-INV-044 | Um veículo de outro modelo não entra no conjunto principal, mesmo com peso maior                                                        | v2.0 §28 · v2.0 §59 J      |
-| V3-INV-045 | O peso efetivo é o máximo entre 4 com Destaque ativo e o peso do plano                                                                  | v2.0 §29                   |
-| V3-INV-046 | Destaque expirado volta ao peso do plano                                                                                                | v2.0 §29 · v2.0 §60        |
-| V3-INV-047 | Entre anúncios de mesmo peso, a ordem é por distância crescente                                                                         | DEC-07 · v2.0 §32          |
-| V3-INV-048 | A ordenação distance-first histórica não é reintroduzida                                                                                | v2.0 §33                   |
-| V3-INV-049 | O ranking termina com um desempate determinístico                                                                                       | v2.0 §38                   |
-| V3-INV-050 | A chave de cache inclui modo geográfico, origem, raio e versão de política                                                              | v2.0 §41                   |
-| V3-INV-051 | Toda busca carrega uma `search_policy_version`                                                                                          | v2.0 §43                   |
-| V3-INV-052 | A telemetria da fase atual é um único evento `search.executed` com payload de contexto                                                  | ADI-01                     |
-| V3-INV-053 | O payload de `search.executed` inclui `required_distance_km` e `effective_radius_km`                                                    | DEC-20 · ADI-01            |
-| V3-INV-054 | Em `EXACT_CITY`, o copy nomeia apenas a cidade e não diz "e região"                                                                     | v2.0 §52                   |
-| V3-INV-055 | Com raio manual arbitrário, o copy declara o valor exato, não o degrau mais próximo                                                     | DEC-19 · v2.0 §52          |
-| V3-INV-056 | Parâmetros transacionais não criam landing indexável                                                                                    | v2.0 §53                   |
-| V3-INV-057 | O parâmetro de raio é transacional e tem seu valor honrado exatamente                                                                   | DEC-19 · v2.0 §53          |
-| V3-INV-058 | Esta política não altera existência territorial, canonical, sitemap, layout, header, pagamento ou módulos legais                        | v2.0 §62 · DEC-01 · DEC-02 |
-| V3-INV-059 | Uma cidade sem página não ganha rota territorial por ser usada como origem de busca                                                     | DEC-15 · DEC-01            |
-| V3-INV-060 | Relaxar preço, ano, câmbio, quilometragem ou distância preserva o mesmo produto                                                         | DEC-12                     |
-| V3-INV-061 | As relaxações não são ordenadas apenas por quantidade acrescentada                                                                      | DEC-21                     |
-| V3-INV-062 | Custos, arredondamentos e pesos de relaxação são configuração versionada, não lógica no frontend                                        | DEC-21                     |
-| V3-INV-063 | O arredondamento amigável do teto de preço continua incluindo o candidato que justificou a sugestão                                     | DEC-21                     |
-| V3-INV-064 | Uma faceta não ativa respeita todas as restrições ativas                                                                                | DEC-13 · v2.0 §40          |
-| V3-INV-065 | Grid, total e facetas compartilham o mesmo território, não só o mesmo produto                                                           | DEC-08                     |
-| V3-INV-066 | A relaxação de distância usa o primeiro anel permitido acima do território atual que acrescenta resultados                              | DEC-21                     |
-| V3-INV-067 | Estado zero vindo de URL antiga, estoque, cache ou concorrência entra em recuperação e Guided Relaxation, não é tratado como impossível | DEC-14                     |
-| V3-INV-068 | O território-base de `/comprar` fica limitado aos anéis 0/25/50/75 km                                                                   | DEC-18                     |
-| V3-INV-069 | A avaliação de liquidez agrupa candidatos por cidade, com o `distance_km` exato de cada uma                                             | DEC-20 · gate D7           |
+| ID         | Enunciado                                                                                                                                                               | Proveniência               |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| V3-INV-001 | Cidade com 0 `ACTIVE` próprio responde 404 na rota territorial                                                                                                          | DEC-02                     |
+| V3-INV-002 | Anúncios de cidades vizinhas nunca criam nem mantêm a existência de uma cidade                                                                                          | DEC-01                     |
+| V3-INV-003 | `/carros-em/[cidade]` inicia em perfil `BROWSE_CITY` com modo `AUTO_RADIUS`                                                                                             | DEC-03                     |
+| V3-INV-004 | Raio efetivo maior que 0 é declarado no copy da página territorial                                                                                                      | DEC-03                     |
+| V3-INV-005 | O automático escolhe o menor anel permitido que atinge o alvo                                                                                                           | DEC-04                     |
+| V3-INV-006 | Um raio manual válido de N km permanece exatamente N, sem arredondar para anel                                                                                          | DEC-19 · DEC-24            |
+| V3-INV-007 | `required_distance_km` e `effective_radius_km` são grandezas distintas e ambas observáveis                                                                              | DEC-20                     |
+| V3-INV-008 | Cidade de outra UF entra se `distance_km <= effective_radius_km`                                                                                                        | DEC-06                     |
+| V3-INV-009 | Filtro explícito de produto não provoca expansão territorial silenciosa                                                                                                 | DEC-10                     |
+| V3-INV-010 | O anel de 150 km só é alcançado por Guided Relaxation, nunca automaticamente                                                                                            | DEC-11                     |
+| V3-INV-011 | Nenhuma concessão de Guided Relaxation é aplicada sem ação explícita do usuário                                                                                         | DEC-21                     |
+| V3-INV-012 | Concessão com delta conhecido igual a zero não é apresentada                                                                                                            | DEC-14 · DEC-21            |
+| V3-INV-013 | A menor concessão útil precede qualquer percentual ou degrau fixo                                                                                                       | DEC-21                     |
+| V3-INV-014 | No máximo três concessões são apresentadas por vez                                                                                                                      | DEC-21                     |
+| V3-INV-015 | Modelo alternativo nunca aparece como relaxação; aparece como recomendação separada                                                                                     | DEC-12                     |
+| V3-INV-016 | Entrada direta em `/comprar` constrói o território-base antes de aplicar as dimensões de produto                                                                        | DEC-18                     |
+| V3-INV-017 | Dentro do território, o peso comercial vence a distância                                                                                                                | DEC-07                     |
+| V3-INV-018 | Anúncio fora do território nunca entra, qualquer que seja o seu peso                                                                                                    | DEC-07                     |
+| V3-INV-019 | Grid, contagem total e facetas saem do mesmo `CandidateScope`                                                                                                           | DEC-08                     |
+| V3-INV-020 | A faceta ativa é calculada removendo apenas a própria restrição                                                                                                         | DEC-13                     |
+| V3-INV-021 | Opção de faceta com `count = 0` não é oferecida como nova escolha                                                                                                       | DEC-14                     |
+| V3-INV-022 | A opção ativa com `count = 0` permanece visível e removível                                                                                                             | DEC-13 · DEC-14            |
+| V3-INV-023 | No caminho novo, a ordenação completa ocorre antes de `LIMIT`/`OFFSET`                                                                                                  | v2.0 §37 · ADI-03          |
+| V3-INV-024 | A paginação é estável: a página 2 não repete card da página 1                                                                                                           | v2.0 §38                   |
+| V3-INV-025 | Nenhum modelo de linguagem participa de elegibilidade, peso, paginação, expiração de Destaque, regras de cidade ou relaxação                                            | v2.0 §46 · DEC-21          |
+| V3-INV-026 | O limiar de indexação SEO é regra separada da existência da cidade e não é alterado por esta política                                                                   | v2.0 §2.2                  |
+| V3-INV-027 | Mudar o raio não altera canonical, H1 nem identidade da página territorial                                                                                              | v2.0 §2.3 · DEC-03         |
+| V3-INV-028 | Uma fonte de localização de menor precedência não sobrescreve uma de maior                                                                                              | v2.0 §5                    |
+| V3-INV-029 | _Retirada por DEC-25 — a proposta do gate D1 não foi ratificada; a precedência de uma origem sem marcador fica pendente até a F3. O identificador não é reaproveitado._ | DEC-25 · `pendente`        |
+| V3-INV-030 | O texto livre não move a origem por casamento de substring dentro de outra palavra                                                                                      | DEC-25                     |
+| V3-INV-031 | A correção do casamento de texto vive no caminho novo; o legado com a flag desligada fica intocado — compatibilidade, não regra de política                             | ADI-03 · DEC-25            |
+| V3-INV-032 | Todo contexto de busca carrega exatamente um dos cinco modos geográficos                                                                                                | v2.0 §6                    |
+| V3-INV-033 | `STATE` e `NATIONAL` só são alcançados por ação explícita do usuário                                                                                                    | v2.0 §6 · v2.0 §18         |
+| V3-INV-034 | A distância de um anúncio é a distância entre a cidade de origem e a cidade do anúncio                                                                                  | v2.0 §11                   |
+| V3-INV-035 | A inclusão territorial é decidida por `distance_km`, nunca por `layer`                                                                                                  | DEC-06 · v2.0 §9           |
+| V3-INV-036 | Com 0 km explícito, um filtro de produto não amplia o território                                                                                                        | DEC-05 · v2.0 §13          |
+| V3-INV-037 | O usuário pode voltar de `MANUAL_RADIUS` para `AUTO_RADIUS` por ação explícita                                                                                          | DEC-05 · v2.0 §50          |
+| V3-INV-038 | Os alvos de liquidez vêm de `platform_settings`, não de constante no código                                                                                             | DEC-17                     |
+| V3-INV-039 | Os alvos iniciais são 20/16/16/12/8/4 para os seis perfis nomeados                                                                                                      | DEC-17                     |
+| V3-INV-040 | A interface não lista como anel automático um valor acima de 75 km, em nenhum perfil                                                                                    | DEC-11 · DEC-18            |
+| V3-INV-041 | `commercial_model` é faceta e filtro por igualdade case-insensitive, com peso A no vetor de busca                                                                       | DEC-09                     |
+| V3-INV-042 | A descrição FIPE completa é preservada e não é usada como modelo comercial                                                                                              | v2.0 §23                   |
+| V3-INV-043 | A busca textual continua sobre o vetor de busca e não é substituída por `ILIKE`                                                                                         | v2.0 §26                   |
+| V3-INV-044 | Um veículo de outro modelo não entra no conjunto principal, mesmo com peso maior                                                                                        | v2.0 §28 · v2.0 §59 J      |
+| V3-INV-045 | O peso efetivo é o máximo entre 4 com Destaque ativo e o peso do plano                                                                                                  | v2.0 §29                   |
+| V3-INV-046 | Destaque expirado volta ao peso do plano                                                                                                                                | v2.0 §29 · v2.0 §60        |
+| V3-INV-047 | Entre anúncios de mesmo peso, a ordem é por distância crescente                                                                                                         | DEC-07 · v2.0 §32          |
+| V3-INV-048 | A ordenação distance-first histórica não é reintroduzida                                                                                                                | v2.0 §33                   |
+| V3-INV-049 | O ranking termina com um desempate determinístico                                                                                                                       | v2.0 §38                   |
+| V3-INV-050 | A chave de cache inclui modo geográfico, origem, raio e versão de política                                                                                              | v2.0 §41                   |
+| V3-INV-051 | Toda busca carrega uma `search_policy_version`                                                                                                                          | v2.0 §43                   |
+| V3-INV-052 | A telemetria da fase atual é um único evento `search.executed` com payload de contexto                                                                                  | ADI-01                     |
+| V3-INV-053 | O payload de `search.executed` inclui `required_distance_km` e `effective_radius_km`                                                                                    | DEC-20 · ADI-01            |
+| V3-INV-054 | Em `EXACT_CITY`, o copy nomeia apenas a cidade e não diz "e região"                                                                                                     | v2.0 §52                   |
+| V3-INV-055 | Com raio manual arbitrário, o copy declara o valor exato, não o degrau mais próximo                                                                                     | DEC-19 · v2.0 §52          |
+| V3-INV-056 | Parâmetros transacionais não criam landing indexável                                                                                                                    | v2.0 §53                   |
+| V3-INV-057 | O parâmetro de raio é transacional e tem seu valor honrado exatamente                                                                                                   | DEC-19 · v2.0 §53          |
+| V3-INV-058 | Esta política não altera existência territorial, canonical, sitemap, layout, header, pagamento ou módulos legais                                                        | v2.0 §62 · DEC-01 · DEC-02 |
+| V3-INV-059 | Uma cidade sem página não ganha rota territorial por ser usada como origem de busca                                                                                     | DEC-15 · DEC-01            |
+| V3-INV-060 | Relaxar preço, ano, câmbio, quilometragem ou distância preserva o mesmo produto                                                                                         | DEC-12                     |
+| V3-INV-061 | As relaxações não são ordenadas apenas por quantidade acrescentada                                                                                                      | DEC-21                     |
+| V3-INV-062 | Custos, arredondamentos e pesos de relaxação são configuração versionada, não lógica no frontend                                                                        | DEC-21                     |
+| V3-INV-063 | O arredondamento amigável do teto de preço continua incluindo o candidato que justificou a sugestão                                                                     | DEC-21                     |
+| V3-INV-064 | Uma faceta não ativa respeita todas as restrições ativas                                                                                                                | DEC-13 · v2.0 §40          |
+| V3-INV-065 | Grid, total e facetas compartilham o mesmo território, não só o mesmo produto                                                                                           | DEC-08                     |
+| V3-INV-066 | A relaxação de distância usa o primeiro anel permitido acima do território atual que acrescenta resultados                                                              | DEC-21                     |
+| V3-INV-067 | Estado zero vindo de URL antiga, estoque, cache ou concorrência entra em recuperação e Guided Relaxation, não é tratado como impossível                                 | DEC-14                     |
+| V3-INV-068 | O território-base de `/comprar` fica limitado aos anéis 0/25/50/75 km                                                                                                   | DEC-18                     |
+| V3-INV-069 | A avaliação de liquidez agrupa candidatos por cidade, com o `distance_km` exato de cada uma                                                                             | DEC-20 · DEC-25            |
+| V3-INV-070 | Preço permanece no conjunto principal de filtros, qualquer que seja seu poder discriminativo                                                                            | DEC-22                     |
+| V3-INV-071 | Sem nenhum anel automático que atinja o alvo, `required_distance_km` é nulo                                                                                             | DEC-23                     |
+| V3-INV-072 | O `effective_radius_km` não sobe ao teto de 75 km apenas por esse teto ter sido avaliado                                                                                | DEC-23                     |
+| V3-INV-073 | Um anel cuja inclusão não acrescenta candidatos não amplia o território efetivo                                                                                         | DEC-23                     |
+| V3-INV-074 | Se nenhum anel externo acrescenta candidatos, `effective_radius_km` é 0                                                                                                 | DEC-23                     |
+| V3-INV-075 | Um raio explícito válido é um inteiro entre 0 e 150, inclusive                                                                                                          | DEC-24                     |
+| V3-INV-076 | Um raio explícito de 0 produz `EXACT_CITY` explícito, com expansão automática bloqueada                                                                                 | DEC-24                     |
+| V3-INV-077 | Raio explícito inválido nunca é silenciosamente arredondado para um valor aceito                                                                                        | DEC-24                     |
+| V3-INV-078 | Com raio explícito válido presente, o baseline territorial de `/comprar` não se aplica                                                                                  | DEC-24 · DEC-05            |
 
 **Princípios não testáveis isoladamente.** Três afirmações normativas das seções 1–19 não geram invariante própria, pelo motivo indicado: "o núcleo deve ser barato" (seção 1) é critério de projeto sem limiar definido; "a arquitetura deve permitir evolução sem reescrita" (seções 6 e 15) é propriedade de contrato, verificável por revisão e não por um caso; "a nomenclatura real dos parâmetros deve ser definida contra a política de URL existente" (seção 18) é instrução de processo, não comportamento observável.
 
-**Proveniência:** DEC-01 · DEC-02 · DEC-03 · DEC-04 · DEC-05 · DEC-06 · DEC-07 · DEC-08 · DEC-09 · DEC-10 · DEC-11 · DEC-12 · DEC-13 · DEC-14 · DEC-15 · DEC-17 · DEC-18 · DEC-19 · DEC-20 · DEC-21 · ADI-01 · ADI-02 · ADI-03 · gate D1 · gate D2 · gate D5 · gate D7 · v2.0 §2.2 · v2.0 §2.3 · v2.0 §5 · v2.0 §6 · v2.0 §9 · v2.0 §11 · v2.0 §13 · v2.0 §18 · v2.0 §23 · v2.0 §26 · v2.0 §28 · v2.0 §29 · v2.0 §32 · v2.0 §33 · v2.0 §37 · v2.0 §38 · v2.0 §40 · v2.0 §41 · v2.0 §43 · v2.0 §46 · v2.0 §50 · v2.0 §52 · v2.0 §53 · v2.0 §59 · v2.0 §60 · v2.0 §61 (não reproduzido) · v2.0 §62 · v2.0 §65 · v2.0 §66.
+**Proveniência:** DEC-01 · DEC-02 · DEC-03 · DEC-04 · DEC-05 · DEC-06 · DEC-07 · DEC-08 · DEC-09 · DEC-10 · DEC-11 · DEC-12 · DEC-13 · DEC-14 · DEC-15 · DEC-17 · DEC-18 · DEC-19 · DEC-20 · DEC-21 · DEC-22 · DEC-23 · DEC-24 · DEC-25 · ADI-01 · ADI-02 · ADI-03 · v2.0 §2.2 · v2.0 §2.3 · v2.0 §5 · v2.0 §6 · v2.0 §9 · v2.0 §11 · v2.0 §13 · v2.0 §18 · v2.0 §23 · v2.0 §26 · v2.0 §28 · v2.0 §29 · v2.0 §32 · v2.0 §33 · v2.0 §37 · v2.0 §38 · v2.0 §40 · v2.0 §41 · v2.0 §43 · v2.0 §46 · v2.0 §50 · v2.0 §52 · v2.0 §53 · v2.0 §59 · v2.0 §60 · v2.0 §61 (não reproduzido) · v2.0 §62 · v2.0 §65 · v2.0 §66.
 
 ---
 
