@@ -105,9 +105,9 @@ A política pode calcular um **Specificity Score** a partir das dimensões de pr
 
 Os perfis nomeados pela fonte normativa são `BROWSE_CITY`, `BROWSE_CATEGORY`, `SEARCH_BRAND`, `SEARCH_MODEL`, `SEARCH_MODEL_YEAR` e `SEARCH_VERSION`. Seus alvos estão na seção 6.
 
-**Teto automático por perfil.** O teto automático de **qualquer** perfil é 75 km: os anéis automáticos são 0/25/50/75, e nenhum perfil chega a 150 km por automação — os 150 km só entram por raio manual explícito ou por concessão aceita (seção 4). A interface não deve listar como anel automático um valor que o motor não honraria. A proposta do gate D5 (evidência) admitia `SEARCH_MODEL` com teto automático de 150 km; DEC-25 a declara **superada** por DEC-11, DEC-18 e DEC-23. O que sobrevive dela é apenas a observação de UX — não oferecer um clique que o motor não cumpre —, e essa observação passa a se apoiar em DEC-11 e DEC-18, não no gate.
+**Teto automático por perfil.** O teto automático de **qualquer** perfil é 75 km: os anéis automáticos são 0/25/50/75, e nenhum perfil chega a 150 km por automação — os 150 km só entram por raio manual explícito ou por concessão aceita (seção 4). A interface não deve listar como anel automático um valor que o motor não honraria: DEC-11, DEC-18 e DEC-23 definem quais anéis são automáticos, e DEC-03 e v2.0 §52 exigem que a página não apresente ao usuário algo diferente do que o motor faz. A proposta do gate D5 (evidência) admitia `SEARCH_MODEL` com teto automático de 150 km; DEC-25 a declara **superada** por DEC-11, DEC-18 e DEC-23. O que sobrevive dela é apenas a observação de UX — não oferecer um clique que o motor não cumpre —, e essa observação passa a se apoiar nessas fontes normativas, não no gate.
 
-**Proveniência:** DEC-11 · DEC-17 · DEC-18 · DEC-23 · DEC-25 · gate D5 (evidência) · v2.0 §12 · v2.0 §20.
+**Proveniência:** DEC-03 · DEC-11 · DEC-17 · DEC-18 · DEC-23 · DEC-25 · gate D5 (evidência) · v2.0 §12 · v2.0 §20 · v2.0 §52.
 
 ---
 
@@ -212,7 +212,7 @@ O campo que hoje guarda a descrição FIPE completa não deve ser tratado como m
 
 `commercial_model` é dimensão de produto de primeira classe: deve existir como faceta, como filtro por igualdade **case-insensitive**, e deve receber peso A no vetor de busca textual.
 
-A derivação de modelo comercial já usada pelas rotas SEO deve ser reaproveitada pela faceta Modelo, pelo parser da busca, pelo Specificity Score, pelo alvo de liquidez, pelas sugestões e pela analytics. Não é necessário criar uma tabela de catálogo FIPE nova apenas para atender a esta especificação.
+A derivação de modelo comercial já usada pelas rotas SEO deve ser reaproveitada pela faceta Modelo, pelo parser da busca, pelo Specificity Score, pelo alvo de liquidez, pelas páginas SEO, pelas sugestões e pela analytics. Não é necessário criar uma tabela de catálogo FIPE nova apenas para atender a esta especificação.
 
 A busca textual existente — vetor de busca com dicionário português, consulta por `plainto_tsquery`, ordenação auxiliar por `ts_rank` e índice GIN — deve ser preservada. Não deve ser substituída por `ILIKE`.
 
@@ -246,7 +246,7 @@ O pipeline de ranking deve ser, nesta ordem: status e disponibilidade; correspon
 
 **Não restaurar o ordenador histórico distance-first.** A ordenação que colocava distância antes de destaque não corresponde à regra comercial vigente e não deve ser reintroduzida.
 
-**Rotação e diversidade.** A v2.0 §34 descreve rotação justa entre anúncios equivalentes — determinística, estável durante uma janela, compatível com cache, não aleatória por refresh — e a §35 descreve diversidade entre vendedores atuando depois de peso e distância. _Delimitação por ADI-02: ambas ficam adiadas até haver volume que as justifique. Permanecem descritas, não exigidas._ Isso não é conflito: a v2.0 já as tratava como configuráveis e ativáveis conforme a liquidez.
+**Rotação e diversidade.** A v2.0 §34 descreve rotação justa entre anúncios equivalentes — determinística, estável durante uma janela, compatível com cache, não aleatória por refresh — e a §35 descreve diversidade entre vendedores atuando depois de peso e distância. _Delimitação por ADI-02: ambas ficam adiadas até haver volume que as justifique. Permanecem descritas, não exigidas._ Isso não é conflito: a v2.0 §35 já tratava a diversidade como configurável e ativável conforme a liquidez, enquanto a §34 descrevia a rotação por parâmetro configurável.
 
 **Proveniência:** ADI-02 · DEC-07 · v2.0 §28 · v2.0 §29 · v2.0 §30 · v2.0 §31 · v2.0 §32 · v2.0 §33 · v2.0 §34 · v2.0 §35 · v2.0 §36 · v2.0 §38.
 
@@ -318,7 +318,7 @@ O texto da página deve refletir a realidade do conjunto exibido. Em `EXACT_CITY
 
 O sistema deve explicar o que fez quando expandiu automaticamente, e o controle de raio deve mostrar qual degrau está ativo e que ele veio do automático.
 
-Ao escolher qualquer raio, o usuário passa de `AUTO_RADIUS` para `MANUAL_RADIUS` e o motor deixa de expandir. Deve existir uma ação para reativar o alcance automático. Escolha manual sempre vence o automático.
+Ao escolher qualquer raio, o usuário passa de `AUTO_RADIUS` para `MANUAL_RADIUS` e o motor deixa de expandir. Pode existir uma ação para reativar o alcance automático. Escolha manual sempre vence o automático.
 
 Quando o raio manual for um valor arbitrário válido, o copy deve refletir esse valor exato, e não o degrau mais próximo (seção 4).
 
@@ -388,7 +388,7 @@ O gate `978c6715` levantou oito divergências entre o prompt que o originou e o 
 
 **Tema.** Quais degraus oferecer ao usuário.
 **Proposta do gate.** Listar apenas os anéis menores ou iguais ao teto automático do perfil, porque oferecer um anel que o motor não honra é um clique morto; com `BROWSE_CITY` em 75 e `SEARCH_MODEL` em 150.
-**Disposição (DEC-25).** **Superada por DEC-11, DEC-18 e DEC-23**: o 150 km sai da expansão automática, o baseline fica em 0/25/50/75 e o raio efetivo abaixo do alvo não sobe ao teto. A observação de UX — não oferecer um clique que o motor não cumpre — sobrevive apoiada em DEC-11 e DEC-18, não no gate.
+**Disposição (DEC-25).** **Superada por DEC-11, DEC-18 e DEC-23**: o 150 km sai da expansão automática, o baseline fica em 0/25/50/75 e o raio efetivo abaixo do alvo não sobe ao teto. A observação de UX — não oferecer um clique que o motor não cumpre — sobrevive apoiada em DEC-03 e v2.0 §52, com DEC-11, DEC-18 e DEC-23 definindo quais anéis são automáticos, não no gate.
 **Onde entra:** seções 4, 5 e 6.
 
 ### D6 — preço recolhido em "Mais filtros"
@@ -587,9 +587,9 @@ Cada invariante é um requisito atômico, testável por um único caso.
 
 **Contagem.** IDs `V3-INV` alocados: **78**. Retirados: **3** — `V3-INV-029`, `V3-INV-031` e `V3-INV-040`. Invariantes normativos ativos: **75**. Um ID retirado permanece reservado para rastreabilidade e nunca é reutilizado por outro requisito, do mesmo modo que a lacuna deliberada do DEC-16 no registro de decisões.
 
-**Princípios não testáveis isoladamente.** Três afirmações normativas das seções 1–19 não geram invariante própria, pelo motivo indicado: "o núcleo deve ser barato" (seção 1) é critério de projeto sem limiar definido; "a arquitetura deve permitir evolução sem reescrita" (seção 15, que a formula como entrar por nova versão de política sem reconstruir endpoints nem frontend) é propriedade de contrato, verificável por revisão e não por um caso — não se confunde com a configurabilidade de alvos e parâmetros da seção 6, que é testável e já está coberta por V3-INV-038; "a nomenclatura real dos parâmetros deve ser definida contra a política de URL existente" (seção 18) é instrução de processo, não comportamento observável.
+**Princípios não testáveis isoladamente.** Três afirmações normativas das seções 1–19 não geram invariante própria por não serem testáveis isoladamente, cada uma pelo motivo indicado: "o núcleo deve ser barato" (seção 1) é critério de projeto sem limiar definido; "a arquitetura deve permitir evolução sem reescrita" (seção 15, que a formula como entrar por nova versão de política sem reconstruir endpoints nem frontend) é propriedade de contrato, verificável por revisão e não por um caso — não se confunde com a configurabilidade de alvos e parâmetros da seção 6, que é testável e já está coberta por V3-INV-038; "a nomenclatura real dos parâmetros deve ser definida contra a política de URL existente" (seção 18) é instrução de processo, não comportamento observável. A contagem vale para esse subconjunto não testável, não para o total de normas sem invariante dedicado.
 
-**Proveniência:** DEC-01 · DEC-02 · DEC-03 · DEC-04 · DEC-05 · DEC-06 · DEC-07 · DEC-08 · DEC-09 · DEC-10 · DEC-11 · DEC-12 · DEC-13 · DEC-14 · DEC-15 · DEC-17 · DEC-18 · DEC-19 · DEC-20 · DEC-21 · DEC-22 · DEC-23 · DEC-24 · DEC-25 · ADI-01 · ADI-02 · ADI-03 · v2.0 §2.2 · v2.0 §2.3 · v2.0 §5 · v2.0 §6 · v2.0 §9 · v2.0 §11 · v2.0 §13 · v2.0 §18 · v2.0 §23 · v2.0 §26 · v2.0 §28 · v2.0 §29 · v2.0 §32 · v2.0 §33 · v2.0 §37 · v2.0 §38 · v2.0 §40 · v2.0 §41 · v2.0 §43 · v2.0 §46 · v2.0 §50 · v2.0 §52 · v2.0 §53 · v2.0 §59 · v2.0 §60 · v2.0 §61 (não reproduzido) · v2.0 §62 · v2.0 §65 · v2.0 §66.
+**Proveniência:** DEC-01 · DEC-02 · DEC-03 · DEC-04 · DEC-05 · DEC-06 · DEC-07 · DEC-08 · DEC-09 · DEC-10 · DEC-11 · DEC-12 · DEC-13 · DEC-14 · DEC-17 · DEC-18 · DEC-19 · DEC-20 · DEC-21 · DEC-22 · DEC-23 · DEC-24 · DEC-25 · ADI-01 · ADI-02 · ADI-03 · v2.0 §2.2 · v2.0 §2.3 · v2.0 §5 · v2.0 §6 · v2.0 §9 · v2.0 §11 · v2.0 §13 · v2.0 §18 · v2.0 §23 · v2.0 §26 · v2.0 §28 · v2.0 §29 · v2.0 §32 · v2.0 §33 · v2.0 §37 · v2.0 §38 · v2.0 §40 · v2.0 §41 · v2.0 §43 · v2.0 §46 · v2.0 §50 · v2.0 §52 · v2.0 §53 · v2.0 §59 · v2.0 §60 · v2.0 §61 (não reproduzido) · v2.0 §62 · v2.0 §65 · v2.0 §66.
 
 ---
 
