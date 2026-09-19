@@ -198,7 +198,7 @@ _Conflito: a proposta do gate D4 (evidência) resolvia o degrau de preço pela f
 
 **O que o motor não faz.** Nenhuma alternativa deve ser aplicada sem ação explícita do usuário. Nenhum modelo de linguagem participa do cálculo ou da ordenação. Uma alternativa cujo delta conhecido seja zero não deve ser apresentada (seção 13). O motor deve apresentar no máximo as melhores opções definidas pela política — inicialmente até três.
 
-**O que nunca é relaxação.** Relaxar preço, ano, câmbio, quilometragem ou distância preserva a intenção: o produto continua o mesmo. Modelo alternativo **nunca** é relaxação — é recomendação separada e deve ser apresentada como tal, em bloco distinto. _Refina v2.0 §28, que já mandava recomendações alternativas aparecerem em bloco separado: DEC-12 e DEC-21 tornam a separação obrigatória e a colocam fora do mecanismo de concessões._
+**O que nunca é relaxação.** Relaxar preço, ano, câmbio, quilometragem ou distância preserva a intenção: o produto continua o mesmo. Modelo alternativo **nunca** é relaxação — é recomendação separada e deve ser apresentada como tal, em bloco distinto. _Refina v2.0 §28, que já permitia que recomendações alternativas aparecessem em bloco separado: DEC-12 e DEC-21 tornam a separação obrigatória e a colocam fora do mecanismo de concessões._
 
 _Conflito: v2.0 §17–§18 fazem o automático expandir até o teto de 150 km antes de parar; DEC-11 encerra a expansão automática no território inicial útil e transforma o 150 em concessão oferecida. Vale DEC-11._
 
@@ -314,15 +314,15 @@ O gatilho de revisão dos alvos de liquidez depende dessa telemetria (seção 6)
 
 ## 17. Copy territorial e UX de expansão
 
-O texto da página deve refletir a realidade do conjunto exibido. Em `EXACT_CITY`, o texto nomeia apenas a cidade e não deve dizer "e região". Com raio efetivo maior que 0, o texto deve declarar o raio — obrigação de DEC-03 — e, em busca de produto, deve dizer quantos resultados foram encontrados em até quantos quilômetros de qual origem.
+O texto da página deve refletir a realidade do conjunto exibido. Em `EXACT_CITY`, o texto nomeia apenas a cidade e não deve dizer "e região". Com raio efetivo maior que 0, o texto deve declarar o raio — obrigação de DEC-03 — e, em busca de produto, deve dizer em até quantos quilômetros de qual origem os resultados foram encontrados. O texto pode informar quantos resultados foram encontrados, desde que a contagem reflita o conjunto efetivamente exibido.
 
 O sistema deve explicar o que fez quando expandiu automaticamente, e o controle de raio deve mostrar qual degrau está ativo e que ele veio do automático.
 
-Ao escolher qualquer raio, o usuário passa de `AUTO_RADIUS` para `MANUAL_RADIUS` e o motor deixa de expandir. Pode existir uma ação para reativar o alcance automático. Escolha manual sempre vence o automático.
+Ao escolher explicitamente um raio entre 1 e 150 km, o usuário passa de `AUTO_RADIUS` para `MANUAL_RADIUS` e o motor deixa de expandir automaticamente. Ao escolher `raio=0`, o modo passa para `EXACT_CITY`, com `user_geo_explicit = true` e expansão automática bloqueada. Pode existir uma ação para reativar o alcance automático. Escolha manual sempre vence o automático.
 
 Quando o raio manual for um valor arbitrário válido, o copy deve refletir esse valor exato, e não o degrau mais próximo (seção 4).
 
-**Proveniência:** DEC-03 · DEC-05 · DEC-19 · v2.0 §49 · v2.0 §50 · v2.0 §52.
+**Proveniência:** DEC-03 · DEC-05 · DEC-19 · DEC-24 · v2.0 §49 · v2.0 §50 · v2.0 §52.
 
 ---
 
@@ -494,7 +494,7 @@ Os cenários funcionais da v2.0 §59 e os testes técnicos da v2.0 §60 permanec
 
 **Não reproduzido.** A v2.0 §61 (governança de branch antes de implementar) está obsoleta: a governança foi resolvida na F0, em sentido diferente do descrito lá. Não integra esta especificação.
 
-**Checklist da v2.0 §66.** Os itens seguem válidos, com duas correções: o item 5, que autorizava o automático a usar 150 km como expansão especial, é substituído por DEC-11 (150 nunca por automação; só por concessão aceita ou raio manual explícito); e o item 9, que mandava diferenciar 0 km implícito de 0 km explícito, vale apenas na metade explícita — o 0 km explícito continua sendo intenção manual, mas o "0 km implícito" deixa de existir como estado inicial (DEC-03).
+**Checklist da v2.0 §66.** O checklist permanece como referência histórica e seus itens seguem válidos, com duas correções e uma exclusão: o item 5, que autorizava o automático a usar 150 km como expansão especial, é substituído por DEC-11 (150 nunca por automação; só por concessão aceita ou raio manual explícito); o item 9, que mandava diferenciar 0 km implícito de 0 km explícito, vale apenas na metade explícita — o 0 km explícito continua sendo intenção manual, mas o "0 km implícito" deixa de existir como estado inicial (DEC-03); e o item 26, que mandava definir primeiro a branch real de release, não tem força normativa, por resumir a §61, marcada como obsoleta na própria v2.0.
 
 **Formulação definitiva.** A síntese da v2.0 §65 permanece a formulação da regra, e é citada literalmente porque a formulação **é** a regra:
 
@@ -521,7 +521,7 @@ Cada invariante é um requisito atômico, testável por um único caso.
 | V3-INV-013 | A menor concessão útil precede qualquer percentual ou degrau fixo                                                                                                                                                                                                                                                 | DEC-21                     |
 | V3-INV-014 | Na configuração inicial da política, são apresentadas no máximo três concessões por vez                                                                                                                                                                                                                           | DEC-21                     |
 | V3-INV-015 | Modelo alternativo nunca aparece como relaxação; aparece como recomendação separada                                                                                                                                                                                                                               | DEC-12                     |
-| V3-INV-016 | Entrada direta em `/comprar` constrói o território-base antes de aplicar as dimensões de produto                                                                                                                                                                                                                  | DEC-18                     |
+| V3-INV-016 | Na entrada direta em `/comprar`, com origem conhecida e sem raio ou escopo manual, o sistema constrói o território-base antes de aplicar as dimensões de produto                                                                                                                                                  | DEC-18                     |
 | V3-INV-017 | Dentro do território, o peso comercial vence a distância                                                                                                                                                                                                                                                          | DEC-07                     |
 | V3-INV-018 | Anúncio fora do território nunca entra, qualquer que seja o seu peso                                                                                                                                                                                                                                              | DEC-07                     |
 | V3-INV-019 | Grid, contagem total e facetas saem do mesmo `CandidateScope`                                                                                                                                                                                                                                                     | DEC-08                     |
@@ -557,7 +557,7 @@ Cada invariante é um requisito atômico, testável por um único caso.
 | V3-INV-049 | O ranking termina com um desempate determinístico                                                                                                                                                                                                                                                                 | v2.0 §38                   |
 | V3-INV-050 | A chave de cache inclui modo geográfico, origem, raio e versão de política                                                                                                                                                                                                                                        | v2.0 §41                   |
 | V3-INV-051 | Toda busca carrega uma `search_policy_version`                                                                                                                                                                                                                                                                    | v2.0 §43                   |
-| V3-INV-052 | A telemetria da fase atual é um único evento `search.executed` com payload de contexto                                                                                                                                                                                                                            | ADI-01                     |
+| V3-INV-052 | Na fase atual, um único evento `search.executed` com payload de contexto completo é suficiente para a telemetria                                                                                                                                                                                                  | ADI-01                     |
 | V3-INV-053 | O payload de `search.executed` registra o raio efetivo usado na busca                                                                                                                                                                                                                                             | ADI-01 · v2.0 §44          |
 | V3-INV-054 | Em `EXACT_CITY`, o copy nomeia apenas a cidade e não diz "e região"                                                                                                                                                                                                                                               | v2.0 §52                   |
 | V3-INV-055 | Com raio manual arbitrário, o copy declara o valor exato, não o degrau mais próximo                                                                                                                                                                                                                               | DEC-19 · v2.0 §52          |
