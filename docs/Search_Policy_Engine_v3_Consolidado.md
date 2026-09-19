@@ -318,7 +318,7 @@ O texto da página deve refletir a realidade do conjunto exibido. Em `EXACT_CITY
 
 O sistema deve explicar o que fez quando expandiu automaticamente, e o controle de raio deve mostrar qual degrau está ativo e que ele veio do automático.
 
-Ao escolher explicitamente um raio entre 1 e 150 km, o usuário passa de `AUTO_RADIUS` para `MANUAL_RADIUS` e o motor deixa de expandir automaticamente. Ao escolher `raio=0`, o modo passa para `EXACT_CITY`, com `user_geo_explicit = true` e expansão automática bloqueada. Pode existir uma ação para reativar o alcance automático. Escolha manual sempre vence o automático.
+Ao escolher explicitamente um raio entre 1 e 150 km, o usuário passa de `AUTO_RADIUS` para `MANUAL_RADIUS` e o motor deixa de expandir automaticamente. Ao escolher `raio=0`, o modo passa para `EXACT_CITY`, com `user_geo_explicit = true` e expansão automática bloqueada. _Conflito: a v2.0 §50 tratava a escolha de qualquer raio como transição de `AUTO_RADIUS` para `MANUAL_RADIUS`. DEC-24 excepciona o valor explícito 0: `raio=0` produz `EXACT_CITY`, com `user_geo_explicit=true` e expansão automática bloqueada. Vale DEC-24._ Pode existir uma ação para reativar o alcance automático. Escolha manual sempre vence o automático.
 
 Quando o raio manual for um valor arbitrário válido, o copy deve refletir esse valor exato, e não o degrau mais próximo (seção 4).
 
