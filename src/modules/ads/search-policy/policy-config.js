@@ -16,6 +16,47 @@ import { logger } from "../../../shared/logger.js";
 
 export const SEARCH_POLICY_SETTING_KEY = "search_policy";
 
+/**
+ * F2.2-A2 — faixa do raio EXPLÍCITO (v3 §4, DEC-19/DEC-24; INV-075).
+ *
+ * "Um raio explícito válido é um inteiro de quilômetros entre 0 e 150,
+ * inclusive; o máximo corresponde à cobertura pré-computada de
+ * `region_memberships`."
+ *
+ * Esta faixa é uma propriedade do DADO (até onde a malha foi pré-computada),
+ * não um parâmetro sintonizável de produto — por isso vive aqui como constante
+ * do código e NÃO como chave de `platform_settings`. Criar uma chave nova no
+ * banco para ela abriria uma segunda política de raio, editável pelo admin,
+ * capaz de divergir silenciosamente da malha que a sustenta.
+ *
+ * Distinção que o §3 da A2 exige e que o bug corrigido nesta fase confundia:
+ *
+ *   faixa VÁLIDA do backend  →  qualquer inteiro em [0, 150]  (estas constantes)
+ *   presets/sugestões de UX  →  `rings_manual` ([0,25,50,75] hoje)
+ *
+ * `rings_manual` é lista de DEGRAUS OFERECIDOS, nunca o conjunto dos valores
+ * aceitos: v3 §4 "os degraus são presets de UX, não o conjunto dos valores
+ * válidos". Nada no backend pode validar um raio por `rings_manual.includes()`.
+ */
+export const MANUAL_RADIUS_MIN_KM = 0;
+export const MANUAL_RADIUS_MAX_KM = 150;
+
+/**
+ * Um raio explícito é válido? (INV-075, puro.)
+ *
+ * Aceita apenas inteiro em [0,150]. Rejeita negativo, > 150, fracionário,
+ * não numérico, vazio e representação múltipla ("25,50"), sem NUNCA aproximar
+ * para um valor aceito (INV-077).
+ */
+export function isValidExplicitRadius(value) {
+  if (value === undefined || value === null) return false;
+  if (Array.isArray(value)) return false;
+  const raw = String(value).trim();
+  if (raw === "") return false;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= MANUAL_RADIUS_MIN_KM && n <= MANUAL_RADIUS_MAX_KM;
+}
+
 export const SEARCH_POLICY_DEFAULT = Object.freeze({
   version: "v1",
   rings_auto: [0, 25, 50, 75],

@@ -164,14 +164,27 @@ describe("ScopeResolver — AUTO_RADIUS (8.3)", () => {
 });
 
 describe("ScopeResolver — pedido de geo (raio=/escopo=)", () => {
-  it("raio=0 → EXACT_CITY; raio=25 → MANUAL; raio fora de rings_manual → AUTO; escopo", () => {
+  // F2.2-A2 (DEC-19/DEC-24): este caso afirmava o contrato anterior — "raio
+  // fora de rings_manual → AUTO" e "manual máximo é 75 (D5)". A v3 §4 revoga
+  // os dois: a faixa válida é o inteiro em [0,150] e `rings_manual` volta a ser
+  // apenas preset de UX. 33 e 150 deixam de cair no automático.
+  it("raio=0 → EXACT_CITY; raio=25 → MANUAL; raio fora dos presets continua MANUAL exato; escopo", () => {
     expect(resolveGeoRequest({ raio: "0" }, policy, true).mode).toBe(GEO_MODE.EXACT_CITY);
     expect(resolveGeoRequest({ raio: "25" }, policy, true)).toEqual({
       mode: GEO_MODE.MANUAL_RADIUS,
       requested_radius_km: 25,
+      user_geo_explicit: true,
     });
-    expect(resolveGeoRequest({ raio: "33" }, policy, true).mode).toBe(GEO_MODE.AUTO_RADIUS);
-    expect(resolveGeoRequest({ raio: "150" }, policy, true).mode).toBe(GEO_MODE.AUTO_RADIUS); // manual máximo é 75 (D5)
+    expect(resolveGeoRequest({ raio: "33" }, policy, true)).toEqual({
+      mode: GEO_MODE.MANUAL_RADIUS,
+      requested_radius_km: 33,
+      user_geo_explicit: true,
+    });
+    expect(resolveGeoRequest({ raio: "150" }, policy, true)).toEqual({
+      mode: GEO_MODE.MANUAL_RADIUS,
+      requested_radius_km: 150,
+      user_geo_explicit: true,
+    });
     expect(resolveGeoRequest({ escopo: "uf" }, policy, true).mode).toBe(GEO_MODE.STATE);
     expect(resolveGeoRequest({ escopo: "brasil" }, policy, true).mode).toBe(GEO_MODE.NATIONAL);
     expect(resolveGeoRequest({}, policy, false).mode).toBe(GEO_MODE.NATIONAL);
