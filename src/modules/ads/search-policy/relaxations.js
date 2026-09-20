@@ -15,6 +15,7 @@ import { pool } from "../../../infrastructure/database/db.js";
 import { baseClauses, buildProductClauses, createParamBag } from "./candidate-scope.js";
 import { POLICY_CACHE_PREFIX, policyCacheGet, policyCacheSet } from "./policy-cache.js";
 import { GEO_MODE } from "./scope-resolver.js";
+import { MANUAL_RADIUS_MAX_KM } from "./policy-config.js";
 
 function fmtMil(value) {
   return `R$ ${Math.round(Number(value) / 1000)} mil`;
@@ -39,7 +40,21 @@ export function buildRelaxationVariants(ctx, scope, policy) {
     const manual = [...(policy.rings_manual || [])].sort((a, b) => a - b);
     let next = manual.find((r) => r > current) ?? null;
     if (next === null && ctx.intent.profile.startsWith("SEARCH_") && current < 150) next = 150;
-    if (next !== null && next <= ctx.intent.max_auto_radius) {
+    // F2.2-A2 — o teto da CONCESSÃO não é o teto do AUTOMÁTICO.
+    //
+    // Aqui estava `next <= ctx.intent.max_auto_radius`. Enquanto
+    // max_auto_radius valia 150 os dois números coincidiam e a confusão não
+    // aparecia; a A1 baixou o teto automático para 75 (DEC-11/18/23) e o degrau
+    // de 150 — que a própria linha acima constrói — passou a ser descartado por
+    // `150 <= 75`. A concessão ficou inalcançável: o mecanismo a montava e o
+    // guard a jogava fora.
+    //
+    // São grandezas distintas (v3 §4): o automático nunca passa de 75 POR SI;
+    // uma concessão é oferta que só vira território por ACEITE explícito, e
+    // pode chegar a 150 — o limite da malha pré-computada. Manter os dois tetos
+    // separados é o que faz 150 continuar "destino legítimo por via explícita"
+    // sem reintroduzir 150 no AUTO.
+    if (next !== null && next <= MANUAL_RADIUS_MAX_KM) {
       variants.push({
         dimension: "radius",
         label: `ampliar para ${next} km`,

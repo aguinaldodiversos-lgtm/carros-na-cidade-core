@@ -216,6 +216,11 @@ function buildSearchPolicyBlock(ctx, scope, total, flagMode) {
       : null,
     location_source: ctx.location_source,
     requested_radius_km: scope.requested_radius_km,
+    // F2.2-A2 (v3 §4/§26): houve raio explícito válido na URL. Descreve o
+    // PEDIDO, não o resultado — em GEO_FALLBACK continua true com
+    // effective_radius_km 0, e quem distingue é `reason`. É o que permite ao
+    // F3 declarar o raio exato em vez do degrau mais próximo (INV-055).
+    user_geo_explicit: scope.user_geo_explicit === true,
     required_distance_km: scope.required_distance_km,
     effective_radius_km: withOrigin ? scope.effective_radius_km : null,
     cities: scope.cities,

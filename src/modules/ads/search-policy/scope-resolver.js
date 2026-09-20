@@ -29,6 +29,7 @@ import { pool } from "../../../infrastructure/database/db.js";
 import { logger } from "../../../shared/logger.js";
 import { baseClauses, buildProductClauses, createParamBag } from "./candidate-scope.js";
 import { POLICY_CACHE_PREFIX, policyCacheGet, policyCacheSet } from "./policy-cache.js";
+import { MANUAL_RADIUS_MAX_KM, isValidExplicitRadius } from "./policy-config.js";
 
 export const GEO_MODE = Object.freeze({
   EXACT_CITY: "EXACT_CITY",
@@ -56,22 +57,44 @@ export function resolveGeoRequest(query = {}, policy, hasOrigin, { uf = null } =
   const escopo = String(query.escopo || "")
     .trim()
     .toLowerCase();
-  if (escopo === "brasil") return { mode: GEO_MODE.NATIONAL, requested_radius_km: null };
-  if (escopo === "uf") return { mode: GEO_MODE.STATE, requested_radius_km: null };
+  // `user_geo_explicit` marca SOMENTE o eixo de raio (v3 §4 e §26): houve um
+  // raio explícito válido na URL. `escopo=` e a ausência de origem não são
+  // escolha de raio, então permanecem false — não é papel desta fase estender a
+  // marca a outros eixos geográficos.
+  if (escopo === "brasil")
+    return { mode: GEO_MODE.NATIONAL, requested_radius_km: null, user_geo_explicit: false };
+  if (escopo === "uf")
+    return { mode: GEO_MODE.STATE, requested_radius_km: null, user_geo_explicit: false };
   if (!hasOrigin)
-    return { mode: uf ? GEO_MODE.STATE : GEO_MODE.NATIONAL, requested_radius_km: null };
+    return {
+      mode: uf ? GEO_MODE.STATE : GEO_MODE.NATIONAL,
+      requested_radius_km: null,
+      user_geo_explicit: false,
+    };
 
-  if (query.raio !== undefined && query.raio !== null && String(query.raio).trim() !== "") {
-    const raio = Number(query.raio);
-    const manual = Array.isArray(policy?.rings_manual) ? policy.rings_manual : [];
-    // DEFAULT §12: raio fora de rings_manual é ignorado (volta ao automático).
-    if (Number.isFinite(raio) && manual.includes(raio)) {
-      return raio === 0
-        ? { mode: GEO_MODE.EXACT_CITY, requested_radius_km: 0 }
-        : { mode: GEO_MODE.MANUAL_RADIUS, requested_radius_km: raio };
-    }
+  // F2.2-A2 (v3 §4, DEC-19/DEC-24; INV-006/075/076/057). A validação é pela
+  // FAIXA [0,150], não pela lista de presets.
+  //
+  // O que havia aqui — `rings_manual.includes(raio)` — tratava os degraus de UX
+  // como se fossem o conjunto dos valores aceitos. Com rings_manual =
+  // [0,25,50,75], `raio=40` caía no `return` de baixo e virava AUTO_RADIUS:
+  // descarte silencioso de uma intenção manual explícita, exatamente o que
+  // INV-057 proíbe. A v3 é explícita: "os degraus são presets de UX, não o
+  // conjunto dos valores válidos".
+  if (isValidExplicitRadius(query.raio)) {
+    const raio = Number(String(query.raio).trim());
+    // DEC-24: o 0 explícito é escolha geográfica, não raio — EXACT_CITY, nunca
+    // MANUAL_RADIUS, com o automático bloqueado.
+    return raio === 0
+      ? { mode: GEO_MODE.EXACT_CITY, requested_radius_km: 0, user_geo_explicit: true }
+      : { mode: GEO_MODE.MANUAL_RADIUS, requested_radius_km: raio, user_geo_explicit: true };
   }
-  return { mode: GEO_MODE.AUTO_RADIUS, requested_radius_km: null };
+  // Raio inválido (negativo, > 150, fracionário, não numérico, múltiplo) NÃO é
+  // raio manual: cai no automático, como já caía antes desta fase. INV-077 é
+  // satisfeito — nada é aproximado para um valor aceito —, mas a EXPERIÊNCIA do
+  // valor inválido (erro 400? aviso? ignorar?) segue `pendente` na v3 §4 e não é
+  // decidida aqui.
+  return { mode: GEO_MODE.AUTO_RADIUS, requested_radius_km: null, user_geo_explicit: false };
 }
 
 /**
@@ -215,11 +238,22 @@ export async function runLiquidityQuery(db, { originId, radiusKm, filters }) {
   return { rows, sql, params: bag.params };
 }
 
-function liquidityCacheKey(originId, profile, filters) {
+/**
+ * F2.2-A2: `radiusKm` entra na chave.
+ *
+ * Até a A2 o raio da liquidez era constante (o teto automático do perfil), e
+ * omiti-lo era inofensivo. Agora que um raio manual pode ampliá-lo, duas
+ * requisições com mesma origem, perfil e filtros podem pedir alcances
+ * diferentes — sem o raio na chave, a primeira a gravar serviria a outra:
+ * `raio=150` receberia as linhas de 75 km (cidades faltando) ou `raio=25`
+ * receberia as de 150 (contagens de anel infladas). É a chave da liquidez da
+ * política (`sp:liq:`), não a cache key da busca de anúncios.
+ */
+function liquidityCacheKey(originId, profile, filters, radiusKm) {
   const bag = createParamBag();
   const product = buildProductClauses(filters, bag);
   const fingerprint = sha1(JSON.stringify([product.clauses, bag.params]));
-  return `${POLICY_CACHE_PREFIX.LIQUIDITY}:${originId}:${profile}:${fingerprint}`;
+  return `${POLICY_CACHE_PREFIX.LIQUIDITY}:${originId}:${profile}:${Number(radiusKm)}:${fingerprint}`;
 }
 
 /**
@@ -238,6 +272,7 @@ export async function resolveScope(ctx, policy, deps = {}) {
   const base = {
     geo_mode: mode,
     requested_radius_km: geoRequest.requested_radius_km ?? null,
+    user_geo_explicit: geoRequest.user_geo_explicit === true,
     required_distance_km: null,
     effective_radius_km: null,
     expanded: false,
@@ -375,7 +410,7 @@ async function loadLiquidityRows({
   useCache,
   bookkeeping,
 }) {
-  const key = liquidityCacheKey(origin.id, profile, filters);
+  const key = liquidityCacheKey(origin.id, profile, filters, radiusKm);
   if (useCache) {
     const hit = await policyCacheGet(key);
     if (Array.isArray(hit)) {
@@ -397,14 +432,37 @@ async function loadLiquidityRows({
   return compact;
 }
 
+/**
+ * Até onde a liquidez precisa enxergar nesta requisição.
+ *
+ * F2.2-A2. Antes desta fase o teto era SEMPRE `intent.max_auto_radius` — que a
+ * A1 baixou para 75 em todos os perfis. Com isso um `raio=150` manual produzia
+ * território correto nos RESULTADOS (buildTerritoryClause monta o `distance_km
+ * <= 150` direto no SQL, sem depender destas linhas) mas uma resposta truncada
+ * em 75 km: `cities[]` sem as cidades de 75–150, `territory_city_count` menor
+ * que o território real e o anel de 150 com contagem incompleta. Grid e
+ * metadados discordariam entre si.
+ *
+ * O raio manual é intenção explícita do usuário e pode passar do teto
+ * automático; a liquidez acompanha o que for maior.
+ */
+function liquidityRadiusFor(ctx) {
+  const auto = Number(ctx.intent.max_auto_radius) || 0;
+  const manual =
+    ctx.geoRequest?.mode === GEO_MODE.MANUAL_RADIUS
+      ? Number(ctx.geoRequest.requested_radius_km) || 0
+      : 0;
+  return Math.min(Math.max(auto, manual), MANUAL_RADIUS_MAX_KM);
+}
+
 async function loadLiquidity(ctx, policy, db, useCache, base) {
-  const { origin, filters, intent } = ctx;
+  const { origin, filters } = ctx;
   return loadLiquidityRows({
     db,
     origin,
     filters,
-    profile: intent.profile,
-    radiusKm: intent.max_auto_radius,
+    profile: ctx.intent.profile,
+    radiusKm: liquidityRadiusFor(ctx),
     policy,
     useCache,
     bookkeeping: base,

@@ -34,7 +34,10 @@ import {
   buildPassiveFacetsQuery,
   facetKeysFor,
 } from "../../src/modules/ads/search-policy/facets-policy.js";
-import { computeRelaxations } from "../../src/modules/ads/search-policy/relaxations.js";
+import {
+  buildRelaxationVariants,
+  computeRelaxations,
+} from "../../src/modules/ads/search-policy/relaxations.js";
 import { resetDictionariesForTests } from "../../src/modules/ads/search-policy/dictionaries.js";
 import { __policyCacheTesting } from "../../src/modules/ads/search-policy/policy-cache.js";
 import { sellerKindExpr } from "../../src/modules/ads/filters/ads-ranking.sql.js";
@@ -334,6 +337,260 @@ describe.sequential("F2 — motor em Postgres real", () => {
     ]);
     expect(r.search_policy.territory_city_count).toBeGreaterThan(2);
     expect(r.search_policy.local_result_count).toBe(2);
+  });
+
+  // ── F2.2-A2 — raio manual exato e concessão de 150 ─────────────────────────
+  //
+  // Distâncias REAIS da fixture a partir de Atibaia (region_memberships
+  // construída pelo builder da F1 sobre as coordenadas de produção):
+  //   Atibaia 0 · Bragança 18,34 · Vargem 29,52 · Jundiaí 35,69 ·
+  //   Extrema 38,10 · Campinas 57,23 · Camanducaia 58,21 · Rio 344,21
+  //
+  // Essa malha é o que permite provar granularidade de 1 km sem inventar
+  // fixture: 37 e 40 km separam Jundiaí de Extrema, coisa que nenhum preset
+  // (0/25/50/75) consegue fazer.
+
+  /** Distâncias do território real, lidas de region_memberships (fonte
+   *  independente do motor). */
+  async function distancesWithin(radiusKm) {
+    const { rows } = await db.query(
+      `SELECT rm.distance_km::float AS d
+         FROM region_memberships rm
+         JOIN cities c ON c.id = rm.base_city_id
+        WHERE c.slug = 'atibaia-sp' AND rm.distance_km <= $1
+        ORDER BY 1`,
+      [radiusKm]
+    );
+    return rows.map((r) => Number(r.d));
+  }
+
+  /** Ativos dentro do raio, contados direto no banco — não pelo motor. */
+  async function activeAdsWithin(radiusKm, extraSql = "") {
+    const { rows } = await db.query(
+      `SELECT COUNT(*)::int AS n
+         FROM ads a
+        WHERE a.status = 'active' ${extraSql}
+          AND a.city_id IN (
+            SELECT rm.member_city_id FROM region_memberships rm
+            JOIN cities c ON c.id = rm.base_city_id
+            WHERE c.slug = 'atibaia-sp' AND rm.distance_km <= $1)`,
+      [radiusKm]
+    );
+    return Number(rows[0].n);
+  }
+
+  it("A2 raio=40 em Atibaia: MANUAL_RADIUS 40 exato, Extrema (38 km) dentro e Campinas (57 km) fora", async () => {
+    const r = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", raio: "40" },
+      { db, policy, cache: false, telemetry: false }
+    );
+    const sp = r.search_policy;
+    expect(sp.geo_mode).toBe("MANUAL_RADIUS");
+    expect(sp.requested_radius_km).toBe(40);
+    expect(sp.effective_radius_km).toBe(40);
+    expect(sp.user_geo_explicit).toBe(true);
+    // 40 não é preset: nenhum arredondamento para 25 ou 50 (INV-006)
+    expect(policy.rings_manual).not.toContain(40);
+    expect(sp.required_distance_km).toBeNull();
+
+    const slugs = sp.cities.map((c) => c.slug);
+    expect(slugs).toContain("extrema-mg"); // 38,10 — e cruza UF
+    expect(slugs).not.toContain("campinas-sp"); // 57,23
+    expect(slugs).not.toContain("camanducaia-mg"); // 58,21
+    for (const c of sp.cities) expect(c.distance_km).toBeLessThanOrEqual(40);
+
+    // territory_city_count é o território, não só as cidades com estoque
+    expect(sp.territory_city_count).toBe((await distancesWithin(40)).length);
+    // e o grid concorda com uma contagem feita fora do motor
+    expect(sp.total_result_count).toBe(await activeAdsWithin(40));
+  });
+
+  it("A2 granularidade de 1 km: raio=37 exclui Extrema (38,10) que raio=40 inclui", async () => {
+    const r37 = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", raio: "37" },
+      { db, policy, cache: false, telemetry: false }
+    );
+    const r40 = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", raio: "40" },
+      { db, policy, cache: false, telemetry: false }
+    );
+    expect(r37.search_policy.effective_radius_km).toBe(37);
+    expect(r40.search_policy.effective_radius_km).toBe(40);
+    // `cities` lista as cidades EMITIDAS (origem + as que têm estoque), não o
+    // território inteiro: Jundiaí está a 35,69 km mas não tem anúncio ativo na
+    // fixture, então nunca aparece aqui. Quem mede território é
+    // `territory_city_count`.
+    const s37 = r37.search_policy.cities.map((c) => c.slug);
+    const s40 = r40.search_policy.cities.map((c) => c.slug);
+    expect(s37).not.toContain("extrema-mg"); // 38,10 > 37
+    expect(s40).toContain("extrema-mg"); // 38,10 <= 40
+    expect(await distancesWithin(37)).not.toContain(38.1);
+    expect(await distancesWithin(40)).toContain(38.1);
+    // Se houvesse snap para presets, 37 e 40 cairiam no MESMO anel (50 km) e
+    // dariam territórios idênticos.
+    expect(r37.search_policy.territory_city_count).toBeLessThan(
+      r40.search_policy.territory_city_count
+    );
+  });
+
+  it("A2 raio=150: MANUAL_RADIUS 150, território até 150, sem AUTO e sem baseline", async () => {
+    const r = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", raio: "150" },
+      { db, policy, cache: false, telemetry: false }
+    );
+    const sp = r.search_policy;
+    expect(sp.geo_mode).toBe("MANUAL_RADIUS");
+    expect(sp.requested_radius_km).toBe(150);
+    expect(sp.effective_radius_km).toBe(150);
+    expect(sp.user_geo_explicit).toBe(true);
+    expect(sp.reason).toBe("MANUAL");
+    // AUTO não participou: `required_distance_km` é grandeza do automático
+    expect(sp.required_distance_km).toBeNull();
+    for (const c of sp.cities) expect(c.distance_km).toBeLessThanOrEqual(150);
+    expect(sp.cities.map((c) => c.slug)).not.toContain("rio-de-janeiro-rj"); // 344,21
+    // O território passou do teto automático de 75 sem que o AUTO o tenha
+    // alcançado — as duas vias continuam separadas.
+    expect(sp.territory_city_count).toBe((await distancesWithin(150)).length);
+    expect(sp.total_result_count).toBe(await activeAdsWithin(150));
+  });
+
+  it("A2 raio=0 explícito: EXACT_CITY com automático bloqueado (INV-076)", async () => {
+    const r = await runSearchPolicyEngine(
+      {
+        origem: "atibaia-sp",
+        raio: "0",
+        q: "onix",
+        transmission: "automatico",
+        price_max: "75000",
+      },
+      { db, policy, cache: false, telemetry: false }
+    );
+    expect(r.search_policy.geo_mode).toBe("EXACT_CITY");
+    expect(r.search_policy.effective_radius_km).toBe(0);
+    expect(r.search_policy.user_geo_explicit).toBe(true);
+    expect(r.search_policy.expanded).toBe(false);
+  });
+
+  it("A2 produto + manual: SEARCH_MODEL com raio=40 respeita 40, não cai no baseline nem expande", async () => {
+    const r = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", q: "onix", raio: "40" },
+      { db, policy, cache: false, telemetry: false }
+    );
+    const sp = r.search_policy;
+    expect(sp.profile).toBe("SEARCH_MODEL");
+    expect(sp.geo_mode).toBe("MANUAL_RADIUS");
+    expect(sp.effective_radius_km).toBe(40);
+    // INV-078: o baseline territorial de /comprar não se aplica com raio
+    // explícito — se aplicasse, o território seria o do BROWSE_CITY (0 km, já
+    // que Atibaia satura o alvo sozinha) e não 40.
+    expect(sp.effective_radius_km).not.toBe(0);
+    expect(sp.required_distance_km).toBeNull();
+    // O filtro de produto não mexeu no raio pedido (INV-009 continua válido na
+    // outra direção: produto não expande, e aqui também não encolhe).
+    expect(sp.total_result_count).toBe(
+      await activeAdsWithin(40, "AND a.commercial_model ILIKE 'onix'")
+    );
+    // ranking e facetas saem do MESMO CandidateScope, com o 40 dentro dele
+    const ctx = await buildSearchContext(
+      { origem: "atibaia-sp", q: "onix", raio: "40" },
+      { db, policy }
+    );
+    const scope = await resolveScope(ctx, policy, { db, cache: false });
+    const q = buildEngineQueries(ctx, scope);
+    expect(q.scopeCtx.territory.radiusKm).toBe(40);
+    expect(q.dataQuery).toContain("distance_km <=");
+    expect(q.params).toContain(40);
+    expect(q.countParams).toContain(40);
+    // o mesmo território alimenta as facetas
+    expect(buildPassiveFacetsQuery(q.scopeCtx, policy, facetKeysFor(ctx.filters)).params).toContain(
+      40
+    );
+  });
+
+  it("A2 concessão de 150 ponta a ponta: oferta → url_params → nova busca em 150", async () => {
+    // Etapa 1 — em 75 km manual, com filtro raro, o mecanismo oferece 150.
+    const step1 = await runSearchPolicyEngine(
+      {
+        origem: "atibaia-sp",
+        q: "onix",
+        raio: "75",
+        transmission: "automatico",
+        price_max: "75000",
+      },
+      { db, policy, cache: false, telemetry: false }
+    );
+    expect(step1.search_policy.effective_radius_km).toBe(75);
+    expect(step1.search_policy.total_result_count).toBeLessThan(step1.search_policy.target);
+
+    // A oferta é lida do CONSTRUTOR de variantes, não da lista publicada.
+    // `computeRelaxations` só publica variantes com delta > 0, e nesta fixture
+    // ampliar de 75 para 150 não acrescenta nada: a cidade mais próxima acima
+    // de 75 km é o Rio, a 344 km. O delta zero é propriedade da FIXTURE, não do
+    // mecanismo — o que a A2 precisa provar é que a variante volta a ser
+    // construída (a A1 a descartava por `150 <= 75`) e que, aceita, produz
+    // território de 150.
+    const ctx1 = await buildSearchContext(
+      {
+        origem: "atibaia-sp",
+        q: "onix",
+        raio: "75",
+        transmission: "automatico",
+        price_max: "75000",
+      },
+      { db, policy }
+    );
+    const scope1 = await resolveScope(ctx1, policy, { db, cache: false });
+    const offer = buildRelaxationVariants(ctx1, scope1, policy).find(
+      (v) => v.dimension === "radius"
+    );
+    expect(offer).toBeDefined();
+    expect(offer.url_params).toEqual({ raio: 150 });
+
+    // Etapa 2 — os url_params da oferta viram a query seguinte, sem tradução.
+    const step2 = await runSearchPolicyEngine(
+      {
+        origem: "atibaia-sp",
+        q: "onix",
+        transmission: "automatico",
+        price_max: "75000",
+        ...offer.url_params,
+      },
+      { db, policy, cache: false, telemetry: false }
+    );
+    expect(step2.search_policy.geo_mode).toBe("MANUAL_RADIUS");
+    expect(step2.search_policy.requested_radius_km).toBe(150);
+    expect(step2.search_policy.effective_radius_km).toBe(150);
+    expect(step2.search_policy.user_geo_explicit).toBe(true);
+    // o território realmente cresceu de 75 para 150
+    expect(step2.search_policy.territory_city_count).toBeGreaterThanOrEqual(
+      step1.search_policy.territory_city_count
+    );
+    expect(step2.search_policy.territory_city_count).toBe((await distancesWithin(150)).length);
+  });
+
+  it("A2 não regride A1: sem raio explícito, nenhum perfil de produto chega a 150", async () => {
+    for (const q of ["onix", "onix 2020", "chevrolet"]) {
+      const r = await runSearchPolicyEngine(
+        { origem: "atibaia-sp", q },
+        { db, policy, cache: false, telemetry: false }
+      );
+      expect(r.search_policy.geo_mode).toBe("AUTO_RADIUS");
+      expect(r.search_policy.effective_radius_km).toBeLessThanOrEqual(75);
+      expect(r.search_policy.user_geo_explicit).toBe(false);
+      expect(r.search_policy.rings.some((x) => x.radius_km === 150)).toBe(false);
+    }
+  });
+
+  it("A2 raio inválido não vira manual nem arredonda (INV-077, comportamento atual)", async () => {
+    for (const bad of ["-1", "151", "40.5", "abc"]) {
+      const r = await runSearchPolicyEngine(
+        { origem: "atibaia-sp", raio: bad },
+        { db, policy, cache: false, telemetry: false }
+      );
+      expect(r.search_policy.geo_mode).toBe("AUTO_RADIUS");
+      expect(r.search_policy.requested_radius_km).toBeNull();
+      expect(r.search_policy.user_geo_explicit).toBe(false);
+    }
   });
 
   // ── 8.8 shadow ─────────────────────────────────────────────────────────────
