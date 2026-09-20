@@ -121,6 +121,36 @@ D7 (liquidez agregada por cidade): ratificada a semântica por DEC-20; a forma S
 D8 (deltas do snapshot +3/+1/R$87k): não normativo; superado por DEC-21.
 · Encerra a pendência de aprovação do gate. · Vigente · 2026-09.
 
+### DEC-26
+
+DEC-26 — Política inicial de Guided Relaxation: bandas de custo, boundary real e ordenação. Fixa o que DEC-21 deixou como `pendente` (pesos, custos por dimensão e quantums de arredondamento). DEC-21 **continua vigente** em todos os seus princípios gerais — menor concessão útil, nenhuma concessão autoaplicada, delta zero oculto, custo participando da ordenação, configuração versionada, nenhum modelo de linguagem no cálculo; o que DEC-26 acrescenta é a política concreta que preenche esses princípios, e DEC-21 **não** deve ser lida como se já os contivesse.
+
+**Modelo de custo.** O custo de uma concessão é uma banda ordinal — `PEQUENA`, `MEDIA` ou `GRANDE` —, nunca um peso contínuo entre dimensões incomparáveis. A comparação de custo entre dimensões é categórica: uma concessão de banda menor **nunca** perde para uma de banda maior apenas por acrescentar mais resultados. É o que impede que uma ampliação de 25 km para 150 km vença automaticamente uma pequena concessão de preço, ano ou quilometragem por produzir `delta_result_count` maior.
+
+**Menor concessão útil, dirigida por boundary real.** Para toda dimensão relaxável, o motor procura a menor mudança que efetivamente acrescente candidato, calculada a partir do estoque, e não um degrau fixo cego. Nenhuma concessão com `delta_result_count = 0` é oferecida (DEC-14). Ficam explicitamente superados como política vigente: preço +15% fixo; ano −2 fixo; quilometragem +25% fixa; "próximo anel" de distância quando esse anel não acrescenta resultados; e ordenação apenas por `delta_count`.
+
+**Arredondamento.** Onde há quantum, o valor é sempre arredondado **para cima** a partir do boundary real, e o valor arredondado é simultaneamente o valor aplicado, o valor transportado na URL e o valor exibido ao usuário — os três são o mesmo número. É proibido arredondar para baixo quando isso excluir o candidato que justificou a concessão.
+
+**Fronteiras e quantums iniciais.**
+
+- **preço máximo** — banda pela variação relativa ao teto atual: `PEQUENA` até +5%; `MEDIA` acima de 5% e até 10%; `GRANDE` acima de 10%. Quantum R$ 1.000.
+- **ano mínimo** — banda pela quantidade de anos cedidos: `PEQUENA` 1 ano; `MEDIA` 2 anos; `GRANDE` 3 anos ou mais. Sem quantum: a concessão usa o próximo ano real disponível que acrescente resultado.
+- **quilometragem máxima** — banda pela variação absoluta sobre o limite atual: `PEQUENA` até +10.000 km; `MEDIA` acima de 10.000 e até 25.000 km; `GRANDE` acima de 25.000 km. Quantum 5.000 km.
+- **distância** — a concessão territorial **não** depende de presets de `rings_manual`. O motor localiza a menor distância real que inclua o primeiro candidato externo que acrescenta resultado, arredonda para cima ao quantum de 5 km e limita o valor final a 150 km. Banda pelo acréscimo sobre o território atual: `PEQUENA` até +25 km; `MEDIA` acima de 25 e até 50 km; `GRANDE` acima de 50 km. A concessão aceita passa a ser `MANUAL_RADIUS`; 150 km permanece proibido em AUTO (DEC-11, DEC-23). Exemplo normativo: território 25 km, primeiro candidato útil a 38,1 km, concessão final 40 km, acréscimo 15 km, banda `PEQUENA`. Outro: território 25 km, concessão necessária 150 km, acréscimo 125 km, banda `GRANDE`. Não existe lista normativa obrigatória de anéis de concessão.
+- **câmbio** — remover a preferência de câmbio é concessão de banda `GRANDE`, por ser mudança qualitativa de preferência e não variação numérica pequena. Não é convertida em peso numérico contínuo.
+
+**Elegibilidade mínima.** Uma concessão pode ser oferecida quando `delta_result_count >= 1`. Esta versão não exige mais de um resultado novo.
+
+**Ordenação.** Na ordem: (1) menor banda de custo; (2) maior `delta_result_count`; (3) maior `delta_seller_count`; (4) maior `delta_city_count`; (5) `priority_order` determinístico. `delta_result_count` é o benefício principal; `delta_seller_count` e `delta_city_count` são desempates sucessivos e **não** entram em um score contínuo nesta versão. Liquidity Quality Score não é implementado aqui.
+
+**`priority_order` inicial.** `price`, `year`, `mileage`, `radius`, `transmission`. Existe apenas como último desempate determinístico e **não** pode superar banda de custo nem benefício.
+
+**Leveza operacional.** A busca normal não consulta automaticamente até 150 km: monta o CandidateScope no território atual e encerra se o alvo foi atingido. Somente quando a Guided Relaxation é necessária a dimensão de distância pode investigar até 150 km. A investigação ampliada é lazy e não vira custo permanente de toda busca.
+
+**Natureza dos valores.** As fronteiras, os quantums, a banda do câmbio, o delta mínimo e o `priority_order` acima são parâmetros iniciais versionados de política, representáveis em `platform_settings.search_policy.relaxations` — não são constantes permanentes do produto. É normativo o conjunto estrutural: as bandas de custo, a ordem de decisão, o princípio do boundary real, o arredondamento para cima, o teto de 150 km para manual e concessão, o delta mínimo e a cadeia de desempates. Os valores podem ser recalibrados com telemetria mediante **nova** decisão normativa; até lá, valem os aqui fixados.
+
+· Refina DEC-21, que segue vigente nos princípios; fixa os valores que ela deixou `pendente`. Preserva DEC-11, DEC-12, DEC-14 e DEC-24. Não altera DEC-22 nem DEC-23. Supera, para a dimensão de distância, a formulação de DEC-21 baseada em "primeiro anel permitido". · Vigente · 2026-09.
+
 ---
 
 ## Adiamentos confirmados
