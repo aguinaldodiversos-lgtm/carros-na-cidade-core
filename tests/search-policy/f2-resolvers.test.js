@@ -269,7 +269,7 @@ describe("intent-resolver — §4.3", () => {
     expect(resolveIntent({ brand: "Fiat" }, "", p)).toMatchObject({
       profile: "SEARCH_BRAND",
       target: 16,
-      max_auto_radius: 150,
+      max_auto_radius: 75,
     });
     expect(
       resolveIntent(

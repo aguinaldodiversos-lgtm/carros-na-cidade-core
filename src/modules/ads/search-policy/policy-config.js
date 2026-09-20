@@ -18,15 +18,15 @@ export const SEARCH_POLICY_SETTING_KEY = "search_policy";
 
 export const SEARCH_POLICY_DEFAULT = Object.freeze({
   version: "v1",
-  rings_auto: [0, 25, 50, 75, 150],
+  rings_auto: [0, 25, 50, 75],
   rings_manual: [0, 25, 50, 75],
   profiles: {
     BROWSE_CITY: { target: 20, max_auto_radius: 75 },
     BROWSE_CATEGORY: { target: 16, max_auto_radius: 75 },
-    SEARCH_BRAND: { target: 16, max_auto_radius: 150 },
-    SEARCH_MODEL: { target: 12, max_auto_radius: 150 },
-    SEARCH_MODEL_YEAR: { target: 8, max_auto_radius: 150 },
-    SEARCH_VERSION: { target: 4, max_auto_radius: 150 },
+    SEARCH_BRAND: { target: 16, max_auto_radius: 75 },
+    SEARCH_MODEL: { target: 12, max_auto_radius: 75 },
+    SEARCH_MODEL_YEAR: { target: 8, max_auto_radius: 75 },
+    SEARCH_VERSION: { target: 4, max_auto_radius: 75 },
   },
   liquidity_cache_ttl_seconds: 900,
   facets: {

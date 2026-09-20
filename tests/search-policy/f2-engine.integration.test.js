@@ -278,7 +278,11 @@ describe.sequential("F2 — motor em Postgres real", () => {
   });
 
   // ── 8.7 ────────────────────────────────────────────────────────────────────
-  it("8.7 relaxações: q=onix + automatico + 75000 em Atibaia → total 0, transmission +3, price_max 87000 +1, sem radius", async () => {
+  // F2.2-A1: o território deixa de vir do perfil de produto. Atibaia tem 34
+  // ativos próprios (≥ 20 do BROWSE_CITY), então o baseline de descoberta para
+  // em 0 km e o modelo raro é procurado DENTRO dele — antes o SEARCH_MODEL
+  // puxava sozinho o território até 150 km (DEC-10/11/18/23).
+  it("8.7 relaxações: q=onix + automatico + 75000 em Atibaia → baseline 0 km, total 0, transmission +3, price_max 87000 +1, sem radius", async () => {
     const r = await runSearchPolicyEngine(
       { origem: "atibaia-sp", q: "onix", transmission: "automatico", price_max: "75000" },
       { db, policy, cache: false, telemetry: false }
@@ -286,8 +290,9 @@ describe.sequential("F2 — motor em Postgres real", () => {
     expect(r.search_policy).toMatchObject({
       profile: "SEARCH_MODEL",
       total_result_count: 0,
-      effective_radius_km: 150,
-      reason: "AUTO_RADIUS_CAP_REACHED",
+      effective_radius_km: 0,
+      required_distance_km: 0,
+      reason: "LOCAL_LIQUIDITY_OK",
       location_source: "CITY_PAGE",
     });
     expect(r.relaxations).toEqual([
@@ -305,10 +310,14 @@ describe.sequential("F2 — motor em Postgres real", () => {
       },
     ]);
     expect(r.chips.map((c) => c.key)).toEqual(["commercial_model", "price", "transmission", "geo"]);
-    expect(r.search_policy.rings[r.search_policy.rings.length - 1]).toEqual({
-      radius_km: 150,
-      label: "150 km",
+    // Anéis: só os de rings_manual; 150 não aparece porque não é anel automático.
+    expect(r.search_policy.rings.map((x) => x.radius_km)).toEqual([0, 25, 50, 75]);
+    expect(r.search_policy.rings.some((x) => x.radius_km === 150)).toBe(false);
+    expect(r.search_policy.rings[0]).toEqual({
+      radius_km: 0,
+      label: "Apenas Atibaia",
       count: 0,
+      url_params: { raio: 0 },
       auto: true,
     });
   });
