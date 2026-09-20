@@ -17,7 +17,7 @@
 
 **O que este documento não é.** Não é uma descrição da implementação. Não afirma nem nega o que a fase F2 fez, deixou de fazer ou fez de outro jeito. A comparação entre esta especificação e a implementação é uma tarefa posterior e separada (MET-01); qualquer divergência encontrada lá é resultado esperado do método, não defeito deste texto.
 
-> **Certificação MET-01:** PENDENTE de releitura documental final em sessão limpa antes da comparação V3 × F2. A especificação permanece normativa, mas sua certificação formal de independência ainda não foi concluída.
+> **Certificação MET-01:** CERTIFICADA em 2026-09-19 sobre o baseline `48f7e9ed7039595cda499704ba2de8ba1521b5df`, por releitura documental independente em pacote isolado, sem consulta à implementação F2.
 
 ---
 
