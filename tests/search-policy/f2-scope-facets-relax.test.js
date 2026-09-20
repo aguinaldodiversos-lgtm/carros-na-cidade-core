@@ -96,16 +96,24 @@ describe("ScopeResolver — AUTO_RADIUS (8.3)", () => {
       reason: REASON.AUTO_RADIUS_CAP_REACHED,
     });
   });
-  it("SEARCH_MODEL com 0 até 150 → effective 150, CAP_REACHED, count 0", () => {
+  // F2.2-A1 (DEC-11/DEC-23): substitui "SEARCH_MODEL com 0 até 150 → effective
+  // 150". Nenhum perfil chega a 150 por automação, e o teto avaliado não vira
+  // território efetivo: sem candidato em anel nenhum, o efetivo é 0.
+  it("SEARCH_MODEL sem candidato em nenhum anel → effective 0, required null, nunca 150", () => {
     const r = resolveAutoRadius(
       rows([
         [0, 0],
         [18.34, 0],
         [120, 0],
       ]),
-      { target: 12, max_auto_radius: 150, rings_auto: policy.rings_auto }
+      { target: 12, max_auto_radius: 75, rings_auto: policy.rings_auto }
     );
-    expect(r).toMatchObject({ effective_radius_km: 150, reason: REASON.AUTO_RADIUS_CAP_REACHED });
+    expect(r).toEqual({
+      required_distance_km: null,
+      effective_radius_km: 0,
+      expanded: false,
+      reason: REASON.AUTO_RADIUS_CAP_REACHED,
+    });
     expect(
       cumulativeCountAt(
         rows([
@@ -116,6 +124,22 @@ describe("ScopeResolver — AUTO_RADIUS (8.3)", () => {
         150
       )
     ).toBe(0);
+  });
+  it("nenhum perfil da política alcança 150 km por automação (INV-010)", () => {
+    const far = rows([
+      [0, 0],
+      [80, 500],
+      [140, 500],
+    ]);
+    for (const [name, p] of Object.entries(policy.profiles)) {
+      const r = resolveAutoRadius(far, {
+        target: p.target,
+        max_auto_radius: p.max_auto_radius,
+        rings_auto: policy.rings_auto,
+      });
+      expect(p.max_auto_radius, name).toBeLessThanOrEqual(75);
+      expect(r.effective_radius_km, name).toBeLessThanOrEqual(75);
+    }
   });
   it("alcança o target exatamente no limite de um anel → esse anel", () => {
     expect(

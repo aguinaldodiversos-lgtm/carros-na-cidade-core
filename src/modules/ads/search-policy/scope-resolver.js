@@ -17,6 +17,12 @@
 //
 // Fail-safe (§4.4): origem sem lat/lng, memberships vazias ou erro de query →
 // EXACT_CITY, reason GEO_FALLBACK, log.error. NUNCA NATIONAL por falha.
+//
+// F2.2-A1 (v3 certificada): o AUTO_RADIUS passou a obedecer DEC-11, DEC-18 e
+// DEC-23. Teto automático de 75 km em qualquer perfil; o território sai do
+// BASELINE de descoberta (política BROWSE_CITY, liquidez sem filtro de
+// produto), nunca do perfil de produto; e, quando nenhum anel atinge o alvo, o
+// raio efetivo é o último anel que acrescentou candidatos — não o teto.
 
 import crypto from "node:crypto";
 import { pool } from "../../../infrastructure/database/db.js";
@@ -71,8 +77,29 @@ export function resolveGeoRequest(query = {}, policy, hasOrigin, { uf = null } =
 /**
  * Núcleo do AUTO_RADIUS (§4.4), puro. `rows` ordenadas por distance_km ASC,
  * cada uma { distance_km, count }.
+ *
+ * F2.2-A1 (DEC-23). Dois caminhos:
+ *
+ *   alvo atingido  →  `required_distance_km` é a distância exata em que o
+ *                     acumulado cruza o alvo; `effective_radius_km` é o menor
+ *                     anel automático permitido que a contém.
+ *
+ *   alvo NÃO atingido →  `required_distance_km` é nulo e o raio efetivo é o
+ *                     ÚLTIMO anel cuja inclusão acrescentou candidatos. Anel
+ *                     com delta zero não amplia o território; se nenhum anel
+ *                     externo acrescenta nada, o efetivo é 0.
+ *
+ * O teto avaliado nunca é, por si, o território efetivo — era o que a versão
+ * anterior fazia (`effective = max_auto_radius`) e o que DEC-23 substituiu.
+ * `AUTO_RADIUS_CAP_REACHED` passa a significar só "o teto automático foi
+ * varrido sem atingir o alvo".
  */
 export function resolveAutoRadius(rows, { target, max_auto_radius, rings_auto }) {
+  const allowed = (rings_auto || [])
+    .map(Number)
+    .filter((r) => Number.isFinite(r) && r <= Number(max_auto_radius))
+    .sort((a, b) => a - b);
+
   let acc = 0;
   let required = null;
   for (const row of rows) {
@@ -82,21 +109,35 @@ export function resolveAutoRadius(rows, { target, max_auto_radius, rings_auto })
       break;
     }
   }
-  if (required === null) {
+
+  if (required !== null) {
+    const candidates = allowed.filter((r) => r >= required);
+    const effective = candidates.length
+      ? Math.min(...candidates)
+      : allowed.length
+        ? Math.max(...allowed)
+        : 0;
     return {
-      required_distance_km: null,
-      effective_radius_km: max_auto_radius,
-      expanded: true,
-      reason: REASON.AUTO_RADIUS_CAP_REACHED,
+      required_distance_km: required,
+      effective_radius_km: effective,
+      expanded: effective > 0,
+      reason: effective > 0 ? REASON.LOW_LOCAL_LIQUIDITY : REASON.LOCAL_LIQUIDITY_OK,
     };
   }
-  const candidates = (rings_auto || []).filter((r) => r >= required && r <= max_auto_radius);
-  const effective = candidates.length ? Math.min(...candidates) : max_auto_radius;
+
+  // Alvo não atingido: último anel contributivo (DEC-23).
+  let effective = 0;
+  let previous = allowed.length ? cumulativeCountAt(rows, allowed[0]) : 0;
+  for (const ring of allowed.slice(1)) {
+    const cumulative = cumulativeCountAt(rows, ring);
+    if (cumulative > previous) effective = ring;
+    previous = cumulative;
+  }
   return {
-    required_distance_km: required,
+    required_distance_km: null,
     effective_radius_km: effective,
     expanded: effective > 0,
-    reason: effective > 0 ? REASON.LOW_LOCAL_LIQUIDITY : REASON.LOCAL_LIQUIDITY_OK,
+    reason: REASON.AUTO_RADIUS_CAP_REACHED,
   };
 }
 
@@ -253,9 +294,14 @@ export async function resolveScope(ctx, policy, deps = {}) {
   let expanded;
   let reason;
   if (mode === GEO_MODE.AUTO_RADIUS) {
-    const auto = resolveAutoRadius(rows, {
-      target: intent.target,
-      max_auto_radius: intent.max_auto_radius,
+    // F2.2-A1 / DEC-18: o território automático sai do BASELINE de descoberta
+    // (política BROWSE_CITY, liquidez SEM filtros de produto), nunca do perfil
+    // de produto. É isso que impede que marca/modelo/ano/versão ampliem o
+    // território sozinhos. Com liquidez sem filtro, baseline === rows.
+    const baselineRows = await loadBaselineLiquidity(ctx, policy, db, useCache, rows);
+    const auto = resolveAutoRadius(baselineRows, {
+      target: baselineTarget(policy),
+      max_auto_radius: baselineMaxAutoRadius(policy),
       rings_auto: policy.rings_auto,
     });
     effective = auto.effective_radius_km;
@@ -318,21 +364,26 @@ function geoFallback(base, origin) {
   };
 }
 
-async function loadLiquidity(ctx, policy, db, useCache, base) {
-  const { origin, filters, intent } = ctx;
-  const key = liquidityCacheKey(origin.id, intent.profile, filters);
+/** Carrega e cacheia uma liquidez qualquer (produto ou baseline). */
+async function loadLiquidityRows({
+  db,
+  origin,
+  filters,
+  profile,
+  radiusKm,
+  policy,
+  useCache,
+  bookkeeping,
+}) {
+  const key = liquidityCacheKey(origin.id, profile, filters);
   if (useCache) {
     const hit = await policyCacheGet(key);
     if (Array.isArray(hit)) {
-      base.cache = { backend: "policy-cache", hit: true, key };
+      bookkeeping.cache = { backend: "policy-cache", hit: true, key };
       return hit;
     }
   }
-  const { rows } = await runLiquidityQuery(db, {
-    originId: origin.id,
-    radiusKm: intent.max_auto_radius,
-    filters,
-  });
+  const { rows } = await runLiquidityQuery(db, { originId: origin.id, radiusKm, filters });
   const compact = rows.map((r) => ({
     city_id: Number(r.city_id),
     slug: r.slug,
@@ -341,9 +392,60 @@ async function loadLiquidity(ctx, policy, db, useCache, base) {
   }));
   if (useCache) {
     await policyCacheSet(key, compact, Number(policy.liquidity_cache_ttl_seconds) || 900);
-    base.cache = { backend: "policy-cache", hit: false, key };
+    bookkeeping.cache = { backend: "policy-cache", hit: false, key };
   }
   return compact;
+}
+
+async function loadLiquidity(ctx, policy, db, useCache, base) {
+  const { origin, filters, intent } = ctx;
+  return loadLiquidityRows({
+    db,
+    origin,
+    filters,
+    profile: intent.profile,
+    radiusKm: intent.max_auto_radius,
+    policy,
+    useCache,
+    bookkeeping: base,
+  });
+}
+/** Perfil do território-base de descoberta (DEC-18): sempre BROWSE_CITY. */
+export const BASELINE_PROFILE = "BROWSE_CITY";
+
+function baselineTarget(policy) {
+  return Number(policy?.profiles?.[BASELINE_PROFILE]?.target);
+}
+
+function baselineMaxAutoRadius(policy) {
+  return Number(policy?.profiles?.[BASELINE_PROFILE]?.max_auto_radius);
+}
+
+/** Há alguma restrição de PRODUTO ativa? Usa o mesmo construtor do
+ *  CandidateScope para não existir uma segunda definição de "produto". */
+export function hasProductFilters(filters = {}) {
+  const bag = createParamBag();
+  return buildProductClauses(filters, bag).clauses.length > 0;
+}
+
+/**
+ * Liquidez do BASELINE (DEC-18): mesma consulta, sem filtros de produto e com
+ * o teto do perfil BROWSE_CITY. Sem filtro de produto ativo, o baseline é a
+ * própria liquidez já carregada — nenhuma query extra.
+ */
+async function loadBaselineLiquidity(ctx, policy, db, useCache, productRows) {
+  const { origin, filters } = ctx;
+  if (!hasProductFilters(filters)) return productRows;
+  return loadLiquidityRows({
+    db,
+    origin,
+    filters: {},
+    profile: BASELINE_PROFILE,
+    radiusKm: baselineMaxAutoRadius(policy),
+    policy,
+    useCache,
+    bookkeeping: {},
+  });
 }
 
 async function localCountViaLiquidity(ctx, policy, db, useCache, out) {
