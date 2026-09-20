@@ -3,7 +3,7 @@
 **STATUS:** NORMATIVA — especificação vigente
 **Data:** 2026-09-09
 **Última sincronização normativa:** 2026-09-20
-**Delta pendente de certificação:** DEC-26 (política inicial de Guided Relaxation), sincronizada em 2026-09-20 e **ainda não** coberta pela certificação MET-01 abaixo.
+**Certificação do delta DEC-26:** CERTIFICADA em 2026-09-20 sobre o baseline normativo `6981b73d`, por auditoria documental independente em air-gap realizada em duas etapas — delta principal `2d3913ec → 96cd99e5` e microdelta pós-arredondamento `96cd99e5 → 6981b73d` —, ambas aprovadas sem blockers. Não substitui nem reescreve a certificação MET-01 histórica registrada abaixo.
 **Fontes:** `docs/Search_Policy_Decisions_2026-09.md` @ 893c0f39 (DEC-01…DEC-15, DEC-17…DEC-25, ADI-01…ADI-03, MET-01) e DEC-26 (2026-09-20) · `docs/history/Search_Policy_Engine_v2_Apos_Auditoria.md` (histórico, não normativo). Por DEC-25, `docs/F2_GATE_SQL.md` @ 978c6715 deixou de ser fonte normativa e permanece apenas como evidência histórica.
 **Método:** MET-01 — escrita sem consultar código, testes ou relatórios da F2. Cada seção declara sua proveniência.
 **Substitui:** a "v2.1 Consolidado", que nunca existiu, e a v2.0 nos pontos em que o registro de decisões a alterou.
@@ -20,7 +20,7 @@
 
 > **Certificação MET-01:** CERTIFICADA em 2026-09-19 sobre o baseline `48f7e9ed7039595cda499704ba2de8ba1521b5df`, por releitura documental independente em pacote isolado, sem consulta à implementação F2.
 >
-> **Governança do delta pós-certificação.** A certificação acima permanece válida **para o baseline que certificou** e não é retroativa ao conteúdo acrescentado depois dele. A sincronização de DEC-26, feita em 2026-09-20, é conteúdo normativo posterior: ela **não** está coberta por essa certificação e exige auditoria documental própria antes de ser tratada como certificada. Até lá, o documento é normativo — DEC-26 vale como norma —, mas apenas as partes anteriores a 2026-09-20 têm certificação MET-01.
+> **Governança do delta pós-certificação.** A certificação MET-01 acima permanece válida **para o baseline que certificou** e não é retroativa ao conteúdo acrescentado depois dele. A sincronização de DEC-26, feita em 2026-09-20, é conteúdo normativo posterior e por isso exigiu auditoria documental própria, que foi realizada em air-gap e em duas etapas — `2d3913ec → 96cd99e5` e `96cd99e5 → 6981b73d` —, ambas aprovadas. Com ela, o estado normativo deste documento até o baseline `6981b73d` está documentalmente certificado. Qualquer mudança normativa posterior a `6981b73d` volta a constituir delta não certificado até que uma nova auditoria própria a cubra.
 
 ---
 
