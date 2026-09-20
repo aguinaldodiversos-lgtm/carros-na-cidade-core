@@ -12,8 +12,14 @@
 //   8.6 facetas    count 0 ausente; 1 opção ausente salvo ativa; Modelo "Onix (6)";
 //                  self-excluding de Câmbio.
 //   8.7 relaxações fixture Atibaia: q=onix + automatico + 75000 → total 0;
-//                  transmission +3 e price_max 87000 +1; radius ausente; ordem.
+//                  DEC-26: preço 79.000 MEDIA (+1) antes de câmbio GRANDE (+3).
+//   B1  DEC-26     boundary real de preço e de distância, concessão até 150 km
+//                  sobre candidato sintético a 148 km, e leveza (0 queries com
+//                  o alvo atingido, exatamente 2 abaixo dele).
 //   8.8 shadow     resposta legada intacta + 1 evento search.executed com old/new.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { withF2Fixture } from "./helpers/f2-fixture.js";
 import { CONTEXTS } from "./helpers/contexts.js";
@@ -35,7 +41,7 @@ import {
   facetKeysFor,
 } from "../../src/modules/ads/search-policy/facets-policy.js";
 import {
-  buildRelaxationVariants,
+  buildBoundaryQuery,
   computeRelaxations,
 } from "../../src/modules/ads/search-policy/relaxations.js";
 import { resetDictionariesForTests } from "../../src/modules/ads/search-policy/dictionaries.js";
@@ -164,7 +170,11 @@ describe.sequential("F2 — motor em Postgres real", () => {
       });
       assertAliasesJoined(liq.sql, `${c.key} liquidez`);
       const relax = await computeRelaxations(ctx, scope, total, policy, { db, cache: false });
-      if (relax.sql) assertAliasesJoined(relax.sql, `${c.key} relaxações`);
+      // F2.2-B1: a Guided Relaxation passou a emitir DUAS queries (boundaries e
+      // benefício). As duas precisam do mesmo guard de JOIN — foi a falta dele
+      // que quebrou o countQuery em produção duas vezes.
+      for (const [i, sql] of (relax.sqls || []).entries())
+        assertAliasesJoined(sql, `${c.key} relaxações[${i}]`);
     }
   }, 120000);
 
@@ -285,7 +295,18 @@ describe.sequential("F2 — motor em Postgres real", () => {
   // ativos próprios (≥ 20 do BROWSE_CITY), então o baseline de descoberta para
   // em 0 km e o modelo raro é procurado DENTRO dele — antes o SEARCH_MODEL
   // puxava sozinho o território até 150 km (DEC-10/11/18/23).
-  it("8.7 relaxações: q=onix + automatico + 75000 em Atibaia → baseline 0 km, total 0, transmission +3, price_max 87000 +1, sem radius", async () => {
+  // F2.2-B1 (DEC-26): o mesmo cenário sob a política certificada. Duas coisas
+  // mudam de lugar em relação à F2 original, e as duas são a norma funcionando:
+  //
+  //   preço — o teto sai do ESTOQUE. O Onix automático mais barato acima de
+  //           R$ 75.000 custa R$ 78.900; arredondado para cima ao quantum de
+  //           R$ 1.000 dá R$ 79.000. A fórmula antiga dava R$ 87.000, um valor
+  //           que nenhum anúncio justificava.
+  //   ordem — a banda é categórica. `price` é MEDIA (+5,3%) e traz 1 resultado;
+  //           `transmission` é GRANDE e traz 3. A concessão mais barata vence,
+  //           embora renda menos: é exatamente a proibição da DEC-26 de que
+  //           benefício maior compre banda maior.
+  it("8.7 relaxações DEC-26: q=onix + automatico + 75000 em Atibaia → preço 79000 MEDIA (+1) antes de câmbio GRANDE (+3), sem radius", async () => {
     const r = await runSearchPolicyEngine(
       { origem: "atibaia-sp", q: "onix", transmission: "automatico", price_max: "75000" },
       { db, policy, cache: false, telemetry: false }
@@ -298,20 +319,25 @@ describe.sequential("F2 — motor em Postgres real", () => {
       reason: "LOCAL_LIQUIDITY_OK",
       location_source: "CITY_PAGE",
     });
-    expect(r.relaxations).toEqual([
-      {
-        dimension: "transmission",
-        label: "aceitar câmbio manual",
-        delta: 3,
-        url_params: { transmission: null },
-      },
-      {
-        dimension: "price_max",
-        label: "subir o teto para R$ 87 mil",
-        delta: 1,
-        url_params: { price_max: 87000 },
-      },
-    ]);
+    expect(r.relaxations.map((x) => x.dimension)).toEqual(["price", "transmission"]);
+    expect(r.relaxations[0]).toMatchObject({
+      dimension: "price",
+      cost_band: "MEDIA",
+      applied_value: 79000,
+      url_params: { price_max: 79000 },
+      delta_result_count: 1,
+      label: "subir o teto para R$ 79 mil",
+    });
+    expect(r.relaxations[1]).toMatchObject({
+      dimension: "transmission",
+      cost_band: "GRANDE",
+      delta_result_count: 3,
+      url_params: { transmission: null },
+    });
+    // O degrau antigo (+15% = R$ 87.000) não pode reaparecer em lugar nenhum.
+    expect(JSON.stringify(r.relaxations)).not.toContain("87000");
+    // Nenhum candidato útil fora de Atibaia até 150 km para este produto.
+    expect(r.relaxations.some((x) => x.dimension === "radius")).toBe(false);
     expect(r.chips.map((c) => c.key)).toEqual(["commercial_model", "price", "transmission", "geo"]);
     // Anéis: só os de rings_manual; 150 não aparece porque não é anel automático.
     expect(r.search_policy.rings.map((x) => x.radius_km)).toEqual([0, 25, 50, 75]);
@@ -507,65 +533,318 @@ describe.sequential("F2 — motor em Postgres real", () => {
     );
   });
 
-  it("A2 concessão de 150 ponta a ponta: oferta → url_params → nova busca em 150", async () => {
-    // Etapa 1 — em 75 km manual, com filtro raro, o mecanismo oferece 150.
-    const step1 = await runSearchPolicyEngine(
-      {
-        origem: "atibaia-sp",
-        q: "onix",
-        raio: "75",
-        transmission: "automatico",
-        price_max: "75000",
-      },
+  // O teste A2 "concessão de 150 ponta a ponta" foi absorvido pelo caso B1 de
+  // 150 km logo abaixo. Ele lia a oferta do CONSTRUTOR de variantes porque a
+  // política de então montava o degrau de 150 mesmo sem candidato nenhum lá —
+  // uma oferta de delta zero, que a DEC-26 proíbe construir. O caso B1 prova a
+  // mesma propriedade da A2 (oferta → url_params → MANUAL_RADIUS 150, sem
+  // reintroduzir 150 no automático) sobre um candidato REAL a 148 km.
+
+  /**
+   * Cidade + membership + anúncio ACTIVE sintéticos entre 75 e 150 km de
+   * Atibaia, criados SÓ dentro deste banco descartável e removidos no fim.
+   *
+   * A fixture histórica não tem cidade útil nessa faixa (a mais próxima acima
+   * de 75 km é o Rio, a 344 km), e a regra do teto de 150 não pode ser provada
+   * por dedução: sem candidato real, o boundary é nulo e a concessão
+   * simplesmente não existe — que é justamente o comportamento correto da
+   * DEC-26. Para provar o outro lado é preciso um candidato real.
+   */
+  async function withSentinelCity({ distanceKm, ad }, fn) {
+    const slug = `sentinela-b1-${String(distanceKm).replace(".", "-")}`;
+    const adSlug = `sentinela-b1-ad-${String(distanceKm).replace(".", "-")}`;
+    let cityId = null;
+    try {
+      const { rows: cityRows } = await db.query(
+        `INSERT INTO cities (name, state, slug, latitude, longitude)
+         VALUES ('Sentinela B1', 'MG', $1, -21.9000, -45.9000) RETURNING id`,
+        [slug]
+      );
+      cityId = Number(cityRows[0].id);
+      const { rows: base } = await db.query(`SELECT id FROM cities WHERE slug = 'atibaia-sp'`);
+      const atibaiaId = Number(base[0].id);
+      await db.query(
+        `INSERT INTO region_memberships (base_city_id, member_city_id, distance_km, layer)
+         VALUES ($1, $2, $3, 3), ($2, $1, $3, 3), ($2, $2, 0, 0)`,
+        [atibaiaId, cityId, distanceKm]
+      );
+      const { ids } = await fixture;
+      await db.query(
+        `INSERT INTO ads (advertiser_id, city_id, city, state, title, brand, model, commercial_model,
+                          price, year, mileage, transmission, fuel_type, body_type, below_fipe,
+                          plan, priority, status, slug, created_at, updated_at, images)
+         VALUES ($1, $2, 'Sentinela B1', 'MG', $3, $4, $5, $6, $7, 2023, 40000, $8, 'flex', 'hatch',
+                 false, 'free', 1, 'active', $9, NOW(), NOW(), '[]'::jsonb)`,
+        [
+          ids.advertisers.startExtrema,
+          cityId,
+          ad.title,
+          ad.brand,
+          ad.model,
+          ad.commercialModel,
+          ad.price,
+          ad.transmission,
+          adSlug,
+        ]
+      );
+      return await fn({ cityId, slug });
+    } finally {
+      if (cityId !== null) {
+        await db.query(`DELETE FROM ads WHERE city_id = $1`, [cityId]);
+        await db.query(
+          `DELETE FROM region_memberships WHERE base_city_id = $1 OR member_city_id = $1`,
+          [cityId]
+        );
+        await db.query(`DELETE FROM cities WHERE id = $1`, [cityId]);
+      }
+    }
+  }
+
+  // ── F2.2-B1 — Guided Relaxation da DEC-26 em Postgres real ────────────────
+
+  it("B1 price boundary: o teto vem do ESTOQUE (74.900 → 75.000), não de um degrau fixo", async () => {
+    // Onix em Atibaia: 70.900 · 74.900 · 74.900 · 77.900 · 78.900 · 78.900.
+    // Com teto 71.000 só o primeiro entra. O candidato imediatamente acima
+    // custa 74.900 — arredondado para cima ao quantum de R$ 1.000, 75.000.
+    const r = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", q: "onix", price_max: "71000" },
       { db, policy, cache: false, telemetry: false }
     );
-    expect(step1.search_policy.effective_radius_km).toBe(75);
-    expect(step1.search_policy.total_result_count).toBeLessThan(step1.search_policy.target);
+    expect(r.search_policy.total_result_count).toBe(1);
+    const price = r.relaxations.find((x) => x.dimension === "price");
+    expect(price).toBeDefined();
+    expect(price.applied_value).toBe(75000);
+    expect(price.url_params.price_max).toBe(75000);
+    // o degrau antigo (+15% = 81.650 → 82.000) não existe mais
+    expect(price.applied_value).not.toBe(82000);
+    // banda pelo VALOR FINAL: (75000-71000)/71000 = +5,63% → MEDIA
+    expect(price.cost_band).toBe("MEDIA");
+    // delta real: passam a caber os dois de 74.900
+    expect(price.delta_result_count).toBe(2);
+    expect(price.delta_seller_count).toBe(0); // mesmo lojista
+    expect(price.delta_city_count).toBe(0); // mesma cidade
 
-    // A oferta é lida do CONSTRUTOR de variantes, não da lista publicada.
-    // `computeRelaxations` só publica variantes com delta > 0, e nesta fixture
-    // ampliar de 75 para 150 não acrescenta nada: a cidade mais próxima acima
-    // de 75 km é o Rio, a 344 km. O delta zero é propriedade da FIXTURE, não do
-    // mecanismo — o que a A2 precisa provar é que a variante volta a ser
-    // construída (a A1 a descartava por `150 <= 75`) e que, aceita, produz
-    // território de 150.
-    const ctx1 = await buildSearchContext(
-      {
-        origem: "atibaia-sp",
-        q: "onix",
-        raio: "75",
-        transmission: "automatico",
-        price_max: "75000",
-      },
-      { db, policy }
+    // O valor aplicado reentra no motor e produz exatamente o que prometeu.
+    const applied = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", q: "onix", ...price.url_params },
+      { db, policy, cache: false, telemetry: false }
     );
-    const scope1 = await resolveScope(ctx1, policy, { db, cache: false });
-    const offer = buildRelaxationVariants(ctx1, scope1, policy).find(
-      (v) => v.dimension === "radius"
+    expect(applied.search_policy.total_result_count).toBe(
+      r.search_policy.total_result_count + price.delta_result_count
     );
-    expect(offer).toBeDefined();
-    expect(offer.url_params).toEqual({ raio: 150 });
+  });
 
-    // Etapa 2 — os url_params da oferta viram a query seguinte, sem tradução.
+  it("B1 radius boundary cross-UF: Atibaia 25 km → candidato em Extrema a 38,10 → concessão 40 km PEQUENA", async () => {
+    // Sentinela real da malha: Extrema-MG está a 38,10 km de Atibaia, e é a
+    // primeira cidade com Gol fora do território de 25 km.
+    const step1 = await runSearchPolicyEngine(
+      { origem: "atibaia-sp", raio: "25", q: "gol" },
+      { db, policy, cache: false, telemetry: false }
+    );
+    expect(step1.search_policy.effective_radius_km).toBe(25);
+    expect(step1.search_policy.total_result_count).toBe(0);
+
+    const radius = step1.relaxations.find((x) => x.dimension === "radius");
+    expect(radius).toBeDefined();
+    expect(radius.applied_value).toBe(40); // ceil(38,10 / 5) * 5
+    expect(radius.url_params).toEqual({ raio: 40 });
+    expect(radius.cost_band).toBe("PEQUENA"); // +15 km ≤ 25
+    expect(radius.delta_result_count).toBeGreaterThanOrEqual(1);
+    expect(radius.included_cities).toContain("extrema-mg");
+    // 40 não é preset de rings_manual: a concessão não veio de anel nenhum.
+    expect(policy.rings_manual.includes(40)).toBe(false);
+
+    // Aceitar a concessão reentra como MANUAL_RADIUS exato e traz o resultado.
     const step2 = await runSearchPolicyEngine(
-      {
-        origem: "atibaia-sp",
-        q: "onix",
-        transmission: "automatico",
-        price_max: "75000",
-        ...offer.url_params,
-      },
+      { origem: "atibaia-sp", q: "gol", ...radius.url_params },
       { db, policy, cache: false, telemetry: false }
     );
     expect(step2.search_policy.geo_mode).toBe("MANUAL_RADIUS");
-    expect(step2.search_policy.requested_radius_km).toBe(150);
-    expect(step2.search_policy.effective_radius_km).toBe(150);
-    expect(step2.search_policy.user_geo_explicit).toBe(true);
-    // o território realmente cresceu de 75 para 150
-    expect(step2.search_policy.territory_city_count).toBeGreaterThanOrEqual(
-      step1.search_policy.territory_city_count
+    expect(step2.search_policy.effective_radius_km).toBe(40);
+    expect(step2.search_policy.total_result_count).toBe(radius.delta_result_count);
+    expect(step2.data.map((x) => x.city_slug)).toContain("extrema-mg");
+  });
+
+  it("B1 concessão até 150 km: candidato real a 148 km vira oferta de 150 GRANDE, aceita como MANUAL_RADIUS", async () => {
+    await withSentinelCity(
+      {
+        distanceKm: 148.0,
+        ad: {
+          title: "Onix Sentinela",
+          brand: "GM - Chevrolet",
+          model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.",
+          commercialModel: "Onix",
+          price: 69000,
+          transmission: "automatico",
+        },
+      },
+      async () => {
+        const step1 = await runSearchPolicyEngine(
+          {
+            origem: "atibaia-sp",
+            q: "onix",
+            raio: "75",
+            transmission: "automatico",
+            price_max: "70000",
+          },
+          { db, policy, cache: false, telemetry: false }
+        );
+        expect(step1.search_policy.effective_radius_km).toBe(75);
+        expect(step1.search_policy.total_result_count).toBe(0);
+
+        const radius = step1.relaxations.find((x) => x.dimension === "radius");
+        expect(radius).toBeDefined();
+        expect(radius.applied_value).toBe(150); // ceil(148 / 5) * 5, dentro do teto
+        expect(radius.url_params).toEqual({ raio: 150 });
+        expect(radius.cost_band).toBe("GRANDE"); // +75 km > 50
+        expect(radius.delta_result_count).toBe(1);
+        expect(radius.delta_city_count).toBe(1);
+        expect(radius.included_cities).toContain("sentinela-b1-148");
+
+        // Etapa 2 — os url_params da oferta viram a query seguinte, sem tradução.
+        const step2 = await runSearchPolicyEngine(
+          {
+            origem: "atibaia-sp",
+            q: "onix",
+            transmission: "automatico",
+            price_max: "70000",
+            ...radius.url_params,
+          },
+          { db, policy, cache: false, telemetry: false }
+        );
+        expect(step2.search_policy.geo_mode).toBe("MANUAL_RADIUS");
+        expect(step2.search_policy.requested_radius_km).toBe(150);
+        expect(step2.search_policy.effective_radius_km).toBe(150);
+        expect(step2.search_policy.user_geo_explicit).toBe(true);
+        expect(step2.search_policy.total_result_count).toBe(1);
+        expect(step2.data[0].city_slug).toBe("sentinela-b1-148");
+
+        // 150 continua PROIBIDO no automático: a mesma busca sem raio explícito
+        // não chega lá sozinha (DEC-11/18/23 preservadas).
+        const auto = await runSearchPolicyEngine(
+          { origem: "atibaia-sp", q: "onix", transmission: "automatico", price_max: "70000" },
+          { db, policy, cache: false, telemetry: false }
+        );
+        expect(auto.search_policy.geo_mode).toBe("AUTO_RADIUS");
+        expect(auto.search_policy.effective_radius_km).toBeLessThanOrEqual(75);
+        expect(auto.search_policy.rings.some((x) => x.radius_km === 150)).toBe(false);
+      }
     );
-    expect(step2.search_policy.territory_city_count).toBe((await distancesWithin(150)).length);
+
+    // a sentinela não sobreviveu ao teste
+    const { rows } = await db.query(
+      `SELECT COUNT(*)::int AS n FROM cities WHERE slug LIKE 'sentinela-b1-%'`
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  it("B1 lazy: com o alvo atingido, a Guided Relaxation não executa NENHUMA query", async () => {
+    const ctx = await buildSearchContext({ origem: "atibaia-sp" }, { db, policy });
+    const scope = await resolveScope(ctx, policy, { db, cache: false });
+    const q = buildEngineQueries(ctx, scope);
+    const { rows } = await db.query(q.countQuery, q.countParams);
+    const total = Number(rows[0].total);
+    expect(total).toBeGreaterThanOrEqual(ctx.intent.target);
+
+    const spy = { calls: [], query: (...args) => (spy.calls.push(args[0]), db.query(...args)) };
+    const relax = await computeRelaxations(ctx, scope, total, policy, { db: spy, cache: false });
+    expect(relax).toEqual({ relaxations: [], queries: 0 });
+    expect(spy.calls).toEqual([]);
+
+    // E abaixo do alvo, a MESMA origem dispara exatamente duas — nunca N+1,
+    // nem uma por dimensão, nem uma por sugestão.
+    const ctxLow = await buildSearchContext(
+      {
+        origem: "atibaia-sp",
+        q: "onix",
+        price_max: "71000",
+        year_min: "2024",
+        mileage_max: "30000",
+      },
+      { db, policy }
+    );
+    const scopeLow = await resolveScope(ctxLow, policy, { db, cache: false });
+    const qLow = buildEngineQueries(ctxLow, scopeLow);
+    const { rows: lowRows } = await db.query(qLow.countQuery, qLow.countParams);
+    const spyLow = {
+      calls: [],
+      query: (...args) => (spyLow.calls.push(args[0]), db.query(...args)),
+    };
+    const relaxLow = await computeRelaxations(ctxLow, scopeLow, Number(lowRows[0].total), policy, {
+      db: spyLow,
+      cache: false,
+    });
+    expect(relaxLow.queries).toBe(2);
+    expect(spyLow.calls).toHaveLength(2);
+    expect(relaxLow.relaxations.length).toBeLessThanOrEqual(3);
+  });
+
+  it("B1 a investigação até 150 km só existe dentro da Guided Relaxation", async () => {
+    // Nenhuma query do caminho normal (grid, count, facetas, liquidez) pode
+    // carregar 150 como parâmetro; a de boundary, sim.
+    const ctx = await buildSearchContext({ origem: "atibaia-sp", q: "onix" }, { db, policy });
+    const scope = await resolveScope(ctx, policy, { db, cache: false });
+    const q = buildEngineQueries(ctx, scope);
+    expect(q.params).not.toContain(150);
+    expect(q.countParams).not.toContain(150);
+    const liq = await runLiquidityQuery(db, {
+      originId: ctx.origin.id,
+      radiusKm: ctx.intent.max_auto_radius,
+      filters: ctx.filters,
+    });
+    expect(liq.params).not.toContain(150);
+    expect(Number(ctx.intent.max_auto_radius)).toBeLessThanOrEqual(75);
+
+    const boundary = buildBoundaryQuery(ctx, scope, policy);
+    expect(boundary.params).toContain(150);
+    expect(boundary.cap).toBe(150);
+  });
+
+  it("B1 migration 068: política persistida == SEARCH_POLICY_DEFAULT, idempotente e sem tocar chaves alheias", async () => {
+    const sql = fs.readFileSync(
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../../src/database/migrations/068_search_policy_guided_relaxation_dec26.sql"
+      ),
+      "utf8"
+    );
+    const read = async () =>
+      (
+        await db.query(
+          `SELECT value, updated_at FROM platform_settings WHERE key = 'search_policy'`
+        )
+      ).rows[0];
+
+    // 1. O banco migrado e a constante do código dizem a MESMA coisa.
+    const persisted = await read();
+    expect(persisted.value.relaxations).toEqual(JSON.parse(JSON.stringify(policy.relaxations)));
+    expect(persisted.value.relaxations.steps).toBeUndefined();
+
+    // 2. Reaplicar não muda nada — nem `updated_at`.
+    const again = await db.query(sql);
+    expect(again.rowCount).toBe(0);
+    expect((await read()).updated_at).toEqual(persisted.updated_at);
+
+    // 3. Um ajuste do admin em OUTRA chave sobrevive à migration.
+    await db.query(
+      `UPDATE platform_settings SET value = jsonb_set(value, '{facets,open_max}', '7'::jsonb, true) WHERE key = 'search_policy'`
+    );
+    // …e um `relaxations` antigo é substituído, não fundido.
+    await db.query(
+      `UPDATE platform_settings SET value = jsonb_set(value, '{relaxations}', '{"max_items":3,"steps":{"price_max":0.15}}'::jsonb, true) WHERE key = 'search_policy'`
+    );
+    const applied = await db.query(sql);
+    expect(applied.rowCount).toBe(1);
+    const after = await read();
+    expect(after.value.facets.open_max).toBe(7); // ajuste alheio preservado
+    expect(after.value.relaxations).toEqual(JSON.parse(JSON.stringify(policy.relaxations)));
+    expect(after.value.relaxations.steps).toBeUndefined();
+    expect(after.value.rings_auto).toEqual([0, 25, 50, 75]); // 067 preservada
+
+    // restaura o estado que os demais testes esperam
+    await db.query(
+      `UPDATE platform_settings SET value = jsonb_set(value, '{facets,open_max}', '3'::jsonb, true) WHERE key = 'search_policy'`
+    );
   });
 
   it("A2 não regride A1: sem raio explícito, nenhum perfil de produto chega a 150", async () => {

@@ -36,6 +36,10 @@ const MIGRATION_067 = path.resolve(
   here,
   "../../src/database/migrations/067_search_policy_auto_cap_75.sql"
 );
+const MIGRATION_068 = path.resolve(
+  here,
+  "../../src/database/migrations/068_search_policy_guided_relaxation_dec26.sql"
+);
 
 function jsonFromMigration() {
   const sql = fs.readFileSync(MIGRATION, "utf8");
@@ -61,6 +65,18 @@ function jsonFromMigration() {
     expect(capped).toContain(`'{profiles,${key},max_auto_radius}'`);
     base.profiles[key].max_auto_radius = 75;
   }
+  // Migration 068 (F2.2-B1, DEC-26): o bloco `relaxations` inteiro é
+  // substituído — o `steps` da 065 descrevia a política que a DEC-26 revogou.
+  // O JSON é lido do PRÓPRIO arquivo, não reescrito aqui: se a migration e a
+  // constante divergirem, é a comparação final que acusa.
+  const relaxed = fs.readFileSync(MIGRATION_068, "utf8");
+  expect(relaxed).toContain("'{relaxations}'");
+  expect(relaxed).toContain("IS DISTINCT FROM");
+  const relaxStart = relaxed.indexOf("'{\n");
+  const relaxEnd = relaxed.indexOf("}'::jsonb", relaxStart);
+  expect(relaxStart).toBeGreaterThan(-1);
+  expect(relaxEnd).toBeGreaterThan(relaxStart);
+  base.relaxations = JSON.parse(relaxed.slice(relaxStart + 1, relaxEnd + 1));
   return base;
 }
 
@@ -82,7 +98,6 @@ describe("search_policy — migration 065 × SEARCH_POLICY_DEFAULT", () => {
       expect(p.max_auto_radius).toBeLessThanOrEqual(75);
     expect(SEARCH_POLICY_DEFAULT.rings_auto.includes(150)).toBe(false);
     expect(SEARCH_POLICY_DEFAULT.liquidity_cache_ttl_seconds).toBe(900);
-    expect(SEARCH_POLICY_DEFAULT.relaxations.priority_order[0]).toBe("radius");
     expect(
       new RegExp(SEARCH_POLICY_DEFAULT.explicit_query_patterns[0]).test("onix em atibaia")
     ).toBe(true);
@@ -95,6 +110,49 @@ describe("search_policy — migration 065 × SEARCH_POLICY_DEFAULT", () => {
       /UPDATE subscription_plans[\s\S]*WHERE id IN \('cpf-premium-highlight', 'cnpj-evento-premium'\)/
     );
     expect(sql).toMatch(/IS DISTINCT FROM 1\.00/);
+  });
+});
+
+// F2.2-B1 — a configuração é a ÚNICA fonte dos valores da DEC-26. Os números
+// não podem reaparecer espalhados pelo código (DEC-26, "Natureza dos valores").
+describe("relaxations — política DEC-26 na configuração", () => {
+  const r = SEARCH_POLICY_DEFAULT.relaxations;
+
+  it("traz fronteiras e quantums certificados, e nenhum degrau fixo", () => {
+    expect(r.price).toEqual({ quantum: 1000, small_max_pct: 0.05, medium_max_pct: 0.1 });
+    expect(r.year).toEqual({ small_max_delta: 1, medium_max_delta: 2 });
+    expect(r.year.quantum).toBeUndefined(); // ano não tem quantum (DEC-26)
+    expect(r.mileage).toEqual({ quantum: 5000, small_max_delta: 10000, medium_max_delta: 25000 });
+    expect(r.radius).toEqual({
+      quantum: 5,
+      small_max_delta: 25,
+      medium_max_delta: 50,
+      max_km: 150,
+    });
+    expect(r.transmission).toEqual({ band: "GRANDE" });
+    expect(r.max_options).toBe(3);
+    expect(r.min_delta_to_offer).toBe(1);
+    expect(r.priority_order).toEqual(["price", "year", "mileage", "radius", "transmission"]);
+  });
+
+  it("a política superada não sobrevive como chave viva", () => {
+    expect(r.steps).toBeUndefined();
+    expect(r.max_items).toBeUndefined();
+    const json = JSON.stringify(SEARCH_POLICY_DEFAULT);
+    expect(json).not.toContain("next_ring");
+    expect(json).not.toContain('"price_max":0.15');
+    expect(json).not.toContain('"mileage_max":0.25');
+  });
+
+  it("um search_policy com o shape ANTIGO é rejeitado e cai no DEFAULT", () => {
+    const legacy = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
+    legacy.relaxations = {
+      show_when_total_below_target: true,
+      max_items: 3,
+      steps: { radius: "next_ring", price_max: 0.15 },
+      priority_order: ["radius", "price_max"],
+    };
+    expect(isValidSearchPolicy(legacy)).toBe(false);
   });
 });
 

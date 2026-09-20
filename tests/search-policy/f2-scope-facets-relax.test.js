@@ -20,7 +20,6 @@ import {
   optionLabel,
   priceBucketOptions,
 } from "../../src/modules/ads/search-policy/facets-policy.js";
-import { buildRelaxationVariants } from "../../src/modules/ads/search-policy/relaxations.js";
 import { buildChips } from "../../src/modules/ads/search-policy/chips.js";
 import {
   buildCandidateScope,
@@ -329,81 +328,11 @@ describe("Facetas — entropia, abertura (D6), E2, rótulos", () => {
   });
 });
 
-describe("Relaxações — variantes (§4.7, D4)", () => {
-  const ctx = (filters, profile = "SEARCH_MODEL", max = 150) => ({
-    filters,
-    origin: BRAGANCA,
-    intent: { profile, max_auto_radius: max, target: policy.profiles[profile].target },
-    uf: "SP",
-  });
-  it("contexto 2: transmission (remover) e price_max 75000 → 87000 (fórmula); radius ausente em 150", () => {
-    const v = buildRelaxationVariants(
-      ctx({ commercial_model: "Onix", transmission: "automatico", price_max: 75000 }),
-      { geo_mode: GEO_MODE.AUTO_RADIUS, effective_radius_km: 150 },
-      policy
-    );
-    expect(v.map((x) => x.dimension)).toEqual(["price_max", "transmission"]);
-    expect(v.find((x) => x.dimension === "price_max")).toMatchObject({
-      label: "subir o teto para R$ 87 mil",
-      url_params: { price_max: 87000 },
-    });
-    expect(v.find((x) => x.dimension === "transmission")).toMatchObject({
-      label: "aceitar câmbio manual",
-      url_params: { transmission: null },
-    });
-  });
-  it("radius: próximo anel de rings_manual; SEARCH_* chega a 150; BROWSE para em 75", () => {
-    expect(
-      buildRelaxationVariants(
-        ctx({}),
-        { geo_mode: GEO_MODE.AUTO_RADIUS, effective_radius_km: 25 },
-        policy
-      )[0]
-    ).toMatchObject({ dimension: "radius", label: "ampliar para 50 km", url_params: { raio: 50 } });
-    expect(
-      buildRelaxationVariants(
-        ctx({}),
-        { geo_mode: GEO_MODE.MANUAL_RADIUS, effective_radius_km: 75 },
-        policy
-      )[0]
-    ).toMatchObject({ dimension: "radius", label: "ampliar para 150 km" });
-    expect(
-      buildRelaxationVariants(
-        ctx({}, "BROWSE_CITY", 75),
-        { geo_mode: GEO_MODE.AUTO_RADIUS, effective_radius_km: 75 },
-        policy
-      )
-    ).toEqual([]);
-  });
-  it("year_from −2 (mínimo 1990), mileage_max +25 % arredondado a 5.000, remoções com os textos de §7.6", () => {
-    const v = buildRelaxationVariants(
-      ctx({
-        year_from: 1991,
-        mileage_max: 80000,
-        fuel: "flex",
-        body_type: "suv",
-        seller_kind: "dealer",
-        transmission: "manual",
-      }),
-      { geo_mode: GEO_MODE.EXACT_CITY, effective_radius_km: 0 },
-      policy
-    );
-    const by = Object.fromEntries(v.map((x) => [x.dimension, x]));
-    expect(by.year_from).toMatchObject({
-      label: "aceitar a partir de 1990",
-      url_params: { year_min: 1990 },
-    });
-    expect(by.mileage_max).toMatchObject({
-      label: "aceitar até 100.000 km",
-      url_params: { mileage_max: 100000 },
-    });
-    expect(by.transmission.label).toBe("aceitar câmbio automático");
-    expect(by.fuel.label).toBe("qualquer combustível");
-    expect(by.body_type.label).toBe("qualquer carroceria");
-    expect(by.seller_kind.label).toBe("lojas e particulares");
-    expect(by.radius).toMatchObject({ label: "ampliar para 25 km" });
-  });
-});
+// As variantes de relaxação saíram daqui: a política de degraus fixos que este
+// bloco travava (+15% de preço, −2 anos, +25% de km, "próximo anel" de
+// rings_manual) foi revogada pela DEC-26. A política vigente — boundary real,
+// arredondamento para cima, bandas ordinais e ordenação categórica — é testada
+// em tests/search-policy/f2-2-guided-relaxation.test.js.
 
 describe("Chips (§5.4, §7.2)", () => {
   const base = { origin: BRAGANCA, location_source: "CITY_PAGE", uf: "SP" };

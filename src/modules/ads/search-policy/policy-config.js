@@ -88,29 +88,34 @@ export const SEARCH_POLICY_DEFAULT = Object.freeze({
       "seller_kind",
     ],
   },
+  // F2.2-B1 — política de Guided Relaxation da DEC-26 (v3 §9).
+  //
+  // O bloco anterior (`max_items` + `steps` + priority_order começando em
+  // radius) era a política que a DEC-26 declarou superada: preço +15% fixo,
+  // ano −2 fixo, quilometragem +25% fixa e raio pelo "próximo anel". Saiu
+  // inteiro — não fica como chave morta que um JSON antigo no banco possa
+  // reativar.
+  //
+  // O que entra são FRONTEIRAS e QUANTUMS, não degraus: o degrau vem do
+  // estoque (boundary real) e estes números só dizem quanto ele custa. São
+  // parâmetros versionados de política, recalibráveis por nova decisão
+  // normativa (DEC-26, "Natureza dos valores"); o que é estrutural — bandas,
+  // ordem de decisão, boundary real, arredondamento para cima, teto de 150 e a
+  // cadeia de desempates — está no código, não aqui.
   relaxations: {
     show_when_total_below_target: true,
-    max_items: 3,
-    steps: {
-      radius: "next_ring",
-      year_from: -2,
-      price_max: 0.15,
-      mileage_max: 0.25,
-      transmission: "remove",
-      fuel: "remove",
-      body_type: "remove",
-      seller_kind: "remove",
-    },
-    priority_order: [
-      "radius",
-      "transmission",
-      "price_max",
-      "year_from",
-      "mileage_max",
-      "fuel",
-      "body_type",
-      "seller_kind",
-    ],
+    max_options: 3,
+    min_delta_to_offer: 1,
+    price: { quantum: 1000, small_max_pct: 0.05, medium_max_pct: 0.1 },
+    year: { small_max_delta: 1, medium_max_delta: 2 },
+    mileage: { quantum: 5000, small_max_delta: 10000, medium_max_delta: 25000 },
+    // `max_km` é o teto da CONCESSÃO. Nunca pode passar de MANUAL_RADIUS_MAX_KM
+    // (a cobertura pré-computada de region_memberships): o código aplica
+    // Math.min dos dois, de modo que a configuração só consegue ser mais
+    // restritiva que a malha, nunca prometer território que a malha não tem.
+    radius: { quantum: 5, small_max_delta: 25, medium_max_delta: 50, max_km: 150 },
+    transmission: { band: "GRANDE" },
+    priority_order: ["price", "year", "mileage", "radius", "transmission"],
   },
   explicit_query_patterns: [
     "\\bem\\s+",
@@ -131,6 +136,38 @@ export function isValidSearchPolicy(value) {
       return false;
   }
   if (!value.facets || !value.relaxations) return false;
+  if (!isValidRelaxationsPolicy(value.relaxations)) return false;
+  return true;
+}
+
+/**
+ * Shape da política de relaxação da DEC-26 (F2.2-B1).
+ *
+ * Existe para que um `platform_settings.search_policy` ANTIGO — o da 065, com
+ * `steps`/`max_items` — não passe como válido. Se passasse, o motor leria
+ * `relaxations.price` como undefined e devolveria zero concessões em silêncio:
+ * o mesmo formato de falha do cache que escondeu um backend fora do ar por
+ * semanas. Com esta checagem, o JSON velho cai no SEARCH_POLICY_DEFAULT com
+ * warn — a política certificada continua valendo mesmo antes da 068 rodar.
+ */
+export function isValidRelaxationsPolicy(relaxations) {
+  if (!relaxations || typeof relaxations !== "object") return false;
+  if (!Array.isArray(relaxations.priority_order) || relaxations.priority_order.length === 0)
+    return false;
+  if (!Number.isFinite(Number(relaxations.max_options))) return false;
+  if (!Number.isFinite(Number(relaxations.min_delta_to_offer))) return false;
+  const numeric = [
+    ["price", ["quantum", "small_max_pct", "medium_max_pct"]],
+    ["year", ["small_max_delta", "medium_max_delta"]],
+    ["mileage", ["quantum", "small_max_delta", "medium_max_delta"]],
+    ["radius", ["quantum", "small_max_delta", "medium_max_delta", "max_km"]],
+  ];
+  for (const [dimension, keys] of numeric) {
+    const cfg = relaxations[dimension];
+    if (!cfg || typeof cfg !== "object") return false;
+    for (const key of keys) if (!Number.isFinite(Number(cfg[key]))) return false;
+  }
+  if (!relaxations.transmission || typeof relaxations.transmission.band !== "string") return false;
   return true;
 }
 

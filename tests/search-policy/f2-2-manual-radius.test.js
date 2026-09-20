@@ -333,9 +333,14 @@ describe("concessão de distância até 150 (DEC-11)", () => {
     effective_radius_km: radius,
   });
 
-  it("a partir de 75 km o degrau oferecido é 150 e NÃO é descartado pelo teto automático", () => {
-    // Regressão exata do bug: com `next <= intent.max_auto_radius` e o teto
-    // automático em 75 (A1), `150 <= 75` é falso e a concessão sumia.
+  // F2.2-B1 (DEC-26): a concessão de distância deixou de ser "o próximo preset
+  // de rings_manual" e passou a ser o primeiro candidato REAL fora do
+  // território, arredondado para cima ao quantum de 5 km. O que a A2 protege
+  // continua idêntico — o teto da CONCESSÃO não é o teto do AUTOMÁTICO —, mas
+  // agora é preciso haver candidato para haver oferta.
+  it("a partir de 75 km a concessão pode chegar a 150 e NÃO é descartada pelo teto automático", () => {
+    // Regressão exata do bug da A1: com `next <= intent.max_auto_radius` e o
+    // teto automático em 75, `150 <= 75` é falso e a concessão sumia.
     const variants = buildRelaxationVariants(
       {
         origin: ORIGIN,
@@ -343,30 +348,40 @@ describe("concessão de distância até 150 (DEC-11)", () => {
         intent: intentFor("SEARCH_MODEL"),
       },
       scopeAt(75),
-      policy
+      policy,
+      { radius_boundary: 148.0 }
     );
     const radius = variants.find((v) => v.dimension === "radius");
     expect(radius).toBeDefined();
     expect(radius.url_params).toEqual({ raio: 150 });
     expect(radius.radiusKm).toBe(150);
+    expect(radius.cost_band).toBe("GRANDE");
     expect(150).toBeGreaterThan(intentFor("SEARCH_MODEL").max_auto_radius);
   });
 
   it("a concessão nunca passa de 150 (teto da malha pré-computada)", () => {
-    const variants = buildRelaxationVariants(
-      {
-        origin: ORIGIN,
-        filters: { commercial_model: "onix" },
-        intent: intentFor("SEARCH_MODEL"),
-      },
-      scopeAt(150),
-      policy
-    );
-    expect(variants.find((v) => v.dimension === "radius")).toBeUndefined();
+    const base = {
+      origin: ORIGIN,
+      filters: { commercial_model: "onix" },
+      intent: intentFor("SEARCH_MODEL"),
+    };
+    // Já em 150: não há para onde ceder.
+    expect(
+      buildRelaxationVariants(base, scopeAt(150), policy, { radius_boundary: 160 }).find(
+        (v) => v.dimension === "radius"
+      )
+    ).toBeUndefined();
+    // Candidato além da malha: a concessão que o incluiria passaria de 150, e
+    // uma concessão que o deixa de fora não é a concessão que ele justificou.
+    expect(
+      buildRelaxationVariants(base, scopeAt(75), policy, { radius_boundary: 151 }).find(
+        (v) => v.dimension === "radius"
+      )
+    ).toBeUndefined();
     expect(MANUAL_RADIUS_MAX_KM).toBe(150);
   });
 
-  it("abaixo de 75 o degrau oferecido continua sendo o próximo preset, não 150", () => {
+  it("abaixo de 75 a concessão é o candidato real arredondado, não um preset nem 150", () => {
     const variants = buildRelaxationVariants(
       {
         origin: ORIGIN,
@@ -374,9 +389,30 @@ describe("concessão de distância até 150 (DEC-11)", () => {
         intent: intentFor("SEARCH_MODEL"),
       },
       scopeAt(25),
-      policy
+      policy,
+      { radius_boundary: 38.1 }
     );
-    expect(variants.find((v) => v.dimension === "radius").url_params).toEqual({ raio: 50 });
+    const radius = variants.find((v) => v.dimension === "radius");
+    expect(radius.url_params).toEqual({ raio: 40 });
+    expect(radius.cost_band).toBe("PEQUENA");
+    // 40 não é preset; 50 (o "próximo anel" da política revogada) não aparece.
+    expect(policy.rings_manual.includes(40)).toBe(false);
+    expect(radius.radiusKm).not.toBe(50);
+  });
+
+  it("sem candidato útil até 150 não há concessão de distância", () => {
+    expect(
+      buildRelaxationVariants(
+        {
+          origin: ORIGIN,
+          filters: { commercial_model: "onix" },
+          intent: intentFor("SEARCH_MODEL"),
+        },
+        scopeAt(25),
+        policy,
+        { radius_boundary: null }
+      )
+    ).toEqual([]);
   });
 
   it("circuito: url_params da concessão realimentados produzem MANUAL_RADIUS 150", async () => {
@@ -387,7 +423,8 @@ describe("concessão de distância até 150 (DEC-11)", () => {
         intent: intentFor("SEARCH_MODEL"),
       },
       scopeAt(75),
-      policy
+      policy,
+      { radius_boundary: 148.0 }
     );
     const offered = variants.find((v) => v.dimension === "radius").url_params;
 
