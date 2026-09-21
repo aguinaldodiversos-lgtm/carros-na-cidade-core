@@ -2,7 +2,8 @@
 //
 // F1 §3.2 — migration 064 + backfill de ads.commercial_model contra Postgres
 // real (banco descartável). Prova:
-//   • coluna e índice existem; trigger versionado dispara em UPDATE OF commercial_model;
+//   • coluna e índice existem; o trigger versionado dispara em qualquer UPDATE
+//     (a lista OF saiu na 070 / F2.2-C1) e chama ads_search_vector_update();
 //   • backfill --dry-run não grava e lista os NULL;
 //   • backfill preenche o rótulo (Onix ×4 → uma entidade; "5 Luxury" → "Omoda 5");
 //   • não derivável → NULL, sem bloquear;
@@ -115,7 +116,11 @@ describe.sequential("F1 — ads.commercial_model: migration 064 + backfill (Post
         const { rows: trg } = await db.query(
           `SELECT pg_get_triggerdef(oid) AS def FROM pg_trigger WHERE tgname = 'ads_search_vector_trigger'`
         );
-        expect(trg[0].def).toMatch(/UPDATE OF brand, model, title, description, commercial_model/);
+        // F2.2-C1 (migration 070): a lista OF saiu e o trigger versionado passou
+        // a chamar ads_search_vector_update() — a função que produção já usava.
+        expect(trg[0].def).toMatch(/BEFORE INSERT OR UPDATE ON public\.ads/);
+        expect(trg[0].def).not.toMatch(/UPDATE OF/);
+        expect(trg[0].def).toMatch(/EXECUTE FUNCTION ads_search_vector_update\(\)/);
 
         const { rows: city } = await db.query(
           `INSERT INTO cities (name, state, slug, latitude, longitude) VALUES ('Atibaia','SP','atibaia-sp',-23.1171,-46.5563) RETURNING id`
