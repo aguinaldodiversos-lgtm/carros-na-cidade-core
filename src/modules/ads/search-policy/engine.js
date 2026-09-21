@@ -34,6 +34,87 @@ import { buildSearchExecutedPayload, recordSearchExecuted } from "./telemetry.js
 
 export const SHADOW_TIMEOUT_MS = 300;
 
+/**
+ * F2.2-D1 — segurança operacional do shadow.
+ *
+ * A race de SHADOW_TIMEOUT_MS só limita o RELATO: `Promise.race` não cancela o
+ * perdedor, e sem `statement_timeout` a query seguia viva no Postgres segurando
+ * conexão do pool (prova em F2.2-D1: 2 backends `active` esperando lock por
+ * 4 s+ depois de a race devolver timedOut). Agora todo o SQL do shadow roda num
+ * client próprio, dentro de BEGIN … ROLLBACK, com `statement_timeout` LOCAL à
+ * transação — morre com ela e não vaza para a próxima requisição do pool.
+ *
+ * Mesmo orçamento da race, por construção (não podem divergir): nenhum
+ * statement do shadow sobrevive ao orçamento lógico por mais do que a sua
+ * própria duração. O pior caso de posse da conexão é (nº de statements
+ * sequenciais do shadow) × este valor — limitado, nunca indefinido.
+ */
+export const SHADOW_STATEMENT_TIMEOUT_MS = SHADOW_TIMEOUT_MS;
+
+/**
+ * Teto de comparações shadow simultâneas por processo. O shadow roda em 100%
+ * do tráfego de /api/ads/search (a allowlist só vale para o v1 — escopo
+ * preservado de propósito) e o pool tem PG_POOL_MAX=20 por padrão: sem teto,
+ * o modo que existe para "não mudar nada" poderia tomar as conexões do legado.
+ * Excedente é DESCARTADO, nunca enfileirado.
+ *
+ * Env operacional `SEARCH_POLICY_SHADOW_MAX_CONCURRENCY` (inteiro ≥ 1), lida a
+ * cada chamada como a flag. Ausente ou inválida → default. Não é decisão de
+ * política de busca.
+ */
+export const SHADOW_MAX_CONCURRENCY_DEFAULT = 2;
+
+export function getShadowMaxConcurrency(env = process.env) {
+  const raw = String(env.SEARCH_POLICY_SHADOW_MAX_CONCURRENCY ?? "").trim();
+  const n = Number(raw);
+  return raw !== "" && Number.isInteger(n) && n >= 1 ? n : SHADOW_MAX_CONCURRENCY_DEFAULT;
+}
+
+const SHADOW_SATURATION_WARN_INTERVAL_MS = 60_000;
+const shadowState = { inFlight: 0, skippedSaturated: 0, lastSaturationWarnAt: 0 };
+
+/** Só para testes/diagnóstico: estado do limitador do shadow. */
+export const __shadowTesting = Object.freeze({
+  inFlight: () => shadowState.inFlight,
+  skippedSaturated: () => shadowState.skippedSaturated,
+  reset() {
+    shadowState.inFlight = 0;
+    shadowState.skippedSaturated = 0;
+    shadowState.lastSaturationWarnAt = 0;
+  },
+});
+
+/** 57014 = query_canceled (statement_timeout) — esperado no shadow, não é falha. */
+function isStatementTimeout(err) {
+  return String(err?.code) === "57014";
+}
+
+/**
+ * Executa `fn(client)` num client dedicado, em BEGIN … ROLLBACK, com
+ * `statement_timeout` LOCAL (set_config is_local=true ≡ SET LOCAL, mas aceita
+ * parâmetro). O shadow só lê: ROLLBACK é sempre correto e é o que zera o
+ * limite antes de o client voltar ao pool. Se o próprio ROLLBACK falhar, o
+ * client é DESTRUÍDO (release(err)) em vez de devolvido em estado incerto.
+ */
+export async function withShadowStatementTimeout(db, fn) {
+  const client = await db.connect();
+  let releaseErr;
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('statement_timeout', $1, true)", [
+      String(SHADOW_STATEMENT_TIMEOUT_MS),
+    ]);
+    return await fn(client);
+  } finally {
+    try {
+      await client.query("ROLLBACK");
+    } catch (err) {
+      releaseErr = err;
+    }
+    client.release(releaseErr);
+  }
+}
+
 /** Campos que o v1 acrescenta ao contrato slim da listagem (§5.5, §6). */
 export const V1_EXTRA_LISTING_FIELDS = Object.freeze([
   "explain",
@@ -383,17 +464,38 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
     await recordSearchExecuted({ path: opts.path, ctx: null, payload }, { db });
     return { ...shadow, timedOut: false, skipped: true, unsupported_params: unsupported };
   }
+  // Limitador: excedente é descartado na hora — sem fila, sem conexão, sem
+  // INSERT de telemetria (gravar evento justamente sob saturação pioraria o
+  // que se quer proteger). Contado e avisado no máximo 1×/min.
+  if (shadowState.inFlight >= getShadowMaxConcurrency()) {
+    shadowState.skippedSaturated += 1;
+    const now = Date.now();
+    if (now - shadowState.lastSaturationWarnAt >= SHADOW_SATURATION_WARN_INTERVAL_MS) {
+      shadowState.lastSaturationWarnAt = now;
+      logger.warn(
+        { skipped_total: shadowState.skippedSaturated, max: getShadowMaxConcurrency() },
+        "[search-policy] shadow saturado — comparações descartadas"
+      );
+    }
+    return { timedOut: false, skipped: true, skipped_reason: "shadow_saturated" };
+  }
+  // O slot vale a COMPARAÇÃO INTEIRA — trabalho SQL + INSERT de telemetria — e
+  // só é devolvido no `finally` lá embaixo. Junto com a espera por `settled`
+  // antes da telemetria, isso garante que uma comparação nunca segura duas
+  // conexões ao mesmo tempo: o teto N limita conexões, não só comparações.
+  shadowState.inFlight += 1;
+
   let timer;
   const timeout = new Promise((resolve) => {
     timer = setTimeout(() => resolve({ timedOut: true }), opts.timeoutMs ?? SHADOW_TIMEOUT_MS);
   });
-  const work = (async () => {
-    const ctx = await buildSearchContext(rawQuery, { db, policy: opts.policy });
-    const scope = await resolveScope(ctx, ctx.policy, { db, cache: opts.cache });
+  const work = withShadowStatementTimeout(db, async (client) => {
+    const ctx = await buildSearchContext(rawQuery, { db: client, policy: opts.policy });
+    const scope = await resolveScope(ctx, ctx.policy, { db: client, cache: opts.cache });
     const queries = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
     const [countResult, firstResult] = await Promise.all([
-      db.query(queries.countQuery, queries.countParams),
-      db.query(queries.dataQuery, queries.params),
+      client.query(queries.countQuery, queries.countParams),
+      client.query(queries.dataQuery, queries.params),
     ]);
     return {
       ctx,
@@ -401,17 +503,33 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       new_count: Number(countResult.rows[0]?.total || 0),
       new_first_ad_id: firstResult.rows[0]?.id ?? null,
     };
-  })();
+  });
+  // Nunca deixa a rejeição tardia do perdedor (57014 depois que a race já
+  // resolveu por timeout) escapar como unhandled rejection.
+  const settled = work.then(
+    (value) => value,
+    (error) => ({ error })
+  );
 
   try {
-    const outcome = await Promise.race([work, timeout]);
+    let outcome = await Promise.race([settled, timeout]);
+    const elapsed = Date.now() - started; // o relato é do instante da race
     clearTimeout(timer);
+    // Espera a conexão da comparação voltar ao pool antes de pedir outra para
+    // a telemetria. Limitado pelo statement_timeout — antes da D1 esta espera
+    // seria indefinida, e era por isso que a race existia.
+    await settled;
+    if (outcome.error) {
+      // statement_timeout venceu o timer JS: é o mesmo timeout, relatado pelo banco.
+      if (!isStatementTimeout(outcome.error)) throw outcome.error;
+      outcome = { timedOut: true };
+    }
     const shadow = {
       old_count: Number(legacyResult?.pagination?.total ?? 0),
       old_first_ad_id: legacyResult?.data?.[0]?.id ?? null,
       new_count: outcome.timedOut ? null : outcome.new_count,
       new_first_ad_id: outcome.timedOut ? null : outcome.new_first_ad_id,
-      elapsed_ms: Date.now() - started,
+      elapsed_ms: elapsed,
     };
     const ctx = outcome.timedOut ? null : outcome.ctx;
     const payload = buildSearchExecutedPayload({
@@ -431,5 +549,7 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
     clearTimeout(timer);
     logger.warn({ err: err?.message || String(err) }, "[search-policy] shadow falhou");
     return null;
+  } finally {
+    shadowState.inFlight -= 1;
   }
 }
