@@ -251,7 +251,7 @@ describe.sequential("F2 — motor em Postgres real", () => {
   });
 
   // ── 8.6 ────────────────────────────────────────────────────────────────────
-  it("8.6 facetas em Atibaia: Modelo mostra Onix (6); sem count 0; sem faceta de 1 opção; self-excluding de Câmbio", async () => {
+  it("8.6 facetas em Atibaia: Modelo mostra Onix (6); sem count 0; 1 opção fica DISPONÍVEL e recolhida; self-excluding de Câmbio", async () => {
     const r = await runSearchPolicyEngine(
       { city_slug: "atibaia-sp", raio: "0" },
       { db, policy, cache: false, telemetry: false }
@@ -263,8 +263,14 @@ describe.sequential("F2 — motor em Postgres real", () => {
     });
     for (const f of r.facets)
       for (const o of f.options) expect(o.count > 0 || o.active === true).toBe(true);
+    // F2.2-B2: toda dimensão emitida tem ao menos UMA opção real — não duas.
+    // A de cardinalidade baixa não some; fica `open: false` ("Mais filtros").
     for (const f of r.facets)
-      if (f.active_value === null) expect(f.options.length).toBeGreaterThanOrEqual(2);
+      if (f.active_value === null) {
+        expect(f.options.length).toBeGreaterThanOrEqual(1);
+        if (f.options.filter((o) => o.count > 0).length < policy.facets.min_options_to_render)
+          expect(f.open).toBe(policy.facets.always_open.includes(f.key));
+      }
     expect(r.facets.find((f) => f.key === "version")).toBeUndefined();
     const open = r.facets.filter((f) => f.open).map((f) => f.key);
     expect(open).toContain("price");
@@ -890,6 +896,246 @@ describe.sequential("F2 — motor em Postgres real", () => {
     await db.query(
       `UPDATE platform_settings SET value = jsonb_set(value, '{facets,open_max}', '3'::jsonb, true) WHERE key = 'search_policy'`
     );
+  });
+
+  // ── F2.2-B2 — facetas guiadas pelo estoque, em Postgres real ──────────────
+  //
+  // Os casos abaixo criam e removem o próprio inventário no banco descartável,
+  // porque a fixture compartilhada é rica demais para produzir cardinalidade 1
+  // em qualquer dimensão. Cada um limpa no `finally`.
+
+  /** Cidade + anúncios sintéticos, removidos ao fim. */
+  async function withInventory(slug, ads, fn) {
+    let cityId = null;
+    try {
+      const { rows: cityRows } = await db.query(
+        `INSERT INTO cities (name, state, slug, latitude, longitude)
+         VALUES ('Inventario B2', 'SP', $1, -23.2000, -46.6000) RETURNING id`,
+        [slug]
+      );
+      cityId = Number(cityRows[0].id);
+      await db.query(
+        `INSERT INTO region_memberships (base_city_id, member_city_id, distance_km, layer)
+         VALUES ($1, $1, 0, 0)`,
+        [cityId]
+      );
+      const { ids } = await fixture;
+      for (const [i, ad] of ads.entries()) {
+        await db.query(
+          `INSERT INTO ads (advertiser_id, city_id, city, state, title, brand, model, commercial_model,
+                            price, year, mileage, transmission, fuel_type, body_type, below_fipe,
+                            plan, priority, status, slug, highlight_until, created_at, updated_at, images)
+           VALUES ($1, $2, 'Inventario B2', 'SP', $3, $4, $5, $6, $7, $8, 40000, $9, $10, 'hatch',
+                   false, 'free', 1, 'active', $11, $12, NOW(), NOW(), '[]'::jsonb)`,
+          [
+            ad.advertiserId ?? ids.advertisers.ittmotors,
+            cityId,
+            `B2 ${i}`,
+            ad.brand,
+            ad.model ?? `${ad.brand} 1.0`,
+            ad.commercialModel,
+            ad.price,
+            ad.year ?? 2022,
+            ad.transmission,
+            ad.fuel ?? "flex",
+            `b2-${slug}-${i}`,
+            ad.highlightUntil ?? null,
+          ]
+        );
+      }
+      return await fn({ cityId, slug });
+    } finally {
+      if (cityId !== null) {
+        await db.query(`DELETE FROM ads WHERE city_id = $1`, [cityId]);
+        await db.query(
+          `DELETE FROM region_memberships WHERE base_city_id = $1 OR member_city_id = $1`,
+          [cityId]
+        );
+        await db.query(`DELETE FROM cities WHERE id = $1`, [cityId]);
+      }
+    }
+  }
+
+  it("B2 caso A: única transmissão do estoque continua disponível e recolhida", async () => {
+    await withInventory(
+      "b2-caso-a",
+      [
+        { brand: "Fiat", commercialModel: "Argo", price: 55000, transmission: "automatico" },
+        {
+          brand: "GM - Chevrolet",
+          commercialModel: "Onix",
+          price: 62000,
+          transmission: "automatico",
+        },
+        { brand: "Honda", commercialModel: "Civic", price: 98000, transmission: "automatico" },
+      ],
+      async ({ slug }) => {
+        const r = await runSearchPolicyEngine(
+          { city_slug: slug, raio: "0" },
+          { db, policy, cache: false, telemetry: false }
+        );
+        expect(r.search_policy.total_result_count).toBe(3);
+
+        const cambio = r.facets.find((f) => f.key === "transmission");
+        expect(cambio).toBeDefined(); // antes da B2, a dimensão sumia
+        expect(cambio.options).toHaveLength(1);
+        expect(cambio.options[0]).toMatchObject({ value: "automatico", count: 3 });
+        // "manual" não existe no estoque → não é oferecido como nova escolha
+        expect(cambio.options.some((o) => o.value === "manual")).toBe(false);
+        // baixa cardinalidade → fica em "Mais filtros", mas existe
+        expect(cambio.open).toBe(false);
+        // e preço continua primário
+        expect(r.facets.find((f) => f.key === "price").open).toBe(true);
+      }
+    );
+  });
+
+  it("B2 caso B: marca e modelo únicos continuam disponíveis com o count certo", async () => {
+    await withInventory(
+      "b2-caso-b",
+      [
+        { brand: "Fiat", commercialModel: "Argo", price: 55000, transmission: "manual" },
+        { brand: "Fiat", commercialModel: "Argo", price: 57000, transmission: "automatico" },
+      ],
+      async ({ slug }) => {
+        const r = await runSearchPolicyEngine(
+          { city_slug: slug, raio: "0" },
+          { db, policy, cache: false, telemetry: false }
+        );
+        const marca = r.facets.find((f) => f.key === "brand");
+        const modelo = r.facets.find((f) => f.key === "commercial_model");
+        expect(marca.options).toEqual([{ value: "Fiat", label: "Fiat", count: 2 }]);
+        expect(modelo.options).toEqual([{ value: "Argo", label: "Argo", count: 2 }]);
+        expect(marca.open).toBe(false);
+        expect(modelo.open).toBe(false);
+        // câmbio tem 2 opções reais e sobe para a área principal
+        expect(r.facets.find((f) => f.key === "transmission").open).toBe(true);
+      }
+    );
+  });
+
+  it("B2 caso C: self-excluding calcula a própria dimensão sem a própria restrição", async () => {
+    await withInventory(
+      "b2-caso-c",
+      [
+        { brand: "Fiat", commercialModel: "Argo", price: 55000, transmission: "manual" },
+        { brand: "Fiat", commercialModel: "Argo", price: 57000, transmission: "automatico" },
+        { brand: "Honda", commercialModel: "Civic", price: 99000, transmission: "automatico" },
+      ],
+      async ({ slug }) => {
+        const r = await runSearchPolicyEngine(
+          { city_slug: slug, raio: "0", brand: "Fiat", transmission: "automatico" },
+          { db, policy, cache: false, telemetry: false }
+        );
+        expect(r.search_policy.total_result_count).toBe(1);
+
+        // câmbio: remove câmbio, MANTÉM Fiat → manual(1) e automatico(1)
+        const cambio = r.facets.find((f) => f.key === "transmission");
+        expect(cambio.options.map((o) => `${o.value}:${o.count}`).sort()).toEqual([
+          "automatico:1",
+          "manual:1",
+        ]);
+        expect(cambio.options.find((o) => o.value === "automatico").active).toBe(true);
+
+        // marca: remove marca, MANTÉM automático → Fiat(1) e Honda(1)
+        const marca = r.facets.find((f) => f.key === "brand");
+        expect(marca.options.map((o) => `${o.value}:${o.count}`).sort()).toEqual([
+          "Fiat:1",
+          "Honda:1",
+        ]);
+        expect(marca.options.find((o) => o.value === "Fiat").active).toBe(true);
+      }
+    );
+  });
+
+  it("B2 caso D: plano e destaque não alteram nenhuma contagem de faceta", async () => {
+    const { ids } = await fixture;
+    // Duas leituras por snapshot: sem filtro ativo (query passiva, com
+    // GROUPING SETS) e com filtro ativo (query self-excluding, uma por faceta).
+    // São caminhos de SQL DIFERENTES — cobrir só o primeiro deixaria a
+    // ponderação comercial passar batida no segundo, que foi o que a prova por
+    // mutação mostrou.
+    const snapshot = async (slug) => {
+      const passivo = await runSearchPolicyEngine(
+        { city_slug: slug, raio: "0" },
+        { db, policy, cache: false, telemetry: false }
+      );
+      const ativo = await runSearchPolicyEngine(
+        { city_slug: slug, raio: "0", transmission: "manual" },
+        { db, policy, cache: false, telemetry: false }
+      );
+      const shape = (r) =>
+        r.facets.map((f) => ({
+          key: f.key,
+          open: f.open,
+          options: f.options.map((o) => `${o.value}:${o.count}`),
+        }));
+      return { passivo: shape(passivo), ativo: shape(ativo) };
+    };
+
+    await withInventory(
+      "b2-caso-d",
+      [
+        { brand: "Fiat", commercialModel: "Argo", price: 55000, transmission: "manual" },
+        { brand: "Honda", commercialModel: "Civic", price: 99000, transmission: "automatico" },
+        {
+          brand: "GM - Chevrolet",
+          commercialModel: "Onix",
+          price: 62000,
+          transmission: "manual",
+          advertiserId: ids.advertisers.pfAtibaia,
+        },
+      ],
+      async ({ slug, cityId }) => {
+        const antes = await snapshot(slug);
+
+        // mesmo inventário, monetização diferente: plano do anunciante e
+        // destaque temporal de um dos anúncios.
+        await db.query(`UPDATE users SET plan_id = 'cnpj-store-pro' WHERE id = $1`, [
+          ids.users.pfBoost,
+        ]);
+        await db.query(
+          `UPDATE ads SET highlight_until = NOW() + INTERVAL '7 days' WHERE city_id = $1`,
+          [cityId]
+        );
+
+        const depois = await snapshot(slug);
+        expect(depois).toEqual(antes);
+
+        await db.query(`UPDATE users SET plan_id = 'cpf-free-essential' WHERE id = $1`, [
+          ids.users.pfBoost,
+        ]);
+      }
+    );
+  });
+
+  it("B2 caso E: seleção sem candidatos mantém a opção ativa visível e removível", async () => {
+    await withInventory(
+      "b2-caso-e",
+      [{ brand: "Fiat", commercialModel: "Argo", price: 55000, transmission: "manual" }],
+      async ({ slug }) => {
+        const r = await runSearchPolicyEngine(
+          { city_slug: slug, raio: "0", transmission: "automatico" },
+          { db, policy, cache: false, telemetry: false }
+        );
+        expect(r.search_policy.total_result_count).toBe(0);
+
+        const cambio = r.facets.find((f) => f.key === "transmission");
+        expect(cambio.active_value).toBe("automatico");
+        const ativa = cambio.options.find((o) => o.active === true);
+        expect(ativa).toMatchObject({ value: "automatico", count: 0 });
+        expect(cambio.open).toBe(true);
+        // a alternativa real continua oferecida; o zero ativo não some nem
+        // impede a recuperação
+        expect(cambio.options.find((o) => o.value === "manual").count).toBe(1);
+      }
+    );
+
+    // a sentinela não sobreviveu a nenhum dos casos
+    const { rows } = await db.query(
+      `SELECT COUNT(*)::int AS n FROM cities WHERE slug LIKE 'b2-caso-%'`
+    );
+    expect(rows[0].n).toBe(0);
   });
 
   it("A2 não regride A1: sem raio explícito, nenhum perfil de produto chega a 150", async () => {

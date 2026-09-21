@@ -4,8 +4,11 @@
 //
 // • Toda faceta de veículo usa o CandidateScope. Opção com count 0 não é
 //   emitida — salvo a opção ATIVA, sempre emitida e marcada active:true (E2).
-// • Faceta com menos de min_options_to_render opções não é emitida, salvo se
-//   tiver filtro ativo (precisa aparecer para permitir remoção).
+// • F2.2-B2: a dimensão é emitida sempre que tiver ao menos UMA opção real, ou
+//   filtro ativo. `min_options_to_render` deixou de decidir existência e passou
+//   a decidir só abertura: abaixo do limiar a dimensão continua na resposta,
+//   recolhida em "Mais filtros" (v3 §13). `always_open` e faceta ativa abrem
+//   sempre, o que mantém preço primário permanente (DEC-22, V3-INV-070).
 // • Self-excluding: faceta com filtro ativo conta com o CandidateScope SEM o
 //   próprio filtro — uma query por faceta ativa. As demais saem de UMA query
 //   com GROUPING SETS (§10: 1 + 1 por faceta ativa).
@@ -306,8 +309,26 @@ export function assembleFacets(rowsByKey, filters, policy) {
           active: true,
         });
     }
-    const minOptions = Number(policy.facets.min_options_to_render) || 2;
-    if (active === null && options.length < minOptions) continue;
+    // F2.2-B2 — DISPONIBILIDADE ≠ APRESENTAÇÃO.
+    //
+    // Aqui havia `if (active === null && options.length < minOptions) continue`,
+    // e o `continue` APAGAVA a dimensão da resposta. Com o default de 2, uma
+    // dimensão com exatamente uma opção real — `automatico (12)`, o estoque
+    // inteiro — sumia do backend, e não havia como o usuário chegar a ela por
+    // caminho nenhum. A v3 §13 diz o contrário em uma frase: facetas de baixo
+    // poder discriminativo "podem permanecer recolhidas em 'Mais filtros', SEM
+    // DEIXAR DE ESTAR DISPONÍVEIS ao usuário quando possuírem opções reais".
+    //
+    // Pior: o `continue` rodava ANTES de `decideOpenFacets`, então `always_open`
+    // nunca chegava a proteger o preço. Um contexto de baixa cardinalidade
+    // derrubava a dimensão que a DEC-22 declara primária permanente
+    // (V3-INV-070) — medido, não deduzido: com uma opção por dimensão, a
+    // resposta saía sem faceta nenhuma.
+    //
+    // A regra passa a ser inventory-guided: existe opção real, a dimensão é
+    // emitida. O limiar continua existindo, mas só decide ABERTURA — ver
+    // `decideOpenFacets`.
+    if (active === null && options.length === 0) continue;
     facets.push({
       key: k,
       label: FACET_LABELS[k],
@@ -356,10 +377,23 @@ export async function computeFacets(ctx, policy, deps = {}) {
   return { facets: assembleFacets(rowsByKey, ctx.filters, policy), queries };
 }
 
-/** Abertura (§5.2 + D6). Puro. */
+/**
+ * Abertura (§5.2 + D6). Puro.
+ *
+ * F2.2-B2: é AQUI que `min_options_to_render` passa a valer. Ele decide se uma
+ * dimensão é candidata à área principal, nunca se ela existe — a dimensão de
+ * uma opção só continua na resposta e fica recolhida em "Mais filtros"
+ * (`open: false`), que é exatamente o que a v3 §13 descreve.
+ *
+ * Duas exceções, as mesmas de sempre: uma faceta com filtro ativo abre sempre,
+ * para que o usuário consiga removê-lo, e `always_open` abre sempre — é o que
+ * mantém preço no conjunto principal "qualquer que seja seu poder
+ * discriminativo" (DEC-22, V3-INV-070), inclusive com uma faixa só.
+ */
 export function decideOpenFacets(facets, policy) {
   const alwaysOpen = new Set(policy.facets.always_open || []);
   const openMax = Number(policy.facets.open_max) || 3;
+  const minOptions = Number(policy.facets.min_options_to_render) || 2;
   const byKey = new Map(facets.map((f) => [f.key, f]));
 
   for (const f of facets) f.open = f.active_value !== null; // ativa abre sempre, fora do limite
@@ -373,7 +407,12 @@ export function decideOpenFacets(facets, policy) {
     }
   }
   const candidates = facets
-    .filter((f) => !f.open && f.key !== "version")
+    .filter(
+      (f) =>
+        !f.open &&
+        f.key !== "version" &&
+        (f.options || []).filter((o) => o.count > 0).length >= minOptions
+    )
     .sort(
       (a, b) =>
         b.entropy - a.entropy ||

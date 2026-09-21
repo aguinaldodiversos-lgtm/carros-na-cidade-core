@@ -260,6 +260,14 @@ describe("Facetas — entropia, abertura (D6), E2, rótulos", () => {
     expect(computeEntropy(opts([23, 11]))).toBeCloseTo(0.908, 2);
     expect(computeEntropy(opts([34]))).toBe(0);
   });
+  // F2.2-B2: `decideOpenFacets` passou a consultar as opções para decidir
+  // ABERTURA (dimensão de baixa cardinalidade fica em "Mais filtros"), então as
+  // facetas sintéticas precisam trazer opções coerentes com a entropia
+  // declarada — como as reais sempre trouxeram.
+  const withOptions = (facet, n = 4) => ({
+    ...facet,
+    options: Array.from({ length: n }, (_, i) => ({ value: `v${i}`, count: i + 1 })),
+  });
   it("D6: preço abre sempre e conta no open_max → Bragança abre price, commercial_model, brand", () => {
     const facets = [
       { key: "price", entropy: 1.574, active_value: null },
@@ -267,7 +275,7 @@ describe("Facetas — entropia, abertura (D6), E2, rótulos", () => {
       { key: "commercial_model", entropy: 3.866, active_value: null },
       { key: "year", entropy: 2.153, active_value: null },
       { key: "transmission", entropy: 0.908, active_value: null },
-    ];
+    ].map((f) => withOptions(f));
     const open = decideOpenFacets(facets, policy)
       .filter((f) => f.open)
       .map((f) => f.key);
@@ -279,13 +287,13 @@ describe("Facetas — entropia, abertura (D6), E2, rótulos", () => {
       { key: "brand", entropy: 2.9, active_value: null },
       { key: "commercial_model", entropy: 3.8, active_value: null },
       { key: "transmission", entropy: 0.9, active_value: "automatico" },
-    ];
+    ].map((f) => withOptions(f));
     const open = decideOpenFacets(facets, policy)
       .filter((f) => f.open)
       .map((f) => f.key);
     expect(open.sort()).toEqual(["brand", "commercial_model", "price", "transmission"]);
   });
-  it("assembleFacets: count 0 fora, opção ativa dentro (E2), 1 opção fora salvo ativa, versão só com modelo", () => {
+  it("assembleFacets: count 0 fora, opção ativa dentro (E2), 1 opção DISPONÍVEL mas recolhida, versão só com modelo", () => {
     const rowsByKey = new Map([
       [
         "transmission",
@@ -310,7 +318,13 @@ describe("Facetas — entropia, abertura (D6), E2, rótulos", () => {
       { value: "manual", label: "Manual", count: 3 },
     ]);
     expect(t.open).toBe(true);
-    expect(f.find((x) => x.key === "fuel")).toBeUndefined(); // 1 opção, não ativa
+    // F2.2-B2: uma opção real NÃO faz a dimensão sumir. Ela continua
+    // disponível, apenas recolhida em "Mais filtros" (v3 §13) — antes desta
+    // fase este `toBeUndefined` travava justamente o defeito.
+    const fuel = f.find((x) => x.key === "fuel");
+    expect(fuel).toBeDefined();
+    expect(fuel.options).toEqual([{ value: "flex", label: "Flex", count: 34 }]);
+    expect(fuel.open).toBe(false);
     expect(f.find((x) => x.key === "version")).toBeUndefined();
     expect(f.find((x) => x.key === "brand").options[0]).toEqual({
       value: "Fiat",
