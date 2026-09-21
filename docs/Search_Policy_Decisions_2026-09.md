@@ -161,19 +161,21 @@ DEC-27 — Granularidade da telemetria. Na fase atual, `search.executed` é even
 
 **Contagem de vendedores (`seller_count`).** É o número de vendedores/anunciantes distintos no mesmo CandidateScope e no mesmo território efetivo usados pela contagem de resultados, antes da paginação: mesmos filtros, mesmo SearchContext, mesma elegibilidade, sem ponderação comercial — `COUNT(DISTINCT advertiser_id)` ou equivalente semântico. Não conta apenas os vendedores da página atual e não é derivada da Guided Relaxation.
 
-**Campos por resultado.** `commercial_weight` (peso comercial), `distance` (distância) e `position` (posição) **não** são obrigatórios em `search.executed`. Pertencem a eventos que identificam um resultado específico — `search.results_served`, `search.result_clicked`, `vehicle.viewed`, `lead.created`, `whatsapp.clicked` ou outro evento futuro explicitamente result-scoped. Quando esses eventos forem implementados:
+**Campos por resultado.** `commercial_weight` (peso comercial), `distance` (distância) e `position` (posição) **não** fazem parte do payload mínimo de `search.executed`. Pertencem somente a eventos futuros que identifiquem explicitamente **um resultado individual dentro de um SearchContext** (por exemplo, um evento de interação com um resultado de busca ou uma futura impressão por resultado). Quando esses eventos forem implementados:
 
-- `position` é a posição 1-based daquele resultado específico na lista efetivamente apresentada ao usuário;
+- `position` é a posição 1-based daquele resultado na lista efetivamente apresentada naquele SearchContext;
 - `commercial_weight` é o peso comercial efetivo daquele anúncio naquele SearchContext, conforme a regra de ranking vigente;
-- `distance` é a distância daquele anúncio em relação à origem efetiva da busca, conforme a semântica geográfica vigente.
+- `distance` é a distância daquele anúncio à origem efetiva daquele SearchContext, conforme a semântica geográfica vigente.
 
 Nunca se emite `position = 1` artificialmente num evento de busca por se ter escolhido o primeiro resultado.
 
 **Sem agregados inventados.** Os três campos não são substituídos em `search.executed` por média, mediana, máximo, mínimo ou valor do primeiro resultado sem nova decisão normativa.
 
-**Shadow.** Esta decisão não exige eventos granulares novos antes do shadow. O shadow controlado pode operar com o contexto de busca, as contagens, os identificadores de primeiro resultado já usados pela comparação e o status de timeout ou divergência, sem fabricar `commercial_weight`, `distance` ou `position` em `search.executed`. Os eventos por resultado continuam adiados (ADI-01).
+**Contexto completo.** Para ADI-01 e para a v3 §16, após DEC-27, "contexto completo" significa o conjunto mínimo **search-scoped** definido acima e por `V3-INV-052`; não significa a transposição integral do vocabulário de 14 grandezas da v2.0 §44.
 
-**Motivo.** Ambiguidade descoberta pela implementação F2.2-D1. A v2.0 §44 lista um único vocabulário de contexto compartilhado por eventos de granularidades diferentes — cinco deles sobre um resultado específico (resultados servidos, clique no resultado, visualização do veículo, lead criado, clique de WhatsApp) —, e a v3 §16 havia transportado essa lista integralmente para o único evento vigente, que é por busca. Nenhuma fonte dizia de qual resultado um evento de busca extrairia peso comercial, distância e posição.
+**Eventos granulares nesta fase.** A DEC-27 não exige a criação de novos eventos result-scoped na fase atual. O único evento obrigatório continua sendo `search.executed`, nos termos de ADI-01 e `V3-INV-052`. A eventual introdução de eventos result-scoped será objeto de contrato próprio posterior.
+
+**Motivo.** Ambiguidade descoberta pela implementação F2.2-D1. A v2.0 §44 lista um único vocabulário de contexto compartilhado por eventos de granularidades diferentes — vários deles ligados a resultados, e não à busca como um todo (resultados servidos, clique no resultado, visualização do veículo, lead criado, clique de WhatsApp) —, e a v3 §16 havia transportado essa lista integralmente para o único evento vigente, que é por busca. Nenhuma fonte dizia de qual resultado um evento de busca extrairia peso comercial, distância e posição.
 
 **Alternativas consideradas.** (A) usar o primeiro resultado; (B) usar um agregado do conjunto de resultados; (C) mover os campos result-scoped para os eventos por resultado futuros. **Decisão: C.** Razões: evita `position = 1` sem informação; evita agregados arbitrários; respeita a granularidade original dos eventos da v2.0 §44; permite completar `search.executed` com métricas realmente de busca.
 
@@ -189,7 +191,7 @@ Estes itens NÃO devem ser classificados posteriormente como lacunas da F2.
 
 ADI-01 — Telemetria: um único evento `search.executed`, com payload de contexto completo, é suficiente na fase atual. Os eventos granulares da v2.0 §44 entram em fase posterior. · 2026-09.
 
-_Complemento por DEC-27 (2026-09):_ um único `search.executed` continua bastando nesta fase, e os eventos granulares continuam adiados. Por consequência, os campos result-scoped — peso comercial, distância e posição — não são obrigatórios até esses eventos existirem.
+_Complemento por DEC-27 (2026-09):_ um único `search.executed` continua bastando nesta fase, e os eventos granulares continuam adiados. `commercial_weight`, `distance` e `position` não fazem parte do payload mínimo de `search.executed`; sua eventual obrigatoriedade pertence exclusivamente ao contrato de futuros eventos explicitamente result-scoped. O "payload de contexto completo" do enunciado acima é, após DEC-27, o conjunto mínimo search-scoped definido por `V3-INV-052`, e não a transposição integral das 14 grandezas da v2.0 §44.
 
 ### ADI-02
 
