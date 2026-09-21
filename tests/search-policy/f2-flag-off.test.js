@@ -136,4 +136,33 @@ describe("8.8 — controller por modo da flag", () => {
     expect(next).not.toHaveBeenCalled();
     expect(res.body).toMatchObject({ data: [{ id: 1 }] });
   });
+
+  // F2.2-D1: o shadow agora pode terminar em timeout de SQL, descarte por
+  // saturação ou falha de telemetria. Nada disso pode alcançar a resposta.
+  it("shadow que trava ou rejeita não muda body/status nem atrasa o res.json", async () => {
+    process.env.SEARCH_POLICY_ENGINE = "shadow";
+    for (const behavior of [
+      () => new Promise(() => {}), // nunca resolve
+      () => Promise.reject(Object.assign(new Error("canceling statement"), { code: "57014" })),
+      () => Promise.resolve({ timedOut: false, skipped: true, skipped_reason: "shadow_saturated" }),
+    ]) {
+      vi.mocked(engine.runShadowComparison).mockImplementationOnce(behavior);
+      const res = fakeRes();
+      const next = vi.fn();
+      await search(
+        { query: { city_slug: "atibaia-sp" }, originalUrl: "/api/ads/search" },
+        res,
+        next
+      );
+      expect(res.json).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+      expect(res.body).toEqual({
+        success: true,
+        ok: true,
+        data: [{ id: 1 }],
+        pagination: { total: 1 },
+      });
+    }
+  });
 });
