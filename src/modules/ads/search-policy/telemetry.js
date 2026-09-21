@@ -17,10 +17,16 @@ export const SEARCH_EXECUTED_EVENT = "search.executed";
 let telemetryDisabled = false;
 const SCHEMA_ERROR_CODES = new Set(["42703", "23514"]);
 
+// Payload mínimo (DEC-27 / V3-INV-052): consulta, commercial_model,
+// especificidade, cidade de origem, fonte da localização, modo geográfico, raio
+// solicitado, raio efetivo, total_count, seller_count e versão de política.
+// Evento DE BUSCA: commercial_weight, distance e position são por resultado e
+// não entram aqui — nem como agregado nem como valor do primeiro resultado.
 export function buildSearchExecutedPayload({
   ctx,
   scope,
   total,
+  sellerCount,
   relaxations,
   flagMode,
   shadow,
@@ -30,6 +36,9 @@ export function buildSearchExecutedPayload({
   return {
     q: ctx.rawQ || null,
     residual_q: ctx.filters?.q || null,
+    // O modelo já resolvido do SearchContext (filtro estruturado ou texto
+    // resolvido pelo ProductResolver). Nunca ads.model/FIPE nem o 1º anúncio.
+    commercial_model: ctx.filters?.commercial_model ? String(ctx.filters.commercial_model) : null,
     profile: ctx.intent?.profile || null,
     specificity: ctx.intent?.specificity ?? null,
     origin_city: ctx.origin?.slug || null,
@@ -40,6 +49,7 @@ export function buildSearchExecutedPayload({
     effective_radius: scope?.effective_radius_km ?? null,
     local_count: scope?.local_result_count ?? null,
     total_count: total ?? null,
+    seller_count: sellerCount ?? null,
     expanded: scope?.expanded ?? null,
     reason: scope?.reason || null,
     relaxations_shown: Array.isArray(relaxations) ? relaxations.map((r) => r.dimension) : [],

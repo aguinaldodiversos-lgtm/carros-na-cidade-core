@@ -232,8 +232,12 @@ export function buildEngineQueries(ctx, scope) {
     LIMIT ${limitP}
     OFFSET ${offsetP}`;
 
+  // seller_count (DEC-27 / V3-INV-052) sai da MESMA query de `total`: mesmo
+  // CandidateScope, mesmo território, antes do LIMIT/OFFSET, sem peso comercial
+  // e sem round-trip a mais.
   const countQuery = `
-    SELECT COUNT(*)::int AS total
+    SELECT COUNT(*)::int AS total,
+           COUNT(DISTINCT a.advertiser_id)::int AS seller_count
     FROM ads a ${candidate.joins}
     ${candidate.whereClause}`;
 
@@ -336,6 +340,7 @@ export async function runSearchPolicyEngine(rawQuery, opts = {}) {
     computeFacets(queries.scopeCtx, ctx.policy, { db }),
   ]);
   const total = Number(countResult.rows[0]?.total || 0);
+  const sellerCount = Number(countResult.rows[0]?.seller_count || 0);
 
   const relax = await computeRelaxations(ctx, scope, total, ctx.policy, { db, cache: opts.cache });
 
@@ -370,6 +375,7 @@ export async function runSearchPolicyEngine(rawQuery, opts = {}) {
       ctx,
       scope,
       total,
+      sellerCount,
       relaxations: relax.relaxations,
       flagMode,
       policy: ctx.policy,
@@ -501,6 +507,7 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       ctx,
       scope,
       new_count: Number(countResult.rows[0]?.total || 0),
+      new_seller_count: Number(countResult.rows[0]?.seller_count || 0),
       new_first_ad_id: firstResult.rows[0]?.id ?? null,
     };
   });
@@ -536,6 +543,7 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       ctx: ctx || { rawQ: rawQuery?.q || null, filters: {}, intent: null, origin: null },
       scope: outcome.timedOut ? null : outcome.scope,
       total: outcome.timedOut ? null : outcome.new_count,
+      sellerCount: outcome.timedOut ? null : outcome.new_seller_count,
       relaxations: [],
       flagMode: "shadow",
       shadow,
