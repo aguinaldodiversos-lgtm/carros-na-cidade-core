@@ -800,46 +800,91 @@ describe.sequential("F2 — motor em Postgres real", () => {
     expect(boundary.cap).toBe(150);
   });
 
-  it("B1 migration 068: política persistida == SEARCH_POLICY_DEFAULT, idempotente e sem tocar chaves alheias", async () => {
-    const sql = fs.readFileSync(
-      path.resolve(
-        path.dirname(fileURLToPath(import.meta.url)),
-        "../../src/database/migrations/068_search_policy_guided_relaxation_dec26.sql"
-      ),
-      "utf8"
-    );
+  it("B1R-FIX migrations 068+069: DEC-26 vigente, compat legada presente, idempotente e sem tocar chaves alheias", async () => {
+    const migration = (name) =>
+      fs.readFileSync(
+        path.resolve(
+          path.dirname(fileURLToPath(import.meta.url)),
+          `../../src/database/migrations/${name}`
+        ),
+        "utf8"
+      );
+    const sql068 = migration("068_search_policy_guided_relaxation_dec26.sql");
+    const sql069 = migration("069_search_policy_relaxation_compat.sql");
     const read = async () =>
       (
         await db.query(
           `SELECT value, updated_at FROM platform_settings WHERE key = 'search_policy'`
         )
       ).rows[0];
+    // A política VIGENTE é só a DEC-26; `steps`/`max_items` existem no banco
+    // apenas para o código anterior à B1 sobreviver a um rollback, e o motor
+    // novo os ignora. A comparação separa os dois contratos.
+    const LEGACY = ["steps", "max_items"];
+    const dec26Only = (relaxations) => {
+      const copy = { ...relaxations };
+      for (const k of LEGACY) delete copy[k];
+      return copy;
+    };
+    const HISTORIC_STEPS = {
+      radius: "next_ring",
+      year_from: -2,
+      price_max: 0.15,
+      mileage_max: 0.25,
+      transmission: "remove",
+      fuel: "remove",
+      body_type: "remove",
+      seller_kind: "remove",
+    };
 
-    // 1. O banco migrado e a constante do código dizem a MESMA coisa.
+    // 1. Estado migrado: DEC-26 idêntica à constante + compat legada ao lado.
     const persisted = await read();
-    expect(persisted.value.relaxations).toEqual(JSON.parse(JSON.stringify(policy.relaxations)));
-    expect(persisted.value.relaxations.steps).toBeUndefined();
+    expect(dec26Only(persisted.value.relaxations)).toEqual(
+      JSON.parse(JSON.stringify(policy.relaxations))
+    );
+    expect(persisted.value.relaxations.max_items).toBe(3);
+    expect(persisted.value.relaxations.steps).toEqual(HISTORIC_STEPS);
 
-    // 2. Reaplicar não muda nada — nem `updated_at`.
-    const again = await db.query(sql);
-    expect(again.rowCount).toBe(0);
+    // 2. Reaplicar as duas não muda nada — nem `updated_at`.
+    expect((await db.query(sql068)).rowCount).toBe(0);
+    expect((await db.query(sql069)).rowCount).toBe(0);
     expect((await read()).updated_at).toEqual(persisted.updated_at);
 
-    // 3. Um ajuste do admin em OUTRA chave sobrevive à migration.
+    // 3. Ajuste do admin em OUTRA chave sobrevive; `relaxations` antigo é
+    //    substituído, não fundido.
     await db.query(
       `UPDATE platform_settings SET value = jsonb_set(value, '{facets,open_max}', '7'::jsonb, true) WHERE key = 'search_policy'`
     );
-    // …e um `relaxations` antigo é substituído, não fundido.
     await db.query(
       `UPDATE platform_settings SET value = jsonb_set(value, '{relaxations}', '{"max_items":3,"steps":{"price_max":0.15}}'::jsonb, true) WHERE key = 'search_policy'`
     );
-    const applied = await db.query(sql);
-    expect(applied.rowCount).toBe(1);
+    expect((await db.query(sql068)).rowCount).toBe(1);
     const after = await read();
-    expect(after.value.facets.open_max).toBe(7); // ajuste alheio preservado
-    expect(after.value.relaxations).toEqual(JSON.parse(JSON.stringify(policy.relaxations)));
-    expect(after.value.relaxations.steps).toBeUndefined();
-    expect(after.value.rings_auto).toEqual([0, 25, 50, 75]); // 067 preservada
+    expect(after.value.facets.open_max).toBe(7);
+    expect(dec26Only(after.value.relaxations)).toEqual(
+      JSON.parse(JSON.stringify(policy.relaxations))
+    );
+    expect(after.value.relaxations.steps).toEqual(HISTORIC_STEPS);
+    expect(after.value.rings_auto).toEqual([0, 25, 50, 75]);
+
+    // 4. A 069 repara um banco que rodou a 068 ORIGINAL (sem as chaves legadas)
+    //    sem tocar em nenhum campo DEC-26 nem em chave alheia.
+    await db.query(
+      `UPDATE platform_settings
+          SET value = jsonb_set(value, '{relaxations}', (value->'relaxations') - 'steps' - 'max_items', true)
+        WHERE key = 'search_policy'`
+    );
+    expect((await read()).value.relaxations.steps).toBeUndefined();
+    expect((await db.query(sql069)).rowCount).toBe(1);
+    const repaired = await read();
+    expect(repaired.value.relaxations.steps).toEqual(HISTORIC_STEPS);
+    expect(repaired.value.relaxations.max_items).toBe(3);
+    expect(dec26Only(repaired.value.relaxations)).toEqual(
+      JSON.parse(JSON.stringify(policy.relaxations))
+    );
+    expect(repaired.value.facets.open_max).toBe(7);
+    expect(repaired.value.rings_auto).toEqual([0, 25, 50, 75]);
+    expect((await db.query(sql069)).rowCount).toBe(0); // idempotente
 
     // restaura o estado que os demais testes esperam
     await db.query(
