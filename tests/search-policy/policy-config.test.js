@@ -21,9 +21,14 @@ vi.mock("../../src/shared/logger.js", () => ({
 import { getSetting } from "../../src/modules/platform/settings.service.js";
 import { logger } from "../../src/shared/logger.js";
 import {
+  RELAXATIONS_SHAPE,
   SEARCH_POLICY_DEFAULT,
+  detectRelaxationsShape,
+  isValidRelaxationsPolicy,
   isValidSearchPolicy,
   loadSearchPolicy,
+  resolveSearchPolicy,
+  validateBaseSearchPolicy,
 } from "../../src/modules/ads/search-policy/policy-config.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +44,10 @@ const MIGRATION_067 = path.resolve(
 const MIGRATION_068 = path.resolve(
   here,
   "../../src/database/migrations/068_search_policy_guided_relaxation_dec26.sql"
+);
+const MIGRATION_069 = path.resolve(
+  here,
+  "../../src/database/migrations/069_search_policy_relaxation_compat.sql"
 );
 
 function jsonFromMigration() {
@@ -80,9 +89,56 @@ function jsonFromMigration() {
   return base;
 }
 
+/**
+ * F2.2-B1R-FIX: o banco carrega DOIS contratos ao mesmo tempo — os campos
+ * DEC-26, que são a política vigente, e `steps`/`max_items`, que existem só
+ * para o código anterior continuar funcional em rollback. A constante do
+ * código espelha apenas o primeiro; a comparação separa os dois.
+ */
+const LEGACY_COMPAT_KEYS = ["steps", "max_items"];
+
+function withoutLegacyCompat(policy) {
+  const relaxations = { ...policy.relaxations };
+  for (const key of LEGACY_COMPAT_KEYS) delete relaxations[key];
+  return { ...policy, relaxations };
+}
+
 describe("search_policy — migration 065 × SEARCH_POLICY_DEFAULT", () => {
-  it("são o mesmo JSON, byte a byte em valor", () => {
-    expect(jsonFromMigration()).toEqual(JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT)));
+  it("são o mesmo JSON em valor, descontada a compatibilidade legada do banco", () => {
+    expect(withoutLegacyCompat(jsonFromMigration())).toEqual(
+      JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT))
+    );
+  });
+
+  it("a 068 grava as chaves legadas de compatibilidade com os valores históricos", () => {
+    const relaxations = jsonFromMigration().relaxations;
+    expect(relaxations.max_items).toBe(3);
+    expect(relaxations.steps).toEqual({
+      radius: "next_ring",
+      year_from: -2,
+      price_max: 0.15,
+      mileage_max: 0.25,
+      transmission: "remove",
+      fuel: "remove",
+      body_type: "remove",
+      seller_kind: "remove",
+    });
+    // …e o bloco continua sendo DEC-26 válido para o código novo, que as ignora.
+    expect(isValidRelaxationsPolicy(relaxations)).toBe(true);
+    expect(detectRelaxationsShape(relaxations)).toBe(RELAXATIONS_SHAPE.DEC26_VALID);
+  });
+
+  it("a 069 repara bancos que rodaram a 068 original, de forma idempotente e aditiva", () => {
+    const sql = fs.readFileSync(MIGRATION_069, "utf8");
+    expect(sql).toContain("'{relaxations,steps}'");
+    expect(sql).toContain("'{relaxations,max_items}'");
+    expect(sql).toContain("legacy compatibility only — ignored by DEC-26 engine");
+    // Só age enquanto faltar alguma das duas chaves: reaplicação é no-op.
+    expect(sql).toMatch(/value->'relaxations'->'steps' IS NULL/);
+    expect(sql).toMatch(/value->'relaxations'->'max_items' IS NULL/);
+    // E não toca em nenhum campo DEC-26.
+    for (const key of ["price", "year", "mileage", "radius", "transmission", "priority_order"])
+      expect(sql).not.toContain(`'{relaxations,${key}}'`);
   });
 
   it("traz os números normativos da §2", () => {
@@ -144,7 +200,7 @@ describe("relaxations — política DEC-26 na configuração", () => {
     expect(json).not.toContain('"mileage_max":0.25');
   });
 
-  it("um search_policy com o shape ANTIGO é rejeitado e cai no DEFAULT", () => {
+  it("um search_policy com o shape ANTIGO não é utilizável como está", () => {
     const legacy = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
     legacy.relaxations = {
       show_when_total_below_target: true,
@@ -153,6 +209,152 @@ describe("relaxations — política DEC-26 na configuração", () => {
       priority_order: ["radius", "price_max"],
     };
     expect(isValidSearchPolicy(legacy)).toBe(false);
+    // …mas a BASE dele é perfeitamente válida, e é isso que o dual-read explora.
+    expect(validateBaseSearchPolicy(legacy)).toBe(true);
+  });
+});
+
+// ── F2.2-B1R-FIX — dual-read de configuração ────────────────────────────────
+//
+// A auditoria B1R mediu o custo de tratar "versão anterior conhecida" como
+// "JSON corrompido": o código novo descartava a política inteira e levava
+// junto TTL, facetas, target de perfil e anéis persistidos — quatro overrides
+// sem relação nenhuma com a Guided Relaxation. Estes testes travam a correção
+// nos dois sentidos: a base persistida sobrevive, e a política DEC-26 do
+// código é a que vale.
+
+/** Política legada realista: a que a migration 065 gravava. */
+function legacyPolicy(overrides = {}) {
+  const policy = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
+  policy.relaxations = {
+    show_when_total_below_target: true,
+    max_items: 3,
+    steps: {
+      radius: "next_ring",
+      year_from: -2,
+      price_max: 0.15,
+      mileage_max: 0.25,
+      transmission: "remove",
+      fuel: "remove",
+      body_type: "remove",
+      seller_kind: "remove",
+    },
+    priority_order: ["radius", "transmission", "price_max", "year_from", "mileage_max"],
+  };
+  return Object.assign(policy, overrides);
+}
+
+describe("resolveSearchPolicy — dual-read (B1R-FIX)", () => {
+  it("classifica os três estados possíveis do bloco de relaxação", () => {
+    expect(detectRelaxationsShape(SEARCH_POLICY_DEFAULT.relaxations)).toBe(
+      RELAXATIONS_SHAPE.DEC26_VALID
+    );
+    expect(detectRelaxationsShape(legacyPolicy().relaxations)).toBe(RELAXATIONS_SHAPE.LEGACY_KNOWN);
+    expect(detectRelaxationsShape({ isso: "não é política nenhuma" })).toBe(
+      RELAXATIONS_SHAPE.INVALID_UNKNOWN
+    );
+    expect(detectRelaxationsShape(null)).toBe(RELAXATIONS_SHAPE.INVALID_UNKNOWN);
+  });
+
+  it("DEC-26 válido → usa o persistido como está", () => {
+    const persisted = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
+    persisted.liquidity_cache_ttl_seconds = 1234;
+    const { policy, outcome } = resolveSearchPolicy(persisted);
+    expect(outcome).toBe(RELAXATIONS_SHAPE.DEC26_VALID);
+    expect(policy).toBe(persisted);
+  });
+
+  it("legacy conhecido → normaliza SÓ relaxations e preserva todo o resto", () => {
+    const persisted = legacyPolicy({
+      liquidity_cache_ttl_seconds: 1234,
+      rings_manual: [0, 10, 25, 50, 75],
+    });
+    persisted.facets.open_max = 5;
+    persisted.profiles.BROWSE_CITY.target = 25;
+    persisted.explicit_query_patterns = ["\\bteste\\s+"];
+
+    const { policy, outcome } = resolveSearchPolicy(persisted);
+    expect(outcome).toBe(RELAXATIONS_SHAPE.LEGACY_KNOWN);
+
+    // as quatro sentinelas da auditoria B1R, mais os padrões de consulta
+    expect(policy.liquidity_cache_ttl_seconds).toBe(1234);
+    expect(policy.facets.open_max).toBe(5);
+    expect(policy.profiles.BROWSE_CITY.target).toBe(25);
+    expect(policy.rings_manual).toEqual([0, 10, 25, 50, 75]);
+    expect(policy.explicit_query_patterns).toEqual(["\\bteste\\s+"]);
+
+    // e a relaxação efetiva é a DEC-26 do código, não os degraus revogados
+    expect(policy.relaxations).toEqual(SEARCH_POLICY_DEFAULT.relaxations);
+    expect(policy.relaxations.steps).toBeUndefined();
+    expect(policy.relaxations.price.quantum).toBe(1000);
+    expect(policy.relaxations.priority_order).toEqual([
+      "price",
+      "year",
+      "mileage",
+      "radius",
+      "transmission",
+    ]);
+  });
+
+  it("a normalização NÃO muta o objeto persistido", () => {
+    const persisted = legacyPolicy({ liquidity_cache_ttl_seconds: 1234 });
+    const snapshot = JSON.parse(JSON.stringify(persisted));
+    const { policy } = resolveSearchPolicy(persisted);
+
+    expect(persisted).toEqual(snapshot); // nada mudou no original
+    expect(persisted.relaxations.steps.price_max).toBe(0.15); // inclusive o legado
+    expect(policy).not.toBe(persisted); // e o efetivo é outro objeto
+    expect(policy.relaxations).not.toBe(persisted.relaxations);
+  });
+
+  it("base inválida ou relaxação irreconhecível → fail-safe integral", () => {
+    const corrupt = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
+    corrupt.relaxations = { alguma_coisa: true };
+    expect(resolveSearchPolicy(corrupt).policy).toBe(SEARCH_POLICY_DEFAULT);
+    expect(resolveSearchPolicy(corrupt).outcome).toBe(RELAXATIONS_SHAPE.INVALID_UNKNOWN);
+
+    const brokenBase = legacyPolicy();
+    brokenBase.rings_auto = "não é array";
+    expect(resolveSearchPolicy(brokenBase).policy).toBe(SEARCH_POLICY_DEFAULT);
+  });
+
+  it("a compatibilidade legada do banco NÃO dispara normalização", () => {
+    // Estado pós-068/069: campos DEC-26 + steps/max_items legados juntos.
+    const compat = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
+    compat.relaxations.max_items = 3;
+    compat.relaxations.steps = { radius: "next_ring", price_max: 0.15 };
+    expect(detectRelaxationsShape(compat.relaxations)).toBe(RELAXATIONS_SHAPE.DEC26_VALID);
+    expect(resolveSearchPolicy(compat).policy).toBe(compat);
+  });
+});
+
+describe("loadSearchPolicy — mensagens distintas por causa (B1R-FIX)", () => {
+  it("legacy conhecido: warn de NORMALIZAÇÃO, política preservada", async () => {
+    vi.mocked(logger.warn).mockClear();
+    const persisted = legacyPolicy({ liquidity_cache_ttl_seconds: 1234 });
+    vi.mocked(getSetting).mockResolvedValue(persisted);
+
+    const policy = await loadSearchPolicy();
+    expect(policy).not.toBe(SEARCH_POLICY_DEFAULT);
+    expect(policy.liquidity_cache_ttl_seconds).toBe(1234);
+    expect(policy.relaxations).toEqual(SEARCH_POLICY_DEFAULT.relaxations);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("relaxations legacy"));
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining("shape inválido — usando SEARCH_POLICY_DEFAULT")
+    );
+  });
+
+  it("corrompido: warn de SHAPE INVÁLIDO, fail-safe", async () => {
+    vi.mocked(logger.warn).mockClear();
+    const corrupt = JSON.parse(JSON.stringify(SEARCH_POLICY_DEFAULT));
+    corrupt.relaxations = { lixo: 1 };
+    vi.mocked(getSetting).mockResolvedValue(corrupt);
+
+    expect(await loadSearchPolicy()).toBe(SEARCH_POLICY_DEFAULT);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("shape inválido — usando SEARCH_POLICY_DEFAULT")
+    );
+    expect(logger.warn).not.toHaveBeenCalledWith(expect.stringContaining("relaxations legacy"));
   });
 });
 

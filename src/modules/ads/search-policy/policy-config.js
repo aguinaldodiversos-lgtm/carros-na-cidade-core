@@ -125,8 +125,18 @@ export const SEARCH_POLICY_DEFAULT = Object.freeze({
   ],
 });
 
-/** Validação mínima de shape — evita que um JSON parcial no banco quebre o motor. */
-export function isValidSearchPolicy(value) {
+/**
+ * Validação da BASE da política — tudo menos a subestrutura `relaxations`.
+ *
+ * F2.2-B1R-FIX. A separação existe porque as duas camadas falham por motivos
+ * diferentes e merecem tratamentos diferentes: um `rings_auto` corrompido
+ * invalida a política inteira, mas um bloco de relaxação no formato anterior à
+ * DEC-26 é apenas uma versão antiga de UMA subestrutura conhecida. Antes desta
+ * fase os dois casos caíam no mesmo lugar, e o segundo descartava TTL, facetas,
+ * perfis e anéis persistidos junto — a auditoria B1R mediu 4 overrides perdidos
+ * por causa de uma incompatibilidade que não tinha relação nenhuma com eles.
+ */
+export function validateBaseSearchPolicy(value) {
   if (!value || typeof value !== "object") return false;
   if (!Array.isArray(value.rings_auto) || !Array.isArray(value.rings_manual)) return false;
   if (!value.profiles || typeof value.profiles !== "object") return false;
@@ -136,8 +146,81 @@ export function isValidSearchPolicy(value) {
       return false;
   }
   if (!value.facets || !value.relaxations) return false;
-  if (!isValidRelaxationsPolicy(value.relaxations)) return false;
   return true;
+}
+
+/**
+ * A política persistida pode ser usada como está? Base válida **e** bloco de
+ * relaxação já no formato DEC-26. Continua sendo a pergunta que os consumidores
+ * externos fazem; quem precisa distinguir "antigo" de "corrompido" usa
+ * `resolveSearchPolicy`.
+ */
+export function isValidSearchPolicy(value) {
+  return validateBaseSearchPolicy(value) && isValidRelaxationsPolicy(value.relaxations);
+}
+
+/** Como o bloco `relaxations` persistido se classifica. */
+export const RELAXATIONS_SHAPE = Object.freeze({
+  DEC26_VALID: "DEC26_VALID",
+  LEGACY_KNOWN: "LEGACY_KNOWN",
+  INVALID_UNKNOWN: "INVALID_UNKNOWN",
+});
+
+/**
+ * Assinatura do bloco de relaxação anterior à DEC-26 (migration 065): um
+ * `steps` objeto e/ou `max_items` numérico.
+ *
+ * Isto é DETECÇÃO, não política. Os degraus históricos — preço +15%, ano −2,
+ * quilometragem +25%, `next_ring` — continuam revogados pela DEC-26 e não
+ * voltam a valer em hipótese nenhuma: a única coisa que se faz com eles é
+ * reconhecer que o JSON é antigo e substituir o bloco inteiro pela política
+ * certificada do código.
+ */
+export function detectRelaxationsShape(relaxations) {
+  if (isValidRelaxationsPolicy(relaxations)) return RELAXATIONS_SHAPE.DEC26_VALID;
+  if (!relaxations || typeof relaxations !== "object") return RELAXATIONS_SHAPE.INVALID_UNKNOWN;
+  const hasLegacySteps = Boolean(relaxations.steps) && typeof relaxations.steps === "object";
+  const hasLegacyMaxItems = Number.isFinite(Number(relaxations.max_items));
+  return hasLegacySteps || hasLegacyMaxItems
+    ? RELAXATIONS_SHAPE.LEGACY_KNOWN
+    : RELAXATIONS_SHAPE.INVALID_UNKNOWN;
+}
+
+/**
+ * Dual-read (F2.2-B1R-FIX): decide o que fazer com o valor persistido **sem
+ * nunca mutá-lo**.
+ *
+ *   DEC26_VALID      → usa o persistido como está;
+ *   LEGACY_KNOWN     → preserva a base persistida e troca SOMENTE `relaxations`
+ *                      pela política DEC-26 do código, em um objeto NOVO;
+ *   INVALID_UNKNOWN  → fail-safe existente (SEARCH_POLICY_DEFAULT inteiro).
+ *
+ * O caso do meio é o que torna o rollout cross-version seguro: enquanto a
+ * migration não roda, o código novo já serve DEC-26 sem jogar fora nenhum
+ * override alheio.
+ */
+export function resolveSearchPolicy(value) {
+  if (!validateBaseSearchPolicy(value)) {
+    return {
+      policy: SEARCH_POLICY_DEFAULT,
+      outcome: RELAXATIONS_SHAPE.INVALID_UNKNOWN,
+      base: false,
+    };
+  }
+  const shape = detectRelaxationsShape(value.relaxations);
+  if (shape === RELAXATIONS_SHAPE.DEC26_VALID) {
+    return { policy: value, outcome: shape, base: true };
+  }
+  if (shape === RELAXATIONS_SHAPE.LEGACY_KNOWN) {
+    // Objeto novo por spread: o JSON carregado do banco não é tocado, e nada
+    // aqui escreve em platform_settings nem mexe em `updated_at`.
+    return {
+      policy: { ...value, relaxations: SEARCH_POLICY_DEFAULT.relaxations },
+      outcome: shape,
+      base: true,
+    };
+  }
+  return { policy: SEARCH_POLICY_DEFAULT, outcome: shape, base: true };
 }
 
 /**
@@ -185,13 +268,20 @@ export async function loadSearchPolicy() {
       );
       return SEARCH_POLICY_DEFAULT;
     }
-    if (!isValidSearchPolicy(value)) {
+    const resolved = resolveSearchPolicy(value);
+    if (resolved.outcome === RELAXATIONS_SHAPE.LEGACY_KNOWN) {
+      // Mensagem PRÓPRIA: confundir "versão anterior conhecida" com "JSON
+      // corrompido" é o que faria um operador procurar corrupção onde só falta
+      // rodar a migration.
+      logger.warn(
+        "[search-policy] relaxations legacy detectada; normalizando apenas relaxations para DEC-26 e preservando demais overrides"
+      );
+    } else if (resolved.outcome === RELAXATIONS_SHAPE.INVALID_UNKNOWN) {
       logger.warn(
         "[search-policy] platform_settings.search_policy com shape inválido — usando SEARCH_POLICY_DEFAULT"
       );
-      return SEARCH_POLICY_DEFAULT;
     }
-    return value;
+    return resolved.policy;
   } catch (err) {
     logger.warn(
       { err: err?.message || String(err) },
