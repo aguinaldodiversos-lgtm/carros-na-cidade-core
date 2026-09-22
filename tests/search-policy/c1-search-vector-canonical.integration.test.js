@@ -69,9 +69,18 @@ async function withDatabase(label, fn) {
   u.pathname = `/${dbName}`;
   const dbUrl = u.toString();
   const db = new Pool({ connectionString: dbUrl, ssl: resolveSslConfig(dbUrl, process.env) });
+  let tearingDown = false;
+  db.on("error", (err) => {
+    // O cleanup pode encerrar um backend já em fechamento. O pg então emite
+    // 57P01 no Pool depois que as asserções terminaram. Durante o teardown isso
+    // é esperado; fora dele, o erro continua sendo fatal para o teste.
+    if (tearingDown && String(err?.code) === "57P01") return;
+    throw err;
+  });
   try {
     return await fn({ dbUrl, db, env: envFor(dbUrl) });
   } finally {
+    tearingDown = true;
     await db.end().catch(() => {});
     await adminPool.query(
       `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`,
