@@ -89,6 +89,110 @@ const shadowNotCounted = {
   lastTimeoutLogAt: 0,
 };
 
+/**
+ * Instrumentação temporária de performance do shadow.
+ *
+ * Objetivo: decompor o envelope real (pool → BEGIN → SET LOCAL → contexto →
+ * escopo → par de queries → ROLLBACK → telemetria) sem tocar em política,
+ * CandidateScope, ranking, resposta pública ou persistência.
+ *
+ * Volume controlado:
+ *   - timeout/error: no máximo 1 log detalhado a cada 10 s;
+ *   - sucesso: no máximo 1 log detalhado a cada 30 s.
+ *
+ * Não registra query string, q, IP, IDs de usuário ou qualquer payload livre.
+ * Em NODE_ENV diferente de production não emite estes logs.
+ */
+const SHADOW_DIAGNOSTIC_TIMEOUT_LOG_INTERVAL_MS = 10_000;
+const SHADOW_DIAGNOSTIC_SUCCESS_LOG_INTERVAL_MS = 30_000;
+const shadowDiagnostics = {
+  completed: 0,
+  timedOut: 0,
+  failed: 0,
+  suppressedSuccess: 0,
+  suppressedTimeout: 0,
+  suppressedFailure: 0,
+  lastSuccessLogAt: 0,
+  lastTimeoutLogAt: 0,
+  lastFailureLogAt: 0,
+};
+
+function elapsedMs(startedAt) {
+  return Math.max(0, Date.now() - startedAt);
+}
+
+function numericTiming(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
+function compactShadowTimings(timings = {}) {
+  return {
+    pool_wait_ms: numericTiming(timings.pool_wait_ms),
+    begin_ms: numericTiming(timings.begin_ms),
+    set_timeout_ms: numericTiming(timings.set_timeout_ms),
+    context_ms: numericTiming(timings.context_ms),
+    scope_ms: numericTiming(timings.scope_ms),
+    query_build_ms: numericTiming(timings.query_build_ms),
+    query_pair_ms: numericTiming(timings.query_pair_ms),
+    count_settle_ms: numericTiming(timings.count_settle_ms),
+    first_result_settle_ms: numericTiming(timings.first_result_settle_ms),
+    transaction_work_ms: numericTiming(timings.transaction_work_ms),
+    rollback_ms: numericTiming(timings.rollback_ms),
+    race_ms: numericTiming(timings.race_ms),
+    settled_total_ms: numericTiming(timings.settled_total_ms),
+    telemetry_ms: numericTiming(timings.telemetry_ms),
+    total_with_telemetry_ms: numericTiming(timings.total_with_telemetry_ms),
+  };
+}
+
+function noteShadowPerformanceDiagnostic(kind, timings, meta = {}) {
+  if (process.env.NODE_ENV !== "production") return;
+
+  const now = Date.now();
+  const isSuccess = kind === "success";
+  const isTimeout = kind === "timeout";
+  const interval = isSuccess
+    ? SHADOW_DIAGNOSTIC_SUCCESS_LOG_INTERVAL_MS
+    : SHADOW_DIAGNOSTIC_TIMEOUT_LOG_INTERVAL_MS;
+  const lastKey = isSuccess
+    ? "lastSuccessLogAt"
+    : isTimeout
+      ? "lastTimeoutLogAt"
+      : "lastFailureLogAt";
+  const suppressedKey = isSuccess
+    ? "suppressedSuccess"
+    : isTimeout
+      ? "suppressedTimeout"
+      : "suppressedFailure";
+
+  if (now - shadowDiagnostics[lastKey] < interval) {
+    shadowDiagnostics[suppressedKey] += 1;
+    return;
+  }
+
+  shadowDiagnostics[lastKey] = now;
+  const suppressedSinceLast = shadowDiagnostics[suppressedKey];
+  shadowDiagnostics[suppressedKey] = 0;
+
+  const payload = {
+    outcome: kind,
+    completed_total: shadowDiagnostics.completed,
+    timed_out_total: shadowDiagnostics.timedOut,
+    failed_total: shadowDiagnostics.failed,
+    suppressed_since_last: suppressedSinceLast,
+    budget_ms: SHADOW_TIMEOUT_MS,
+    profile: meta.profile || null,
+    geo_mode: meta.geo_mode || null,
+    cache_backend: meta.cache_backend || null,
+    cache_hit: meta.cache_hit === true,
+    ...compactShadowTimings(timings),
+  };
+
+  const message = "[search-policy] shadow performance diagnostic";
+  if (isSuccess) logger.info(payload, message);
+  else logger.warn(payload, message);
+}
+
 function noteShadowUnsupported(params) {
   shadowNotCounted.unsupported += 1;
   for (const p of params) {
@@ -138,6 +242,15 @@ export const __shadowTesting = Object.freeze({
     shadowNotCounted.timedOut = 0;
     shadowNotCounted.lastUnsupportedLogAt = 0;
     shadowNotCounted.lastTimeoutLogAt = 0;
+    shadowDiagnostics.completed = 0;
+    shadowDiagnostics.timedOut = 0;
+    shadowDiagnostics.failed = 0;
+    shadowDiagnostics.suppressedSuccess = 0;
+    shadowDiagnostics.suppressedTimeout = 0;
+    shadowDiagnostics.suppressedFailure = 0;
+    shadowDiagnostics.lastSuccessLogAt = 0;
+    shadowDiagnostics.lastTimeoutLogAt = 0;
+    shadowDiagnostics.lastFailureLogAt = 0;
   },
 });
 
@@ -153,20 +266,36 @@ function isStatementTimeout(err) {
  * limite antes de o client voltar ao pool. Se o próprio ROLLBACK falhar, o
  * client é DESTRUÍDO (release(err)) em vez de devolvido em estado incerto.
  */
-export async function withShadowStatementTimeout(db, fn) {
+export async function withShadowStatementTimeout(db, fn, timings = null) {
+  let stepStarted = Date.now();
   const client = await db.connect();
+  if (timings) timings.pool_wait_ms = elapsedMs(stepStarted);
+
   let releaseErr;
+  let workStarted;
   try {
+    stepStarted = Date.now();
     await client.query("BEGIN");
+    if (timings) timings.begin_ms = elapsedMs(stepStarted);
+
+    stepStarted = Date.now();
     await client.query("SELECT set_config('statement_timeout', $1, true)", [
       String(SHADOW_STATEMENT_TIMEOUT_MS),
     ]);
+    if (timings) timings.set_timeout_ms = elapsedMs(stepStarted);
+
+    workStarted = Date.now();
     return await fn(client);
   } finally {
+    if (timings && workStarted != null) timings.transaction_work_ms = elapsedMs(workStarted);
+
+    stepStarted = Date.now();
     try {
       await client.query("ROLLBACK");
     } catch (err) {
       releaseErr = err;
+    } finally {
+      if (timings) timings.rollback_ms = elapsedMs(stepStarted);
     }
     client.release(releaseErr);
   }
@@ -537,26 +666,52 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
   // conexões ao mesmo tempo: o teto N limita conexões, não só comparações.
   shadowState.inFlight += 1;
 
+  const timings = {};
   let timer;
   const timeout = new Promise((resolve) => {
     timer = setTimeout(() => resolve({ timedOut: true }), opts.timeoutMs ?? SHADOW_TIMEOUT_MS);
   });
-  const work = withShadowStatementTimeout(db, async (client) => {
-    const ctx = await buildSearchContext(rawQuery, { db: client, policy: opts.policy });
-    const scope = await resolveScope(ctx, ctx.policy, { db: client, cache: opts.cache });
-    const queries = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
-    const [countResult, firstResult] = await Promise.all([
-      client.query(queries.countQuery, queries.countParams),
-      client.query(queries.dataQuery, queries.params),
-    ]);
-    return {
-      ctx,
-      scope,
-      new_count: Number(countResult.rows[0]?.total || 0),
-      new_seller_count: Number(countResult.rows[0]?.seller_count || 0),
-      new_first_ad_id: firstResult.rows[0]?.id ?? null,
-    };
-  });
+  const work = withShadowStatementTimeout(
+    db,
+    async (client) => {
+      let stepStarted = Date.now();
+      const ctx = await buildSearchContext(rawQuery, { db: client, policy: opts.policy });
+      timings.context_ms = elapsedMs(stepStarted);
+
+      stepStarted = Date.now();
+      const scope = await resolveScope(ctx, ctx.policy, { db: client, cache: opts.cache });
+      timings.scope_ms = elapsedMs(stepStarted);
+
+      stepStarted = Date.now();
+      const queries = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
+      timings.query_build_ms = elapsedMs(stepStarted);
+
+      // O pg.Client usa uma conexão física e serializa statements. Mantemos o
+      // Promise.all original para não alterar comportamento; por isso os dois
+      // "*_settle_ms" medem do despacho comum até cada Promise resolver, e
+      // query_pair_ms é o custo operacional real do par dentro do envelope.
+      const queryPairStarted = Date.now();
+      const countPromise = client.query(queries.countQuery, queries.countParams).then((result) => {
+        timings.count_settle_ms = elapsedMs(queryPairStarted);
+        return result;
+      });
+      const firstPromise = client.query(queries.dataQuery, queries.params).then((result) => {
+        timings.first_result_settle_ms = elapsedMs(queryPairStarted);
+        return result;
+      });
+      const [countResult, firstResult] = await Promise.all([countPromise, firstPromise]);
+      timings.query_pair_ms = elapsedMs(queryPairStarted);
+
+      return {
+        ctx,
+        scope,
+        new_count: Number(countResult.rows[0]?.total || 0),
+        new_seller_count: Number(countResult.rows[0]?.seller_count || 0),
+        new_first_ad_id: firstResult.rows[0]?.id ?? null,
+      };
+    },
+    timings
+  );
   // Nunca deixa a rejeição tardia do perdedor (57014 depois que a race já
   // resolveu por timeout) escapar como unhandled rejection.
   const settled = work.then(
@@ -567,11 +722,13 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
   try {
     let outcome = await Promise.race([settled, timeout]);
     const elapsed = Date.now() - started; // o relato é do instante da race
+    timings.race_ms = elapsed;
     clearTimeout(timer);
     // Espera a conexão da comparação voltar ao pool antes de pedir outra para
     // a telemetria. Limitado pelo statement_timeout — antes da D1 esta espera
     // seria indefinida, e era por isso que a race existia.
     await settled;
+    timings.settled_total_ms = elapsedMs(started);
     if (outcome.error) {
       // statement_timeout venceu o timer JS: é o mesmo timeout, relatado pelo banco.
       if (!isStatementTimeout(outcome.error)) throw outcome.error;
@@ -587,6 +744,13 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
     if (outcome.timedOut) {
       // A contagem não terminou: sem total/seller_count reais, sem search.executed.
       noteShadowTimeout();
+      shadowDiagnostics.timedOut += 1;
+      noteShadowPerformanceDiagnostic("timeout", timings, {
+        profile: outcome.ctx?.intent?.profile,
+        geo_mode: outcome.scope?.geo_mode,
+        cache_backend: outcome.scope?.cache?.backend || policyCacheBackend(),
+        cache_hit: outcome.scope?.cache?.hit === true,
+      });
       return { ...shadow, timedOut: true };
     }
     const ctx = outcome.ctx;
@@ -601,10 +765,24 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       policy: ctx.policy,
       cacheBackend: policyCacheBackend(),
     });
+    const telemetryStarted = Date.now();
     await recordSearchExecuted({ path: opts.path, ctx, payload }, { db });
+    timings.telemetry_ms = elapsedMs(telemetryStarted);
+    timings.total_with_telemetry_ms = elapsedMs(started);
+
+    shadowDiagnostics.completed += 1;
+    noteShadowPerformanceDiagnostic("success", timings, {
+      profile: ctx.intent?.profile,
+      geo_mode: outcome.scope?.geo_mode,
+      cache_backend: outcome.scope?.cache?.backend || policyCacheBackend(),
+      cache_hit: outcome.scope?.cache?.hit === true,
+    });
     return { ...shadow, timedOut: false };
   } catch (err) {
     clearTimeout(timer);
+    timings.settled_total_ms ??= elapsedMs(started);
+    shadowDiagnostics.failed += 1;
+    noteShadowPerformanceDiagnostic("failure", timings);
     logger.warn({ err: err?.message || String(err) }, "[search-policy] shadow falhou");
     return null;
   } finally {
