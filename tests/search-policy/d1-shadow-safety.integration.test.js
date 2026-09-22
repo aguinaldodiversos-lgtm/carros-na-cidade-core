@@ -337,21 +337,34 @@ describe.sequential("F2.2-D1 — shadow sob Postgres real", () => {
     expect(peakCheckedOut).toBeLessThanOrEqual(2);
   });
 
-  it("telemetria: o timeout continua gravando search.executed com shadow_timeout (sem regressão)", async () => {
+  // F2.2-D1R-S: sem contagem concluída não há total_count/seller_count reais,
+  // então o timeout NÃO grava search.executed (DEC-27 / V3-INV-052). O
+  // diagnóstico passou para o contador do processo.
+  it("telemetria: o timeout NÃO grava search.executed e conta no diagnóstico do processo", async () => {
     const db = newPool("d1-tel", 2);
-    const { rows: before } = await db.query(
-      `SELECT COUNT(*)::int AS n FROM analytics_events WHERE event_type = 'search.executed' AND payload->>'shadow_timeout' = 'true'`
-    );
+    const count = async () =>
+      (
+        await db.query(
+          `SELECT COUNT(*)::int AS n FROM analytics_events WHERE event_type = 'search.executed' AND path = '/api/ads/search?d1'`
+        )
+      ).rows[0].n;
+    const before = await count();
     const release = await lockAds();
     try {
       const out = await shadow(db);
       expect(out.timedOut).toBe(true);
+      expect(out.new_count).toBeNull();
     } finally {
       await release();
     }
-    const { rows: after } = await db.query(
-      `SELECT COUNT(*)::int AS n FROM analytics_events WHERE event_type = 'search.executed' AND payload->>'shadow_timeout' = 'true'`
-    );
-    expect(after[0].n).toBe(before[0].n + 1);
+    expect(await count()).toBe(before);
+    expect(__shadowTesting.timedOut()).toBe(1);
+
+    // Controle: sem o lock, a MESMA comparação conclui e grava 1 evento — o
+    // zero acima não é o INSERT falhando por outro motivo.
+    const ok = await shadow(db, { timeoutMs: 5000 });
+    expect(ok.timedOut).toBe(false);
+    expect(await count()).toBe(before + 1);
+    expect(__shadowTesting.timedOut()).toBe(1);
   });
 });

@@ -30,6 +30,7 @@ import {
   runSearchPolicyEngine,
   runSearchPolicyEngineIfAllowed,
   runShadowComparison,
+  __shadowTesting,
 } from "../../src/modules/ads/search-policy/engine.js";
 import {
   resolveScope,
@@ -1209,7 +1210,7 @@ describe.sequential("F2 — motor em Postgres real", () => {
   });
 
   // ── §4.9 — só assume o que modela ────────────────────────────────────────
-  it("chaves legadas não modeladas: v1 recua ao legado SEM tocar o banco; shadow grava skipped", async () => {
+  it("chaves legadas não modeladas: v1 recua ao legado SEM tocar o banco; shadow pula sem search.executed", async () => {
     const dbThatThrows = {
       query: async () => {
         throw new Error("o motor não podia consultar o banco");
@@ -1242,17 +1243,13 @@ describe.sequential("F2 — motor em Postgres real", () => {
       new_count: null,
       timedOut: false,
     });
+    // F2.2-D1R-S: o motor não rodou, logo não há search.executed (DEC-27 /
+    // V3-INV-052); o skip fica no diagnóstico do processo.
     const { rows } = await db.query(
       "SELECT payload FROM analytics_events WHERE event_type = 'search.executed' AND path = '/api/ads/search?highlight_only=true'"
     );
-    expect(rows.length).toBe(1);
-    expect(rows[0].payload).toMatchObject({
-      flag_mode: "shadow",
-      skipped: "unsupported_params",
-      unsupported_params: ["highlight_only"],
-      old_count: 0,
-      new_count: null,
-    });
+    expect(rows.length).toBe(0);
+    expect(__shadowTesting.skippedUnsupportedByParam().highlight_only).toBeGreaterThanOrEqual(1);
   });
 
   it("cross-UF: a partir de Extrema-MG o motor enxerga Atibaia (38 km) e Bragança (25 km)", async () => {
