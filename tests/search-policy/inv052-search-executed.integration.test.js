@@ -401,10 +401,10 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
     expect(sc.length).toBe(1);
     expect(sc[0]).toMatch(/COUNT\(\*\)::int AS total/);
     // BEGIN+SET LOCAL é um statement de setup; a comparação em si é UMA query
-    // que contém summary + first_match. Não pode reaparecer o antigo par
-    // countQuery + dataQuery serializado na mesma conexão.
+    // que materializa candidates e contém summary + first_match. Não pode
+    // reaparecer o antigo par countQuery + dataQuery serializado na conexão.
     const comparisonStatements = rdb.log.filter(
-      (t) => /WITH summary AS/.test(t) && /first_match AS/.test(t)
+      (t) => /WITH candidates AS MATERIALIZED/.test(t) && /first_match AS/.test(t)
     );
     expect(comparisonStatements).toHaveLength(1);
   });

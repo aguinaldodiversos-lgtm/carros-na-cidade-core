@@ -441,12 +441,51 @@ export function buildEngineQueries(ctx, scope) {
   };
 }
 
+function buildShadowCandidateSortClause(sort, { hasOrigin, hasText }) {
+  switch (sort) {
+    case "recent":
+      return "created_at DESC, id DESC";
+    case "price_asc":
+      return "price ASC NULLS LAST, created_at DESC";
+    case "price_desc":
+      return "price DESC NULLS LAST, created_at DESC";
+    case "year_desc":
+      return "year DESC NULLS LAST, created_at DESC";
+    case "year_asc":
+      return "year ASC NULLS LAST, created_at DESC";
+    case "mileage_asc":
+      return "mileage ASC NULLS LAST, created_at DESC";
+    case "mileage_desc":
+      return "mileage DESC NULLS LAST, created_at DESC";
+    case "highlight":
+      return `
+        highlight_active DESC,
+        priority DESC NULLS LAST,
+        created_at DESC
+      `;
+    case "relevance":
+    default: {
+      const parts = ["commercial_layer DESC"];
+      if (hasOrigin) parts.push("distance_km ASC");
+      if (hasText) parts.push("text_rank DESC");
+      parts.push("created_at DESC", "id ASC");
+      return parts.join(",\n        ");
+    }
+  }
+}
+
 /**
- * Shadow: total + seller_count + primeiro id em UM único statement.
+ * Shadow: total + seller_count + primeiro id em UM único statement e UMA única
+ * avaliação materializada do CandidateScope.
  *
- * O CandidateScope e a ORDER BY continuam exatamente os mesmos do v1; apenas
- * eliminamos o segundo round-trip. O CTE `summary` preserva a contagem
- * comercialmente neutra e `first_match` aplica a ordenação do grid.
+ * Antes, `summary` e `first_match` repetiam o mesmo FROM/JOIN/WHERE dentro
+ * do statement. Em produção isso deixou o planejamento/execução vulnerável a
+ * picos de ~300-400 ms mesmo com apenas dezenas de anúncios ativos. O CTE
+ * MATERIALIZED calcula o conjunto elegível uma vez; a contagem e o primeiro
+ * resultado leem essa pequena relação intermediária.
+ *
+ * A ordenação abaixo é um espelho estrutural de buildEngineSortClause /
+ * buildSortClause, mas aplicada às colunas já materializadas.
  */
 export function buildShadowComparisonQuery(ctx, scope) {
   const scopeCtx = { filters: ctx.filters, territory: scope.territory };
@@ -463,24 +502,37 @@ export function buildShadowComparisonQuery(ctx, scope) {
   const textRank = candidate.qParam
     ? `ts_rank(a.search_vector, plainto_tsquery('portuguese', ${candidate.qParam}))`
     : "0";
-  const orderBy = buildEngineSortClause(ctx.sort, {
+  const orderBy = buildShadowCandidateSortClause(ctx.sort, {
     hasOrigin,
     hasText: Boolean(candidate.qParam),
   });
 
   const query = `
-    WITH summary AS (
-      SELECT COUNT(*)::int AS total,
-             COUNT(DISTINCT a.advertiser_id)::int AS seller_count
-      FROM ads a ${candidate.joins}
-      ${candidate.whereClause}
-    ),
-    first_match AS (
-      SELECT a.id,
-             ${textRank} AS text_rank
+    WITH candidates AS MATERIALIZED (
+      SELECT
+        a.id,
+        a.advertiser_id,
+        a.created_at,
+        a.price,
+        a.year,
+        a.mileage,
+        a.priority,
+        (CASE WHEN a.highlight_until > NOW() THEN 1 ELSE 0 END) AS highlight_active,
+        ${commercialLayerExpr} AS commercial_layer,
+        ${textRank} AS text_rank,
+        ${hasOrigin ? "COALESCE(rm.distance_km, 0)::float" : "NULL::float"} AS distance_km
       FROM ads a ${candidate.joins}
       ${rmJoin}
       ${candidate.whereClause}
+    ),
+    summary AS (
+      SELECT COUNT(*)::int AS total,
+             COUNT(DISTINCT advertiser_id)::int AS seller_count
+      FROM candidates
+    ),
+    first_match AS (
+      SELECT id
+      FROM candidates
       ORDER BY ${orderBy}
       LIMIT 1
     )
