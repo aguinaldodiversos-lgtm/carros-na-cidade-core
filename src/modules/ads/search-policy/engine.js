@@ -92,8 +92,8 @@ const shadowNotCounted = {
 /**
  * Instrumentação temporária de performance do shadow.
  *
- * Objetivo: decompor o envelope real (pool → BEGIN → SET LOCAL → contexto →
- * escopo → par de queries → ROLLBACK → telemetria) sem tocar em política,
+ * Objetivo: decompor o envelope real (pool → setup transacional → contexto →
+ * escopo → query de comparação → ROLLBACK → telemetria) sem tocar em política,
  * CandidateScope, ranking, resposta pública ou persistência.
  *
  * Volume controlado:
@@ -122,17 +122,20 @@ function elapsedMs(startedAt) {
 }
 
 function numericTiming(value) {
+  if (value === undefined || value === null) return null;
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
 function compactShadowTimings(timings = {}) {
   return {
     pool_wait_ms: numericTiming(timings.pool_wait_ms),
+    setup_ms: numericTiming(timings.setup_ms),
     begin_ms: numericTiming(timings.begin_ms),
     set_timeout_ms: numericTiming(timings.set_timeout_ms),
     context_ms: numericTiming(timings.context_ms),
     scope_ms: numericTiming(timings.scope_ms),
     query_build_ms: numericTiming(timings.query_build_ms),
+    comparison_query_ms: numericTiming(timings.comparison_query_ms),
     query_pair_ms: numericTiming(timings.query_pair_ms),
     count_settle_ms: numericTiming(timings.count_settle_ms),
     first_result_settle_ms: numericTiming(timings.first_result_settle_ms),
@@ -260,11 +263,15 @@ function isStatementTimeout(err) {
 }
 
 /**
- * Executa `fn(client)` num client dedicado, em BEGIN … ROLLBACK, com
- * `statement_timeout` LOCAL (set_config is_local=true ≡ SET LOCAL, mas aceita
- * parâmetro). O shadow só lê: ROLLBACK é sempre correto e é o que zera o
- * limite antes de o client voltar ao pool. Se o próprio ROLLBACK falhar, o
- * client é DESTRUÍDO (release(err)) em vez de devolvido em estado incerto.
+ * Executa `fn(client)` num client dedicado, em transação READ ONLY, com
+ * `statement_timeout` LOCAL. BEGIN + SET LOCAL seguem no MESMO round-trip:
+ * o diagnóstico de produção mostrou saltos de ~90–100 ms em comandos triviais,
+ * então dois round-trips de setup consumiam até 2/3 do orçamento sem executar
+ * a comparação. O literal é constante do código — não há input do usuário.
+ *
+ * O shadow só lê: ROLLBACK zera o limite antes de o client voltar ao pool. Se
+ * o próprio ROLLBACK falhar, o client é DESTRUÍDO (release(err)) em vez de
+ * devolvido em estado incerto.
  */
 export async function withShadowStatementTimeout(db, fn, timings = null) {
   let stepStarted = Date.now();
@@ -275,14 +282,10 @@ export async function withShadowStatementTimeout(db, fn, timings = null) {
   let workStarted;
   try {
     stepStarted = Date.now();
-    await client.query("BEGIN");
-    if (timings) timings.begin_ms = elapsedMs(stepStarted);
-
-    stepStarted = Date.now();
-    await client.query("SELECT set_config('statement_timeout', $1, true)", [
-      String(SHADOW_STATEMENT_TIMEOUT_MS),
-    ]);
-    if (timings) timings.set_timeout_ms = elapsedMs(stepStarted);
+    await client.query(
+      `BEGIN READ ONLY; SET LOCAL statement_timeout = '${SHADOW_STATEMENT_TIMEOUT_MS}ms'`
+    );
+    if (timings) timings.setup_ms = elapsedMs(stepStarted);
 
     workStarted = Date.now();
     return await fn(client);
@@ -432,6 +435,63 @@ export function buildEngineQueries(ctx, scope) {
     countQuery,
     params: bag.params,
     countParams: bag.params.slice(0, whereParamsLength),
+    candidate,
+    scopeCtx,
+  };
+}
+
+/**
+ * Shadow: total + seller_count + primeiro id em UM único statement.
+ *
+ * O CandidateScope e a ORDER BY continuam exatamente os mesmos do v1; apenas
+ * eliminamos o segundo round-trip. O CTE `summary` preserva a contagem
+ * comercialmente neutra e `first_match` aplica a ordenação do grid.
+ */
+export function buildShadowComparisonQuery(ctx, scope) {
+  const scopeCtx = { filters: ctx.filters, territory: scope.territory };
+  const candidate = buildCandidateScope(scopeCtx);
+  const bag = candidate.bag;
+  const hasOrigin =
+    Boolean(ctx.origin) &&
+    scope.geo_mode !== GEO_MODE.NATIONAL &&
+    scope.geo_mode !== GEO_MODE.STATE;
+
+  const rmJoin = hasOrigin
+    ? `LEFT JOIN region_memberships rm ON rm.base_city_id = ${bag.p(Number(ctx.origin.id))} AND rm.member_city_id = a.city_id`
+    : "";
+  const textRank = candidate.qParam
+    ? `ts_rank(a.search_vector, plainto_tsquery('portuguese', ${candidate.qParam}))`
+    : "0";
+  const orderBy = buildEngineSortClause(ctx.sort, {
+    hasOrigin,
+    hasText: Boolean(candidate.qParam),
+  });
+
+  const query = `
+    WITH summary AS (
+      SELECT COUNT(*)::int AS total,
+             COUNT(DISTINCT a.advertiser_id)::int AS seller_count
+      FROM ads a ${candidate.joins}
+      ${candidate.whereClause}
+    ),
+    first_match AS (
+      SELECT a.id,
+             ${textRank} AS text_rank
+      FROM ads a ${candidate.joins}
+      ${rmJoin}
+      ${candidate.whereClause}
+      ORDER BY ${orderBy}
+      LIMIT 1
+    )
+    SELECT summary.total,
+           summary.seller_count,
+           first_match.id AS first_ad_id
+    FROM summary
+    LEFT JOIN first_match ON TRUE`;
+
+  return {
+    query,
+    params: bag.params,
     candidate,
     scopeCtx,
   };
@@ -683,31 +743,20 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       timings.scope_ms = elapsedMs(stepStarted);
 
       stepStarted = Date.now();
-      const queries = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
+      const comparison = buildShadowComparisonQuery({ ...ctx, page: 1, limit: 1 }, scope);
       timings.query_build_ms = elapsedMs(stepStarted);
 
-      // O pg.Client usa uma conexão física e serializa statements. Mantemos o
-      // Promise.all original para não alterar comportamento; por isso os dois
-      // "*_settle_ms" medem do despacho comum até cada Promise resolver, e
-      // query_pair_ms é o custo operacional real do par dentro do envelope.
-      const queryPairStarted = Date.now();
-      const countPromise = client.query(queries.countQuery, queries.countParams).then((result) => {
-        timings.count_settle_ms = elapsedMs(queryPairStarted);
-        return result;
-      });
-      const firstPromise = client.query(queries.dataQuery, queries.params).then((result) => {
-        timings.first_result_settle_ms = elapsedMs(queryPairStarted);
-        return result;
-      });
-      const [countResult, firstResult] = await Promise.all([countPromise, firstPromise]);
-      timings.query_pair_ms = elapsedMs(queryPairStarted);
+      const comparisonStarted = Date.now();
+      const comparisonResult = await client.query(comparison.query, comparison.params);
+      timings.comparison_query_ms = elapsedMs(comparisonStarted);
+      const row = comparisonResult.rows[0] || {};
 
       return {
         ctx,
         scope,
-        new_count: Number(countResult.rows[0]?.total || 0),
-        new_seller_count: Number(countResult.rows[0]?.seller_count || 0),
-        new_first_ad_id: firstResult.rows[0]?.id ?? null,
+        new_count: Number(row.total || 0),
+        new_seller_count: Number(row.seller_count || 0),
+        new_first_ad_id: row.first_ad_id ?? null,
       };
     },
     timings
