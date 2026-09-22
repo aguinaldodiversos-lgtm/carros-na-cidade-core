@@ -400,6 +400,13 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
     const sc = sellerCountStatements(rdb.log);
     expect(sc.length).toBe(1);
     expect(sc[0]).toMatch(/COUNT\(\*\)::int AS total/);
+    // BEGIN+SET LOCAL é um statement de setup; a comparação em si é UMA query
+    // que contém summary + first_match. Não pode reaparecer o antigo par
+    // countQuery + dataQuery serializado na mesma conexão.
+    const comparisonStatements = rdb.log.filter(
+      (t) => /WITH summary AS/.test(t) && /first_match AS/.test(t)
+    );
+    expect(comparisonStatements).toHaveLength(1);
   });
 
   // ── F2.2-D1R-S — shadow pulado ────────────────────────────────────────────
