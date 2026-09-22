@@ -57,6 +57,7 @@ const QUERY = { city_slug: "atibaia-sp" };
 
 let adminPool;
 let dbUrl;
+let tearingDown = false;
 const openPools = [];
 
 function sslFor(url) {
@@ -69,6 +70,14 @@ function newPool(appName, max) {
     ssl: sslFor(dbUrl),
     max,
     application_name: appName,
+  });
+  // O cleanup pode precisar encerrar uma conexão que ainda está fechando no
+  // servidor. Nesse instante o pg emite 57P01 ("administrator command") no
+  // Pool; durante o teardown isso é esperado. Fora do teardown, qualquer erro
+  // continua derrubando o teste normalmente.
+  p.on("error", (err) => {
+    if (tearingDown && String(err?.code) === "57P01") return;
+    throw err;
   });
   openPools.push(p);
   return p;
@@ -164,6 +173,7 @@ beforeAll(async () => {
 }, 300000);
 
 afterAll(async () => {
+  tearingDown = true;
   for (const p of openPools) await p.end().catch(() => {});
   await adminPool.query(
     `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`,
