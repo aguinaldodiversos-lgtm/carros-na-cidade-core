@@ -1199,7 +1199,9 @@ describe.sequential("F2 — motor em Postgres real", () => {
       expect(shadowQ.query, sort).toMatch(/WITH candidates AS MATERIALIZED/);
       expect(shadowQ.query, sort).toMatch(/FROM candidates/);
       expect(shadowQ.query, sort).toMatch(/COUNT\(\*\)::int AS total/);
-      expect(shadowQ.query, sort).toMatch(/COUNT\(DISTINCT advertiser_id\)::int AS seller_count/);
+      expect(shadowQ.query, sort).toMatch(
+        /COUNT\(DISTINCT advertiser_id\)::int AS seller_count/
+      );
       expect(shadowQ.query, sort).toMatch(/LIMIT 1/);
       // O CandidateScope físico deve aparecer uma vez só: dentro do CTE
       // materializado. summary/first_match leem "candidates", não "ads".
