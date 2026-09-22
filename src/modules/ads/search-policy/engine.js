@@ -140,6 +140,7 @@ function compactShadowTimings(timings = {}) {
     count_settle_ms: numericTiming(timings.count_settle_ms),
     first_result_settle_ms: numericTiming(timings.first_result_settle_ms),
     transaction_work_ms: numericTiming(timings.transaction_work_ms),
+    work_result_ms: numericTiming(timings.work_result_ms),
     rollback_ms: numericTiming(timings.rollback_ms),
     race_ms: numericTiming(timings.race_ms),
     settled_total_ms: numericTiming(timings.settled_total_ms),
@@ -728,6 +729,15 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
 
   const timings = {};
   let timer;
+  let publishOperationOutcome;
+  let operationOutcomePublished = false;
+  const operationOutcome = new Promise((resolve) => {
+    publishOperationOutcome = (value) => {
+      if (operationOutcomePublished) return;
+      operationOutcomePublished = true;
+      resolve(value);
+    };
+  });
   const timeout = new Promise((resolve) => {
     timer = setTimeout(() => resolve({ timedOut: true }), opts.timeoutMs ?? SHADOW_TIMEOUT_MS);
   });
@@ -747,17 +757,31 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       timings.query_build_ms = elapsedMs(stepStarted);
 
       const comparisonStarted = Date.now();
-      const comparisonResult = await client.query(comparison.query, comparison.params);
+      let comparisonResult;
+      try {
+        comparisonResult = await client.query(comparison.query, comparison.params);
+      } catch (error) {
+        timings.comparison_query_ms = elapsedMs(comparisonStarted);
+        timings.work_result_ms = elapsedMs(started);
+        publishOperationOutcome({ error });
+        throw error;
+      }
       timings.comparison_query_ms = elapsedMs(comparisonStarted);
       const row = comparisonResult.rows[0] || {};
 
-      return {
+      const outcome = {
         ctx,
         scope,
         new_count: Number(row.total || 0),
         new_seller_count: Number(row.seller_count || 0),
         new_first_ad_id: row.first_ad_id ?? null,
       };
+      // O orçamento de 300 ms mede a COMPARAÇÃO, não o housekeeping do
+      // ROLLBACK. Publicamos o resultado antes de entrar no finally do helper;
+      // a conexão ainda só volta ao pool depois do cleanup.
+      timings.work_result_ms = elapsedMs(started);
+      publishOperationOutcome(outcome);
+      return outcome;
     },
     timings
   );
@@ -767,15 +791,20 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
     (value) => value,
     (error) => ({ error })
   );
+  // Erros ocorridos antes de o callback começar (connect/setup) não passam pelo
+  // publish acima. Este fallback os publica quando o helper termina; no caminho
+  // normal ele é no-op porque o resultado já foi publicado.
+  settled.then((value) => publishOperationOutcome(value));
 
   try {
-    let outcome = await Promise.race([settled, timeout]);
+    let outcome = await Promise.race([operationOutcome, timeout]);
     const elapsed = Date.now() - started; // o relato é do instante da race
     timings.race_ms = elapsed;
     clearTimeout(timer);
-    // Espera a conexão da comparação voltar ao pool antes de pedir outra para
-    // a telemetria. Limitado pelo statement_timeout — antes da D1 esta espera
-    // seria indefinida, e era por isso que a race existia.
+    // O resultado/timeout já foi decidido. Agora esperamos apenas o cleanup
+    // transacional terminar antes de pedir outra conexão para telemetria.
+    // ROLLBACK lento não retroage e transforma uma comparação concluída dentro
+    // do budget em timeout falso.
     await settled;
     timings.settled_total_ms = elapsedMs(started);
     if (outcome.error) {
