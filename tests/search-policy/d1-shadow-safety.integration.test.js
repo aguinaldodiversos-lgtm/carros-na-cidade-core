@@ -259,6 +259,37 @@ describe.sequential("F2.2-D1 — shadow sob Postgres real", () => {
     }
   });
 
+  it("race: ROLLBACK lento não transforma comparação concluída no prazo em timeout", async () => {
+    const base = newPool("d1-rollback-race", 2);
+    const delayMs = 700;
+    const db = {
+      query: (...args) => base.query(...args),
+      async connect() {
+        const client = await base.connect();
+        return {
+          async query(text, params) {
+            if (String(text).trim() === "ROLLBACK") {
+              await new Promise((r) => setTimeout(r, delayMs));
+            }
+            return client.query(text, params);
+          },
+          release: (err) => client.release(err),
+        };
+      },
+    };
+
+    const t0 = Date.now();
+    const out = await shadow(db, { timeoutMs: 500 });
+    const wall = Date.now() - t0;
+
+    expect(out.timedOut).toBe(false);
+    expect(out.elapsed_ms).toBeLessThan(500);
+    // A função ainda espera o cleanup antes da telemetria/retorno: segurança de
+    // conexão preservada, mas o housekeeping não redefine o resultado da race.
+    expect(wall).toBeGreaterThanOrEqual(delayMs);
+    expect(__shadowTesting.inFlight()).toBe(0);
+  });
+
   it("E: depois do release, a MESMA conexão (mesmo pid) volta com statement_timeout = 0", async () => {
     const db = newPool("d1-iso", 1);
     const before = await db.query(
