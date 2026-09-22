@@ -73,14 +73,71 @@ export function getShadowMaxConcurrency(env = process.env) {
 const SHADOW_SATURATION_WARN_INTERVAL_MS = 60_000;
 const shadowState = { inFlight: 0, skippedSaturated: 0, lastSaturationWarnAt: 0 };
 
+/**
+ * F2.2-D1R-S — comparações em que o motor NÃO contou (parâmetro não modelado
+ * ou timeout). Não viram `search.executed`: esse evento é de busca e exige
+ * total_count/seller_count reais (DEC-27 / V3-INV-052), e "não calculado" não
+ * pode virar null num evento normativo nem zero inventado. O diagnóstico fica
+ * aqui — contadores do processo + log limitado a 1×/min, como a saturação.
+ */
+const SHADOW_NOT_COUNTED_LOG_INTERVAL_MS = 60_000;
+const shadowNotCounted = {
+  unsupported: 0,
+  unsupportedByParam: new Map(),
+  timedOut: 0,
+  lastUnsupportedLogAt: 0,
+  lastTimeoutLogAt: 0,
+};
+
+function noteShadowUnsupported(params) {
+  shadowNotCounted.unsupported += 1;
+  for (const p of params) {
+    shadowNotCounted.unsupportedByParam.set(
+      p,
+      (shadowNotCounted.unsupportedByParam.get(p) || 0) + 1
+    );
+  }
+  const now = Date.now();
+  if (now - shadowNotCounted.lastUnsupportedLogAt >= SHADOW_NOT_COUNTED_LOG_INTERVAL_MS) {
+    shadowNotCounted.lastUnsupportedLogAt = now;
+    logger.info(
+      {
+        skipped_total: shadowNotCounted.unsupported,
+        by_param: Object.fromEntries(shadowNotCounted.unsupportedByParam),
+      },
+      "[search-policy] shadow pulado por parâmetros não modelados — sem search.executed"
+    );
+  }
+}
+
+function noteShadowTimeout() {
+  shadowNotCounted.timedOut += 1;
+  const now = Date.now();
+  if (now - shadowNotCounted.lastTimeoutLogAt >= SHADOW_NOT_COUNTED_LOG_INTERVAL_MS) {
+    shadowNotCounted.lastTimeoutLogAt = now;
+    logger.warn(
+      { timed_out_total: shadowNotCounted.timedOut, budget_ms: SHADOW_TIMEOUT_MS },
+      "[search-policy] shadow estourou o orçamento — sem search.executed"
+    );
+  }
+}
+
 /** Só para testes/diagnóstico: estado do limitador do shadow. */
 export const __shadowTesting = Object.freeze({
   inFlight: () => shadowState.inFlight,
   skippedSaturated: () => shadowState.skippedSaturated,
+  skippedUnsupported: () => shadowNotCounted.unsupported,
+  skippedUnsupportedByParam: () => Object.fromEntries(shadowNotCounted.unsupportedByParam),
+  timedOut: () => shadowNotCounted.timedOut,
   reset() {
     shadowState.inFlight = 0;
     shadowState.skippedSaturated = 0;
     shadowState.lastSaturationWarnAt = 0;
+    shadowNotCounted.unsupported = 0;
+    shadowNotCounted.unsupportedByParam.clear();
+    shadowNotCounted.timedOut = 0;
+    shadowNotCounted.lastUnsupportedLogAt = 0;
+    shadowNotCounted.lastTimeoutLogAt = 0;
   },
 });
 
@@ -455,19 +512,8 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       new_first_ad_id: null,
       elapsed_ms: Date.now() - started,
     };
-    const payload = buildSearchExecutedPayload({
-      ctx: { rawQ: rawQuery?.q || null, filters: {}, intent: null, origin: null },
-      scope: null,
-      total: null,
-      relaxations: [],
-      flagMode: "shadow",
-      shadow,
-      policy: opts.policy,
-      cacheBackend: policyCacheBackend(),
-    });
-    payload.skipped = "unsupported_params";
-    payload.unsupported_params = unsupported;
-    await recordSearchExecuted({ path: opts.path, ctx: null, payload }, { db });
+    // O motor não roda: não há CandidateScope, logo não há search.executed.
+    noteShadowUnsupported(unsupported);
     return { ...shadow, timedOut: false, skipped: true, unsupported_params: unsupported };
   }
   // Limitador: excedente é descartado na hora — sem fila, sem conexão, sem
@@ -538,21 +584,25 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       new_first_ad_id: outcome.timedOut ? null : outcome.new_first_ad_id,
       elapsed_ms: elapsed,
     };
-    const ctx = outcome.timedOut ? null : outcome.ctx;
+    if (outcome.timedOut) {
+      // A contagem não terminou: sem total/seller_count reais, sem search.executed.
+      noteShadowTimeout();
+      return { ...shadow, timedOut: true };
+    }
+    const ctx = outcome.ctx;
     const payload = buildSearchExecutedPayload({
-      ctx: ctx || { rawQ: rawQuery?.q || null, filters: {}, intent: null, origin: null },
-      scope: outcome.timedOut ? null : outcome.scope,
-      total: outcome.timedOut ? null : outcome.new_count,
-      sellerCount: outcome.timedOut ? null : outcome.new_seller_count,
+      ctx,
+      scope: outcome.scope,
+      total: outcome.new_count,
+      sellerCount: outcome.new_seller_count,
       relaxations: [],
       flagMode: "shadow",
       shadow,
-      policy: ctx?.policy,
+      policy: ctx.policy,
       cacheBackend: policyCacheBackend(),
     });
-    if (outcome.timedOut) payload.shadow_timeout = true;
     await recordSearchExecuted({ path: opts.path, ctx, payload }, { db });
-    return { ...shadow, timedOut: Boolean(outcome.timedOut) };
+    return { ...shadow, timedOut: false };
   } catch (err) {
     clearTimeout(timer);
     logger.warn({ err: err?.message || String(err) }, "[search-policy] shadow falhou");

@@ -402,21 +402,64 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
     expect(sc[0]).toMatch(/COUNT\(\*\)::int AS total/);
   });
 
-  it("shadow sem modelo e com parâmetro legado: commercial_model null, seller_count null (não medido)", async () => {
+  // ── F2.2-D1R-S — shadow pulado ────────────────────────────────────────────
+  it("T2/T3/T5 shadow pulado: nenhum SQL, nenhum search.executed (nem null, nem zero), diagnóstico no processo", async () => {
     const legacy = { pagination: { total: 5 }, data: [{ id: 1 }] };
-    await runShadowComparison({ ...inAtibaia(), highlight_only: "true" }, legacy, {
-      db,
+    const rdb = recordingDb(db);
+    const before = __shadowTesting.skippedUnsupported();
+    const out = await runShadowComparison({ ...inAtibaia(), highlight_only: "true" }, legacy, {
+      db: rdb,
       policy,
       cache: false,
       path: "/shadow-inv052-skipped",
     });
+    // Contrato de retorno preservado.
+    expect(out).toMatchObject({
+      skipped: true,
+      unsupported_params: ["highlight_only"],
+      old_count: 5,
+      new_count: null,
+      timedOut: false,
+    });
+    expect(out).not.toHaveProperty("seller_count");
+    // T5: o skip não executa SQL algum — nem contagem para "preencher" telemetria.
+    expect(rdb.log).toEqual([]);
+    // T2/T3: nada gravado para esta busca — nem seller_count null, nem 0.
     const { rows } = await db.query(`SELECT payload FROM analytics_events WHERE path = $1`, [
       "/shadow-inv052-skipped",
     ]);
+    expect(rows).toEqual([]);
+    expect(__shadowTesting.skippedUnsupported()).toBe(before + 1);
+  });
+
+  it("T4 zero real continua válido: shadow que conta e acha zero grava 0 / 0", async () => {
+    const legacy = { pagination: { total: 0 }, data: [] };
+    const out = await runShadowComparison(inAtibaia({ commercial_model: "Nenhum052" }), legacy, {
+      db,
+      policy,
+      cache: false,
+      path: "/shadow-inv052-zero",
+      timeoutMs: 5000,
+    });
+    expect(out.timedOut).toBe(false);
+    const { rows } = await db.query(`SELECT payload FROM analytics_events WHERE path = $1`, [
+      "/shadow-inv052-zero",
+    ]);
     expect(rows.length).toBe(1);
-    expect(rows[0].payload.skipped).toBe("unsupported_params");
-    expect(rows[0].payload.commercial_model).toBeNull();
-    expect(rows[0].payload.seller_count).toBeNull();
-    for (const k of RESULT_SCOPED_KEYS) expect(rows[0].payload).not.toHaveProperty(k);
+    expect(rows[0].payload).toMatchObject({ total_count: 0, seller_count: 0 });
+  });
+
+  // Sentinela final (describe.sequential): tudo que este arquivo gravou.
+  it("T2 global: nenhum search.executed persistido tem seller_count/total_count ausente ou não numérico", async () => {
+    const { rows } = await db.query(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (
+                WHERE jsonb_typeof(payload->'seller_count') IS DISTINCT FROM 'number'
+                   OR jsonb_typeof(payload->'total_count') IS DISTINCT FROM 'number'
+              )::int AS bad
+         FROM analytics_events WHERE event_type = 'search.executed'`
+    );
+    expect(rows[0].total).toBeGreaterThan(10); // não vacuoso
+    expect(rows[0].bad).toBe(0);
   });
 });
