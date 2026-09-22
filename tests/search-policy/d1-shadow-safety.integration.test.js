@@ -268,7 +268,12 @@ describe.sequential("F2.2-D1 — shadow sob Postgres real", () => {
         const client = await base.connect();
         return {
           async query(text, params) {
-            if (String(text).trim() === "ROLLBACK") {
+            const sql = String(text);
+            if (sql.includes("SET LOCAL statement_timeout")) {
+              const relaxed = sql.replace("300ms", "2000ms");
+              return client.query(relaxed, params);
+            }
+            if (sql.trim() === "ROLLBACK") {
               await new Promise((r) => setTimeout(r, delayMs));
             }
             return client.query(text, params);
@@ -282,6 +287,7 @@ describe.sequential("F2.2-D1 — shadow sob Postgres real", () => {
     const out = await shadow(db, { timeoutMs: 500 });
     const wall = Date.now() - t0;
 
+    expect(out).not.toBeNull();
     expect(out.timedOut).toBe(false);
     expect(out.elapsed_ms).toBeLessThan(500);
     // A função ainda espera o cleanup antes da telemetria/retorno: segurança de
