@@ -1194,9 +1194,7 @@ describe.sequential("F2 — motor em Postgres real", () => {
 
       expect(combined.rows, sort).toHaveLength(1);
       expect(Number(combined.rows[0].total), sort).toBe(Number(count.rows[0].total));
-      expect(Number(combined.rows[0].seller_count), sort).toBe(
-        Number(count.rows[0].seller_count)
-      );
+      expect(Number(combined.rows[0].seller_count), sort).toBe(Number(count.rows[0].seller_count));
       expect(String(combined.rows[0].first_ad_id), sort).toBe(String(first.rows[0].id));
       expect(shadowQ.query, sort).toMatch(/WITH candidates AS MATERIALIZED/);
       expect(shadowQ.query, sort).toMatch(/FROM candidates/);
