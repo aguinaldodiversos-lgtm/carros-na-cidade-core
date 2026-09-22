@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 25
     env:
       # Sinaliza ao loader de env (src/config/env.js) que estamos em contexto de
-      # testes unitários. Integração fica fora (`vitest run --exclude tests/integration/**`).
+      # testes unitários. Qualquer `*.integration.test.js` fica fora desta suíte.
       NODE_ENV: test
     steps:
       # fetch-depth: 0 — o gate de formatação compara o HEAD com a BASE do PR, e
@@ -103,8 +103,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Integration tests (ads + DB)
-        run: npm run ci:integration-ads
+      - name: Integration tests (ads + search policy + DB)
+        run: npm run ci:integration
 
       - name: Job summary
         if: success()
