@@ -25,6 +25,7 @@ import { withF2Fixture } from "./helpers/f2-fixture.js";
 import { CONTEXTS } from "./helpers/contexts.js";
 import {
   buildEngineQueries,
+  buildShadowComparisonQuery,
   buildSearchContext,
   findUnsupportedParams,
   runSearchPolicyEngine,
@@ -1165,6 +1166,31 @@ describe.sequential("F2 — motor em Postgres real", () => {
   });
 
   // ── 8.8 shadow ─────────────────────────────────────────────────────────────
+  it("8.8 shadow query: total + seller_count + primeiro id saem de um único statement com o mesmo CandidateScope", async () => {
+    const ctx = await buildSearchContext(
+      { city_slug: "braganca-paulista-sp", q: "onix" },
+      { db, policy }
+    );
+    const scope = await resolveScope(ctx, policy, { db, cache: false });
+    const shadowQ = buildShadowComparisonQuery(ctx, scope);
+    const engineQ = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
+
+    const [combined, count, first] = await Promise.all([
+      db.query(shadowQ.query, shadowQ.params),
+      db.query(engineQ.countQuery, engineQ.countParams),
+      db.query(engineQ.dataQuery, engineQ.params),
+    ]);
+
+    expect(combined.rows).toHaveLength(1);
+    expect(Number(combined.rows[0].total)).toBe(Number(count.rows[0].total));
+    expect(Number(combined.rows[0].seller_count)).toBe(Number(count.rows[0].seller_count));
+    expect(String(combined.rows[0].first_ad_id)).toBe(String(first.rows[0].id));
+    expect(shadowQ.query).toMatch(/COUNT\(\*\)::int AS total/);
+    expect(shadowQ.query).toMatch(/COUNT\(DISTINCT a\.advertiser_id\)::int AS seller_count/);
+    expect(shadowQ.query).toMatch(/LIMIT 1/);
+    assertAliasesJoined(shadowQ.query, "shadow combined");
+  });
+
   it("8.8 shadow: telemetria com old/new gravada em analytics_events, resposta legada intocada", async () => {
     const legacy = { pagination: { total: 34 }, data: [{ id: 999 }] };
     const before = JSON.stringify(legacy);
