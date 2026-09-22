@@ -1166,50 +1166,48 @@ describe.sequential("F2 — motor em Postgres real", () => {
   });
 
   // ── 8.8 shadow ─────────────────────────────────────────────────────────────
-  it(
-    "8.8 shadow query: materializa CandidateScope uma vez e preserva total/seller/primeiro id em todos os sorts",
-    async () => {
-      for (const sort of [
-        "relevance",
-        "recent",
-        "price_asc",
-        "price_desc",
-        "year_asc",
-        "year_desc",
-        "mileage_asc",
-        "mileage_desc",
-        "highlight",
-      ]) {
-        const raw = { city_slug: "braganca-paulista-sp", q: "onix", sort };
-        const ctx = await buildSearchContext(raw, { db, policy });
-        const scope = await resolveScope(ctx, policy, { db, cache: false });
-        const shadowQ = buildShadowComparisonQuery(ctx, scope);
-        const engineQ = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
+  it("8.8 shadow query: CandidateScope único preserva paridade dos sorts", async () => {
+    const sellerCountPattern = /COUNT\(DISTINCT advertiser_id\)::int AS seller_count/;
 
-        const [combined, count, first] = await Promise.all([
-          db.query(shadowQ.query, shadowQ.params),
-          db.query(engineQ.countQuery, engineQ.countParams),
-          db.query(engineQ.dataQuery, engineQ.params),
-        ]);
+    for (const sort of [
+      "relevance",
+      "recent",
+      "price_asc",
+      "price_desc",
+      "year_asc",
+      "year_desc",
+      "mileage_asc",
+      "mileage_desc",
+      "highlight",
+    ]) {
+      const raw = { city_slug: "braganca-paulista-sp", q: "onix", sort };
+      const ctx = await buildSearchContext(raw, { db, policy });
+      const scope = await resolveScope(ctx, policy, { db, cache: false });
+      const shadowQ = buildShadowComparisonQuery(ctx, scope);
+      const engineQ = buildEngineQueries({ ...ctx, page: 1, limit: 1 }, scope);
 
-        expect(combined.rows, sort).toHaveLength(1);
-        expect(Number(combined.rows[0].total), sort).toBe(Number(count.rows[0].total));
-        expect(Number(combined.rows[0].seller_count), sort).toBe(
-          Number(count.rows[0].seller_count)
-        );
-        expect(String(combined.rows[0].first_ad_id), sort).toBe(String(first.rows[0].id));
-        expect(shadowQ.query, sort).toMatch(/WITH candidates AS MATERIALIZED/);
-        expect(shadowQ.query, sort).toMatch(/FROM candidates/);
-        expect(shadowQ.query, sort).toMatch(/COUNT\(\*\)::int AS total/);
-        expect(shadowQ.query, sort).toMatch(/COUNT\(DISTINCT advertiser_id\)::int AS seller_count/);
-        expect(shadowQ.query, sort).toMatch(/LIMIT 1/);
-        // O CandidateScope físico deve aparecer uma vez só: dentro do CTE
-        // materializado. summary/first_match leem "candidates", não "ads".
-        expect((shadowQ.query.match(/FROM ads a/g) || []).length, sort).toBe(1);
-        assertAliasesJoined(shadowQ.query, `shadow combined ${sort}`);
-      }
+      const [combined, count, first] = await Promise.all([
+        db.query(shadowQ.query, shadowQ.params),
+        db.query(engineQ.countQuery, engineQ.countParams),
+        db.query(engineQ.dataQuery, engineQ.params),
+      ]);
+
+      expect(combined.rows, sort).toHaveLength(1);
+      expect(Number(combined.rows[0].total), sort).toBe(Number(count.rows[0].total));
+      expect(Number(combined.rows[0].seller_count), sort).toBe(
+        Number(count.rows[0].seller_count)
+      );
+      expect(String(combined.rows[0].first_ad_id), sort).toBe(String(first.rows[0].id));
+      expect(shadowQ.query, sort).toMatch(/WITH candidates AS MATERIALIZED/);
+      expect(shadowQ.query, sort).toMatch(/FROM candidates/);
+      expect(shadowQ.query, sort).toMatch(/COUNT\(\*\)::int AS total/);
+      expect(shadowQ.query, sort).toMatch(sellerCountPattern);
+      expect(shadowQ.query, sort).toMatch(/LIMIT 1/);
+      // O CandidateScope físico aparece uma vez: dentro do CTE materializado.
+      expect((shadowQ.query.match(/FROM ads a/g) || []).length, sort).toBe(1);
+      assertAliasesJoined(shadowQ.query, `shadow combined ${sort}`);
     }
-  );
+  });
 
   it("8.8 shadow: telemetria com old/new gravada em analytics_events, resposta legada intocada", async () => {
     const legacy = { pagination: { total: 34 }, data: [{ id: 999 }] };
