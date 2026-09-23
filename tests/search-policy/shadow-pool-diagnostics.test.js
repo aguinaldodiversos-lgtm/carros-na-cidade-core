@@ -23,11 +23,7 @@ describe("shadow pool diagnostics", () => {
     };
 
     const timings = {};
-    const result = await withShadowStatementTimeout(
-      db,
-      async () => "ok",
-      timings
-    );
+    const result = await withShadowStatementTimeout(db, async () => "ok", timings);
 
     expect(result).toBe("ok");
     expect(timings).toMatchObject({
