@@ -1,6 +1,50 @@
 import { redis } from "../../infrastructure/cache/redis.js";
 import crypto from "crypto";
 
+const MEMORY_CACHE_MAX_ENTRIES = 500;
+const memoryCache = new Map();
+
+function memoryGet(key) {
+  const hit = memoryCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    memoryCache.delete(key);
+    return null;
+  }
+  // Recência aproximada por ordem de inserção do Map.
+  memoryCache.delete(key);
+  memoryCache.set(key, hit);
+  return hit.value;
+}
+
+function memorySet(key, value, ttlSeconds) {
+  const now = Date.now();
+
+  // Limpeza oportunista de expirados antes de expulsar entrada válida.
+  for (const [cachedKey, entry] of memoryCache) {
+    if (entry.expiresAt <= now) memoryCache.delete(cachedKey);
+  }
+
+  if (memoryCache.has(key)) memoryCache.delete(key);
+  while (memoryCache.size >= MEMORY_CACHE_MAX_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    memoryCache.delete(oldestKey);
+  }
+
+  memoryCache.set(key, {
+    value,
+    expiresAt: now + Math.max(1, Number(ttlSeconds) || 1) * 1000,
+  });
+}
+
+function memoryInvalidatePrefix(prefix) {
+  const needle = `${prefix}:`;
+  for (const key of memoryCache.keys()) {
+    if (key.startsWith(needle)) memoryCache.delete(key);
+  }
+}
+
 function stableStringify(obj) {
   const keys = Object.keys(obj || {}).sort();
   const sorted = {};
@@ -35,8 +79,6 @@ function filterQuery(query, allowed) {
 export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"], allowedQueryKeys = null }) {
   return async (req, res, next) => {
     try {
-      if (!redis) return next();
-
       // Só cacheia GET
       if (req.method !== "GET") return next();
 
@@ -47,14 +89,15 @@ export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"], allowedQ
       const raw = `${prefix}:${req.path}:${stableStringify(vary)}`;
       const key = `${prefix}:${crypto.createHash("sha1").update(raw).digest("hex")}`;
 
-      const cached = await redis.get(key);
+      const cached = redis ? await redis.get(key) : memoryGet(key);
       if (cached) {
         res.setHeader("X-Cache", "HIT");
         res.setHeader("Cache-Control", `public, max-age=${ttlSeconds}`);
         return res.status(200).json(JSON.parse(cached));
       }
 
-      // Monkey patch res.json para gravar no cache
+      // Monkey patch res.json para gravar no cache configurado. Quando Redis
+      // não existe, usa LRU local limitado — nunca Map sem teto.
       const originalJson = res.json.bind(res);
       res.json = (body) => {
         // Só cacheia respostas de sucesso: status 2xx e sem indicador de erro no payload.
@@ -62,9 +105,14 @@ export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"], allowedQ
         const statusOk = res.statusCode >= 200 && res.statusCode < 400;
         const bodyOk = !body || body.ok !== false;
         if (statusOk && bodyOk) {
-          Promise.resolve()
-            .then(() => redis.set(key, JSON.stringify(body), "EX", ttlSeconds))
-            .catch(() => {});
+          const serialized = JSON.stringify(body);
+          if (redis) {
+            Promise.resolve()
+              .then(() => redis.set(key, serialized, "EX", ttlSeconds))
+              .catch(() => {});
+          } else {
+            memorySet(key, serialized, ttlSeconds);
+          }
         }
         res.setHeader("X-Cache", "MISS");
         res.setHeader("Cache-Control", statusOk ? `public, max-age=${ttlSeconds}` : "no-store");
@@ -80,6 +128,7 @@ export function cacheGet({ prefix, ttlSeconds = 60, varyBy = ["query"], allowedQ
 }
 
 export async function cacheInvalidatePrefix(prefix) {
+  memoryInvalidatePrefix(prefix);
   if (!redis) return;
 
   // Estratégia simples: usar SCAN com match no prefixo
@@ -93,3 +142,13 @@ export async function cacheInvalidatePrefix(prefix) {
     if (keys?.length) await redis.del(keys);
   } while (cursor !== "0");
 }
+
+export const __memoryCacheTesting = {
+  clear() {
+    memoryCache.clear();
+  },
+  size() {
+    return memoryCache.size;
+  },
+  maxEntries: MEMORY_CACHE_MAX_ENTRIES,
+};
