@@ -234,7 +234,22 @@ export async function runLiquidityQuery(db, { originId, radiusKm, filters }) {
     ) cnt ON cnt.city_id = c.id
     WHERE rm.base_city_id = ${originP} AND rm.distance_km <= ${radiusP}
     ORDER BY rm.distance_km ASC, c.slug ASC`;
-  const { rows } = await db.query(sql, bag.params);
+  const canUseNamedPrepared =
+    product.clauses.length === 0 &&
+    (typeof db?.processID === "number" || typeof db?.totalCount === "number");
+
+  const queryInput = canUseNamedPrepared
+    ? {
+        name: `sp_liq_browse_${sha1(sql).slice(0, 12)}`,
+        text: sql,
+        values: bag.params,
+      }
+    : sql;
+
+  const { rows } = canUseNamedPrepared
+    ? await db.query(queryInput)
+    : await db.query(queryInput, bag.params);
+
   return { rows, sql, params: bag.params };
 }
 
