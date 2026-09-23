@@ -143,7 +143,6 @@ export async function cacheInvalidatePrefix(prefix) {
   } while (cursor !== "0");
 }
 
-
 export const __memoryCacheTesting = {
   clear() {
     memoryCache.clear();
