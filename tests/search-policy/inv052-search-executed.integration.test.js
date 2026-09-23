@@ -83,14 +83,21 @@ function recordingDb(pool) {
 function capturingDb(pool) {
   const base = recordingDb(pool);
   const inserts = [];
+  const pending = new Set();
   const query = base.query.bind(base);
   base.query = (text, params) => {
-    if (typeof text === "string" && text.includes("INSERT INTO analytics_events")) {
-      inserts.push(JSON.parse(params.at(-1)));
+    const isTelemetry =
+      typeof text === "string" && text.includes("INSERT INTO analytics_events");
+    if (isTelemetry) inserts.push(JSON.parse(params.at(-1)));
+    const result = query(text, params);
+    if (isTelemetry && result && typeof result.finally === "function") {
+      pending.add(result);
+      result.finally(() => pending.delete(result)).catch(() => {});
     }
-    return query(text, params);
+    return result;
   };
   base.inserts = inserts;
+  base.pending = pending;
   return base;
 }
 
@@ -103,6 +110,7 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
   const sellers = [];
   const policy = SEARCH_POLICY_DEFAULT;
   const adIds = {};
+  const pendingTelemetry = new Set();
 
   beforeAll(async () => {
     const fixture = new Promise((resolve, reject) => {
@@ -176,6 +184,7 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
   }, 300000);
 
   afterAll(async () => {
+    await Promise.allSettled([...pendingTelemetry]);
     if (done) done();
     await new Promise((r) => setTimeout(r, 100));
   });
@@ -183,6 +192,10 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
   async function runNormal(query, path) {
     const rdb = capturingDb(db);
     const response = await runSearchPolicyEngine(query, { db: rdb, policy, cache: false, path });
+    for (const promise of rdb.pending) {
+      pendingTelemetry.add(promise);
+      promise.finally(() => pendingTelemetry.delete(promise)).catch(() => {});
+    }
     expect(rdb.inserts.length, "um search.executed por busca").toBe(1);
     return { response, payload: rdb.inserts[0], log: rdb.log };
   }
