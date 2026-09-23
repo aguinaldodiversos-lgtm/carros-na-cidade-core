@@ -18,13 +18,42 @@ import { FREE_QUERY_CACHE_TTL_MS } from "../filters/ads-free-query.constants.js"
 import { normalizeText } from "./text.js";
 
 const cache = new Map(); // name → { value, expiresAt }
+const refreshes = new Map(); // name → Promise
+
+function loadAndStore(name, loader) {
+  const inFlight = refreshes.get(name);
+  if (inFlight) return inFlight;
+
+  const refresh = Promise.resolve()
+    .then(loader)
+    .then((value) => {
+      cache.set(name, { value, expiresAt: Date.now() + FREE_QUERY_CACHE_TTL_MS });
+      return value;
+    })
+    .finally(() => {
+      if (refreshes.get(name) === refresh) refreshes.delete(name);
+    });
+
+  refreshes.set(name, refresh);
+  return refresh;
+}
 
 async function cached(name, loader) {
   const hit = cache.get(name);
   if (hit && hit.expiresAt > Date.now()) return hit.value;
-  const value = await loader();
-  cache.set(name, { value, expiresAt: Date.now() + FREE_QUERY_CACHE_TTL_MS });
-  return value;
+
+  // Stale-while-revalidate: dicionários são metadados de parsing, não estoque
+  // transacional. Depois do primeiro carregamento, nunca bloqueie a busca só
+  // porque o TTL venceu. Uma única atualização roda em background; chamadas
+  // concorrentes recebem o valor stale e não formam stampede no PostgreSQL.
+  if (hit) {
+    loadAndStore(name, loader).catch(() => {});
+    return hit.value;
+  }
+
+  // Cold start: não há valor seguro para servir; todas as chamadas concorrentes
+  // compartilham a mesma Promise até o primeiro carregamento terminar.
+  return loadAndStore(name, loader);
 }
 
 /** Mesmo SELECT de ads-free-query.repository.js#loadBrandDictionary (limite 300,
@@ -111,4 +140,5 @@ export async function getActiveCityDictionary(db = pool) {
 
 export function resetDictionariesForTests() {
   cache.clear();
+  refreshes.clear();
 }
