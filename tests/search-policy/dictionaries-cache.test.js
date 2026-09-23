@@ -42,6 +42,7 @@ describe("search-policy dictionaries cache", () => {
     const first = getBrandDictionary(db);
     const second = getBrandDictionary(db);
 
+    await Promise.resolve();
     expect(queries).toBe(1);
 
     gate.resolve({
@@ -88,8 +89,7 @@ describe("search-policy dictionaries cache", () => {
       rows: [{ brand: "Chevrolet", total: 7 }],
     });
     await refreshGate.promise;
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
 
     const fresh = await getBrandDictionary(db);
     expect(fresh[0]).toMatchObject({ original: "Chevrolet", total: 7 });
