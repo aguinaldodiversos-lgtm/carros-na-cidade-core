@@ -176,8 +176,10 @@ describe.sequential("F2.2-D1R — V3-INV-052 search.executed (Postgres real)", (
   }, 300000);
 
   afterAll(async () => {
+    // A telemetria normal é fire-and-forget. Dê margem para o último INSERT
+    // devolver o client ao pool antes de a fixture descartar o banco temporário.
+    await new Promise((r) => setTimeout(r, 1000));
     if (done) done();
-    await new Promise((r) => setTimeout(r, 100));
   });
 
   async function runNormal(query, path) {

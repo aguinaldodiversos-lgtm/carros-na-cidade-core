@@ -29,6 +29,39 @@ export const LOCATION_SOURCE = Object.freeze({
   NONE: "NONE",
 });
 
+const CITY_LOOKUP_TTL_MS = 10 * 60 * 1000;
+// Isolado por instância de db/client: evita compartilhar dados entre bancos
+// descartáveis dos testes e produção. Em produção, os clients do pool aquecem
+// suas próprias entradas e removem o round-trip repetitivo de `cities`.
+const cityLookupCacheByDb = new WeakMap();
+
+function cityLookupCache(db) {
+  let cache = cityLookupCacheByDb.get(db);
+  if (!cache) {
+    cache = { bySlug: new Map(), byId: new Map() };
+    cityLookupCacheByDb.set(db, cache);
+  }
+  return cache;
+}
+
+function readCachedCity(map, key) {
+  const hit = map.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    map.delete(key);
+    return null;
+  }
+  return hit.city;
+}
+
+function writeCachedCity(db, city) {
+  if (!city) return;
+  const cache = cityLookupCache(db);
+  const entry = { city, expiresAt: Date.now() + CITY_LOOKUP_TTL_MS };
+  cache.bySlug.set(String(city.slug).trim().toLowerCase(), entry);
+  cache.byId.set(Number(city.id), entry);
+}
+
 function firstSlug(value) {
   if (Array.isArray(value)) return value.find((v) => typeof v === "string" && v.trim()) || null;
   if (typeof value === "string" && value.includes(",")) return value.split(",")[0].trim() || null;
@@ -74,19 +107,33 @@ export function detectExplicitCity(q, patterns, activeCities) {
 }
 
 async function findCityBySlug(slug, db) {
+  const normalizedSlug = String(slug).trim().toLowerCase();
+  const cache = cityLookupCache(db);
+  const cached = readCachedCity(cache.bySlug, normalizedSlug);
+  if (cached) return cached;
+
   const { rows } = await db.query(
     `SELECT id, slug, name, state, latitude, longitude FROM cities WHERE slug = $1 LIMIT 1`,
-    [String(slug).trim().toLowerCase()]
+    [normalizedSlug]
   );
-  return rows[0] ? toCity(rows[0]) : null;
+  const city = rows[0] ? toCity(rows[0]) : null;
+  writeCachedCity(db, city);
+  return city;
 }
 
 async function findCityById(id, db) {
+  const numericId = Number(id);
+  const cache = cityLookupCache(db);
+  const cached = readCachedCity(cache.byId, numericId);
+  if (cached) return cached;
+
   const { rows } = await db.query(
     `SELECT id, slug, name, state, latitude, longitude FROM cities WHERE id = $1 LIMIT 1`,
-    [Number(id)]
+    [numericId]
   );
-  return rows[0] ? toCity(rows[0]) : null;
+  const city = rows[0] ? toCity(rows[0]) : null;
+  writeCachedCity(db, city);
+  return city;
 }
 
 function toCity(row) {

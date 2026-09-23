@@ -244,6 +244,32 @@ describe("location-resolver — §4.2 + D1 (8.5)", () => {
     expect(none.location_source).toBe(LOCATION_SOURCE.NONE);
     expect(none.uf).toBe("SP");
   });
+  it("cacheia cidade por slug e id no mesmo db, evitando round-trip repetido", async () => {
+    let queries = 0;
+    const countingDb = {
+      async query(sql, params) {
+        queries += 1;
+        if (/WHERE slug = \$1/.test(sql))
+          return { rows: CITY_ROWS[params[0]] ? [CITY_ROWS[params[0]]] : [] };
+        if (/WHERE id = \$1/.test(sql)) {
+          const row = Object.values(CITY_ROWS).find((c) => c.id === Number(params[0]));
+          return { rows: row ? [row] : [] };
+        }
+        throw new Error(`stub sem resposta para: ${sql.slice(0, 60)}`);
+      },
+    };
+    const localDeps = { db: countingDb, activeCities: ACTIVE_CITIES };
+
+    const first = await resolveLocation({ city_slug: "atibaia-sp" }, policy, localDeps);
+    const second = await resolveLocation({ city_slug: "atibaia-sp" }, policy, localDeps);
+    const byId = await resolveLocation({ city_id: 4761 }, policy, localDeps);
+
+    expect(first.origin.slug).toBe("atibaia-sp");
+    expect(second.origin.slug).toBe("atibaia-sp");
+    expect(byId.origin.slug).toBe("atibaia-sp");
+    expect(queries).toBe(1);
+  });
+
   it("cidade explícita sem estoque (Icó) não move a origem mesmo com 'em '", async () => {
     const r = await resolveLocation({ origem: "atibaia-sp", q: "onix em ico" }, policy, deps);
     expect(r.origin.slug).toBe("atibaia-sp");
