@@ -242,3 +242,29 @@ jobs:
       - name: Job summary
         if: success()
         run: echo "### E2E full-flow passed" >> "$GITHUB_STEP_SUMMARY"
+
+
+  temp-shadow-pg-activity-probe:
+    name: Temporary shadow pg_activity load
+    if: github.event_name == 'pull_request' && github.head_ref == 'temp/shadow-pg-activity-probe-20260923'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run controlled public load
+        shell: bash
+        run: |
+          set -u
+          URLS=(
+            "https://www.carrosnacidade.com/carros-em/braganca-paulista-sp"
+            "https://www.carrosnacidade.com/carros-em/braganca-paulista-sp?q=onix"
+            "https://www.carrosnacidade.com/carros-em/atibaia-sp"
+            "https://www.carrosnacidade.com/carros-em/atibaia-sp?q=onix"
+          )
+          echo "START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for cycle in $(seq 1 20); do
+            for url in "${URLS[@]}"; do
+              curl -L -sS --connect-timeout 10 --max-time 30 -o /dev/null "$url" || true
+            done
+            [ "$cycle" -lt 20 ] && sleep 3
+          done
+          echo "END_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
