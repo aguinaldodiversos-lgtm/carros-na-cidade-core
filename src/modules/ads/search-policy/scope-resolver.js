@@ -261,12 +261,13 @@ function liquidityCacheKey(originId, profile, filters, radiusKm) {
  *
  * @param {object} ctx { origin, filters, intent:{profile,target,max_auto_radius}, geoRequest:{mode,requested_radius_km}, uf }
  * @param {object} policy
- * @param {{ db?, cache?: boolean, includeDetails?: boolean }} deps
+ * @param {{ db?, cache?: boolean, includeDetails?: boolean, timings?: object }} deps
  */
 export async function resolveScope(ctx, policy, deps = {}) {
   const db = deps.db || pool;
   const useCache = deps.cache !== false;
   const includeDetails = deps.includeDetails !== false;
+  const timings = deps.timings || null;
   const { origin, intent, geoRequest } = ctx;
   const mode = geoRequest.mode;
 
@@ -306,7 +307,7 @@ export async function resolveScope(ctx, policy, deps = {}) {
 
   let rows;
   try {
-    rows = await loadLiquidity(ctx, policy, db, useCache, base);
+    rows = await loadLiquidity(ctx, policy, db, useCache, base, timings);
   } catch (err) {
     logger.error(
       { err: err?.message || String(err), origin: origin.slug, mode },
@@ -334,7 +335,11 @@ export async function resolveScope(ctx, policy, deps = {}) {
     // (política BROWSE_CITY, liquidez SEM filtros de produto), nunca do perfil
     // de produto. É isso que impede que marca/modelo/ano/versão ampliem o
     // território sozinhos. Com liquidez sem filtro, baseline === rows.
-    const baselineRows = await loadBaselineLiquidity(ctx, policy, db, useCache, rows);
+    const baselineStarted = Date.now();
+    const baselineRows = await loadBaselineLiquidity(ctx, policy, db, useCache, rows, timings);
+    if (timings) timings.scope_baseline_ms = Date.now() - baselineStarted;
+
+    const finalizeStarted = Date.now();
     const auto = resolveAutoRadius(baselineRows, {
       target: baselineTarget(policy),
       max_auto_radius: baselineMaxAutoRadius(policy),
@@ -344,6 +349,7 @@ export async function resolveScope(ctx, policy, deps = {}) {
     required = auto.required_distance_km;
     expanded = auto.expanded;
     reason = auto.reason;
+    if (timings) timings.scope_finalize_ms = Date.now() - finalizeStarted;
   } else if (mode === GEO_MODE.MANUAL_RADIUS) {
     effective = Number(geoRequest.requested_radius_km);
     expanded = effective > 0;
@@ -412,16 +418,22 @@ async function loadLiquidityRows({
   policy,
   useCache,
   bookkeeping,
+  timings = null,
+  timingPrefix = "scope_primary",
 }) {
   const key = liquidityCacheKey(origin.id, profile, filters, radiusKm);
   if (useCache) {
+    const cacheStarted = Date.now();
     const hit = await policyCacheGet(key);
+    if (timings) timings[`${timingPrefix}_cache_get_ms`] = Date.now() - cacheStarted;
     if (Array.isArray(hit)) {
       bookkeeping.cache = { backend: "policy-cache", hit: true, key };
       return hit;
     }
   }
+  const queryStarted = Date.now();
   const { rows } = await runLiquidityQuery(db, { originId: origin.id, radiusKm, filters });
+  if (timings) timings[`${timingPrefix}_query_ms`] = Date.now() - queryStarted;
   const compact = rows.map((r) => ({
     city_id: Number(r.city_id),
     slug: r.slug,
@@ -429,7 +441,9 @@ async function loadLiquidityRows({
     count: Number(r.count),
   }));
   if (useCache) {
+    const cacheSetStarted = Date.now();
     await policyCacheSet(key, compact, Number(policy.liquidity_cache_ttl_seconds) || 900);
+    if (timings) timings[`${timingPrefix}_cache_set_ms`] = Date.now() - cacheSetStarted;
     bookkeeping.cache = { backend: "policy-cache", hit: false, key };
   }
   return compact;
@@ -458,7 +472,7 @@ function liquidityRadiusFor(ctx) {
   return Math.min(Math.max(auto, manual), MANUAL_RADIUS_MAX_KM);
 }
 
-async function loadLiquidity(ctx, policy, db, useCache, base) {
+async function loadLiquidity(ctx, policy, db, useCache, base, timings = null) {
   const { origin, filters } = ctx;
   return loadLiquidityRows({
     db,
@@ -469,6 +483,8 @@ async function loadLiquidity(ctx, policy, db, useCache, base) {
     policy,
     useCache,
     bookkeeping: base,
+    timings,
+    timingPrefix: "scope_primary",
   });
 }
 /** Perfil do território-base de descoberta (DEC-18): sempre BROWSE_CITY. */
@@ -494,7 +510,7 @@ export function hasProductFilters(filters = {}) {
  * o teto do perfil BROWSE_CITY. Sem filtro de produto ativo, o baseline é a
  * própria liquidez já carregada — nenhuma query extra.
  */
-async function loadBaselineLiquidity(ctx, policy, db, useCache, productRows) {
+async function loadBaselineLiquidity(ctx, policy, db, useCache, productRows, timings = null) {
   const { origin, filters } = ctx;
   if (!hasProductFilters(filters)) return productRows;
   return loadLiquidityRows({
@@ -506,6 +522,8 @@ async function loadBaselineLiquidity(ctx, policy, db, useCache, productRows) {
     policy,
     useCache,
     bookkeeping: {},
+    timings,
+    timingPrefix: "scope_baseline",
   });
 }
 

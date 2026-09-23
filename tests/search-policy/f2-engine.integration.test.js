@@ -157,6 +157,26 @@ describe.sequential("F2 — motor em Postgres real", () => {
     }
   });
 
+  it("instrumenta subetapas do scope sem alterar o território", async () => {
+    const ctx = await buildSearchContext(
+      { city_slug: "braganca-paulista-sp", q: "onix", sort: "relevance" },
+      { db, policy }
+    );
+    const timings = {};
+    const scope = await resolveScope(ctx, policy, {
+      db,
+      cache: false,
+      includeDetails: false,
+      timings,
+    });
+
+    expect(scope.territory).toBeDefined();
+    expect(Number.isFinite(timings.scope_primary_query_ms)).toBe(true);
+    expect(Number.isFinite(timings.scope_baseline_query_ms)).toBe(true);
+    expect(Number.isFinite(timings.scope_baseline_ms)).toBe(true);
+    expect(Number.isFinite(timings.scope_finalize_ms)).toBe(true);
+  });
+
   // ── 8.1 ────────────────────────────────────────────────────────────────────
   it("8.1 paridade em 24 contextos + JOINs estruturais nas 5 queries", async () => {
     for (const c of CONTEXTS) {
