@@ -249,9 +249,9 @@ describe("location-resolver — §4.2 + D1 (8.5)", () => {
     const countingDb = {
       async query(sql, params) {
         queries += 1;
-        if (/WHERE slug = \\$1/.test(sql))
+        if (/WHERE slug = \$1/.test(sql))
           return { rows: CITY_ROWS[params[0]] ? [CITY_ROWS[params[0]]] : [] };
-        if (/WHERE id = \\$1/.test(sql)) {
+        if (/WHERE id = \$1/.test(sql)) {
           const row = Object.values(CITY_ROWS).find((c) => c.id === Number(params[0]));
           return { rows: row ? [row] : [] };
         }
