@@ -71,7 +71,29 @@ export function getShadowMaxConcurrency(env = process.env) {
 }
 
 const SHADOW_SATURATION_WARN_INTERVAL_MS = 60_000;
-const shadowState = { inFlight: 0, skippedSaturated: 0, lastSaturationWarnAt: 0 };
+const shadowState = {
+  inFlight: 0,
+  skippedSaturated: 0,
+  skippedPoolPressure: 0,
+  lastSaturationWarnAt: 0,
+  lastPoolPressureWarnAt: 0,
+};
+
+function poolHasShadowPressure(db) {
+  const idle = Number(db?.idleCount);
+  const total = Number(db?.totalCount);
+  const waiting = Number(db?.waitingCount);
+  const max = Number(db?.options?.max);
+
+  if (!Number.isFinite(idle) || !Number.isFinite(total)) return false;
+  if (idle > 0) return false;
+
+  // Já existe fila: Shadow nunca deve acrescentar mais um waiter.
+  if (Number.isFinite(waiting) && waiting > 0) return true;
+
+  // Sem idle e pool no teto: o Shadow seria o primeiro waiter.
+  return Number.isFinite(max) && max > 0 && total >= max;
+}
 
 /**
  * F2.2-D1R-S — comparações em que o motor NÃO contou (parâmetro não modelado
@@ -262,13 +284,16 @@ function noteShadowTimeout() {
 export const __shadowTesting = Object.freeze({
   inFlight: () => shadowState.inFlight,
   skippedSaturated: () => shadowState.skippedSaturated,
+  skippedPoolPressure: () => shadowState.skippedPoolPressure,
   skippedUnsupported: () => shadowNotCounted.unsupported,
   skippedUnsupportedByParam: () => Object.fromEntries(shadowNotCounted.unsupportedByParam),
   timedOut: () => shadowNotCounted.timedOut,
   reset() {
     shadowState.inFlight = 0;
     shadowState.skippedSaturated = 0;
+    shadowState.skippedPoolPressure = 0;
     shadowState.lastSaturationWarnAt = 0;
+    shadowState.lastPoolPressureWarnAt = 0;
     shadowNotCounted.unsupported = 0;
     shadowNotCounted.unsupportedByParam.clear();
     shadowNotCounted.timedOut = 0;
@@ -815,6 +840,29 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
     }
     return { timedOut: false, skipped: true, skipped_reason: "shadow_saturated" };
   }
+  // Segunda barreira: o teto de Shadow não sabe se o pool já está ocupado por
+  // tráfego normal. Se não há idle e o pool já está cheio/em fila, o Shadow é
+  // descartado ANTES de db.connect(). Observabilidade nunca disputa a última
+  // conexão com a resposta pública.
+  if (poolHasShadowPressure(db)) {
+    shadowState.skippedPoolPressure += 1;
+    const now = Date.now();
+    if (now - shadowState.lastPoolPressureWarnAt >= SHADOW_SATURATION_WARN_INTERVAL_MS) {
+      shadowState.lastPoolPressureWarnAt = now;
+      logger.warn(
+        {
+          skipped_total: shadowState.skippedPoolPressure,
+          pool_total: Number(db?.totalCount) || 0,
+          pool_idle: Number(db?.idleCount) || 0,
+          pool_waiting: Number(db?.waitingCount) || 0,
+          pool_max: Number(db?.options?.max) || null,
+        },
+        "[search-policy] shadow descartado por pressão do pool"
+      );
+    }
+    return { timedOut: false, skipped: true, skipped_reason: "pool_pressure" };
+  }
+
   // O slot vale a COMPARAÇÃO INTEIRA — trabalho SQL + INSERT de telemetria — e
   // só é devolvido no `finally` lá embaixo. Junto com a espera por `settled`
   // antes da telemetria, isso garante que uma comparação nunca segura duas

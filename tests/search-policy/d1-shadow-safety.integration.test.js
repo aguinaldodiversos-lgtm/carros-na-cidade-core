@@ -207,6 +207,51 @@ describe("F2.2-D1 — contrato das constantes e do limitador (puro)", () => {
 });
 
 describe.sequential("F2.2-D1 — shadow sob Postgres real", () => {
+  it("pressão do pool: cheio e sem idle → Shadow é descartado sem entrar na fila", async () => {
+    const db = newPool("d1-pool-pressure", 1);
+    const held = await db.connect();
+    try {
+      expect(db.totalCount).toBe(1);
+      expect(db.idleCount).toBe(0);
+      expect(db.waitingCount).toBe(0);
+
+      const t0 = Date.now();
+      const out = await shadow(db);
+      const elapsed = Date.now() - t0;
+
+      expect(out).toMatchObject({
+        timedOut: false,
+        skipped: true,
+        skipped_reason: "pool_pressure",
+      });
+      expect(elapsed).toBeLessThan(250);
+      expect(db.waitingCount).toBe(0);
+      expect(__shadowTesting.skippedPoolPressure()).toBe(1);
+      expect(__shadowTesting.inFlight()).toBe(0);
+    } finally {
+      held.release();
+    }
+  });
+
+  it("pressão do pool: sem idle mas com capacidade para crescer → Shadow ainda pode rodar", async () => {
+    const db = newPool("d1-pool-grow", 2);
+    const held = await db.connect();
+    try {
+      expect(db.totalCount).toBe(1);
+      expect(db.idleCount).toBe(0);
+
+      const out = await shadow(db, { timeoutMs: 5000 });
+
+      expect(out).not.toBeNull();
+      expect(out.skipped_reason).not.toBe("pool_pressure");
+      expect(out.timedOut).toBe(false);
+      expect(db.totalCount).toBeLessThanOrEqual(2);
+      expect(__shadowTesting.skippedPoolPressure()).toBe(0);
+    } finally {
+      held.release();
+    }
+  });
+
   it("C: pg_sleep dentro do envelope do shadow é cancelado pelo banco (57014) em ~300 ms", async () => {
     const db = newPool("d1-sleep", 2);
     const t0 = Date.now();
