@@ -154,6 +154,14 @@ function compactShadowTimings(timings = {}) {
     context_product_ms: numericTiming(timings.context_product_ms),
     context_intent_geo_ms: numericTiming(timings.context_intent_geo_ms),
     scope_ms: numericTiming(timings.scope_ms),
+    scope_primary_cache_get_ms: numericTiming(timings.scope_primary_cache_get_ms),
+    scope_primary_query_ms: numericTiming(timings.scope_primary_query_ms),
+    scope_primary_cache_set_ms: numericTiming(timings.scope_primary_cache_set_ms),
+    scope_baseline_ms: numericTiming(timings.scope_baseline_ms),
+    scope_baseline_cache_get_ms: numericTiming(timings.scope_baseline_cache_get_ms),
+    scope_baseline_query_ms: numericTiming(timings.scope_baseline_query_ms),
+    scope_baseline_cache_set_ms: numericTiming(timings.scope_baseline_cache_set_ms),
+    scope_finalize_ms: numericTiming(timings.scope_finalize_ms),
     query_build_ms: numericTiming(timings.query_build_ms),
     comparison_query_ms: numericTiming(timings.comparison_query_ms),
     query_pair_ms: numericTiming(timings.query_pair_ms),
@@ -846,6 +854,7 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
         // and telemetry. City labels/rings cost an extra DB round-trip and
         // are discarded before any public response is built.
         includeDetails: false,
+        timings,
       });
       timings.scope_ms = elapsedMs(stepStarted);
 
