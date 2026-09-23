@@ -126,9 +126,25 @@ function numericTiming(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
+function capturePoolSnapshot(timings, phase, db) {
+  if (!timings) return;
+  timings[`pool_total_${phase}`] = numericTiming(db?.totalCount);
+  timings[`pool_idle_${phase}`] = numericTiming(db?.idleCount);
+  timings[`pool_waiting_${phase}`] = numericTiming(db?.waitingCount);
+}
+
 function compactShadowTimings(timings = {}) {
   return {
     pool_wait_ms: numericTiming(timings.pool_wait_ms),
+    pool_total_before: numericTiming(timings.pool_total_before),
+    pool_idle_before: numericTiming(timings.pool_idle_before),
+    pool_waiting_before: numericTiming(timings.pool_waiting_before),
+    pool_total_acquired: numericTiming(timings.pool_total_acquired),
+    pool_idle_acquired: numericTiming(timings.pool_idle_acquired),
+    pool_waiting_acquired: numericTiming(timings.pool_waiting_acquired),
+    pool_total_released: numericTiming(timings.pool_total_released),
+    pool_idle_released: numericTiming(timings.pool_idle_released),
+    pool_waiting_released: numericTiming(timings.pool_waiting_released),
     setup_ms: numericTiming(timings.setup_ms),
     begin_ms: numericTiming(timings.begin_ms),
     set_timeout_ms: numericTiming(timings.set_timeout_ms),
@@ -275,9 +291,11 @@ function isStatementTimeout(err) {
  * devolvido em estado incerto.
  */
 export async function withShadowStatementTimeout(db, fn, timings = null) {
+  capturePoolSnapshot(timings, "before", db);
   let stepStarted = Date.now();
   const client = await db.connect();
   if (timings) timings.pool_wait_ms = elapsedMs(stepStarted);
+  capturePoolSnapshot(timings, "acquired", db);
 
   let releaseErr;
   let workStarted;
@@ -302,6 +320,7 @@ export async function withShadowStatementTimeout(db, fn, timings = null) {
       if (timings) timings.rollback_ms = elapsedMs(stepStarted);
     }
     client.release(releaseErr);
+    capturePoolSnapshot(timings, "released", db);
   }
 }
 
