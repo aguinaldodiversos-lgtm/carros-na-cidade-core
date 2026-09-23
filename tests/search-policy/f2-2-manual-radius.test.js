@@ -56,7 +56,7 @@ const intentFor = (profile = "BROWSE_CITY") => ({
 /** `cities` = [[distance_km, count], ...]. Registra o raio pedido em cada
  *  chamada de liquidez, lendo $2 do SQL montado por runLiquidityQuery. */
 function fakeDb(cities) {
-  const calls = { radii: [], baseline: 0, product: 0 };
+  const calls = { radii: [], baseline: 0, product: 0, cityMetadata: 0 };
   return {
     calls,
     query: async (sql, params) => {
@@ -77,6 +77,7 @@ function fakeDb(cities) {
         };
       }
       if (/FROM cities WHERE id = ANY/.test(sql)) {
+        calls.cityMetadata += 1;
         return {
           rows: (params[0] || []).map((id) => ({
             id,
@@ -167,6 +168,47 @@ describe("resolveGeoRequest — faixa manual [0,150] (INV-075/006/076)", () => {
     expect(scope.territory.radiusKm).toBe(0);
     expect(scope.user_geo_explicit).toBe(true);
   });
+});
+
+it("includeDetails=false preserva o território e elimina o round-trip de metadados do Shadow", async () => {
+  const ctx = {
+    origin: ORIGIN,
+    filters: {},
+    intent: intentFor("BROWSE_CITY"),
+    geoRequest: resolveGeoRequest({ raio: "40" }, policy, true),
+  };
+
+  const compactDb = fakeDb([
+    [0, 1],
+    [20, 30],
+  ]);
+  const compact = await resolveScope(ctx, policy, {
+    db: compactDb,
+    cache: false,
+    includeDetails: false,
+  });
+
+  expect(compactDb.calls.cityMetadata).toBe(0);
+  expect(compact.cities).toEqual([]);
+  expect(compact.rings).toEqual([]);
+  expect(compact.effective_radius_km).toBe(40);
+  expect(compact.territory.radiusKm).toBe(40);
+  expect(compact.territory_city_count).toBe(2);
+  expect(compact.local_result_count).toBe(1);
+
+  const fullDb = fakeDb([
+    [0, 1],
+    [20, 30],
+  ]);
+  const full = await resolveScope(ctx, policy, { db: fullDb, cache: false });
+
+  expect(fullDb.calls.cityMetadata).toBe(1);
+  expect(full.cities).toHaveLength(2);
+  expect(full.rings.length).toBeGreaterThan(0);
+  expect(full.effective_radius_km).toBe(compact.effective_radius_km);
+  expect(full.territory).toEqual(compact.territory);
+  expect(full.territory_city_count).toBe(compact.territory_city_count);
+  expect(full.local_result_count).toBe(compact.local_result_count);
 });
 
 // ── 10.6 — inválidos ────────────────────────────────────────────────────────

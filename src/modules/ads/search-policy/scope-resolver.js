@@ -261,11 +261,12 @@ function liquidityCacheKey(originId, profile, filters, radiusKm) {
  *
  * @param {object} ctx { origin, filters, intent:{profile,target,max_auto_radius}, geoRequest:{mode,requested_radius_km}, uf }
  * @param {object} policy
- * @param {{ db?, cache?: boolean }} deps
+ * @param {{ db?, cache?: boolean, includeDetails?: boolean }} deps
  */
 export async function resolveScope(ctx, policy, deps = {}) {
   const db = deps.db || pool;
   const useCache = deps.cache !== false;
+  const includeDetails = deps.includeDetails !== false;
   const { origin, intent, geoRequest } = ctx;
   const mode = geoRequest.mode;
 
@@ -355,7 +356,7 @@ export async function resolveScope(ctx, policy, deps = {}) {
 
   const inTerritory = rows.filter((r) => Number(r.distance_km) <= effective);
   const emitted = inTerritory.filter((r) => Number(r.count) > 0 || Number(r.distance_km) === 0);
-  const cities = await decorateCities(db, emitted, origin);
+  const cities = includeDetails ? await decorateCities(db, emitted, origin) : [];
 
   return {
     ...base,
@@ -365,12 +366,14 @@ export async function resolveScope(ctx, policy, deps = {}) {
     reason,
     cities,
     territory_city_count: inTerritory.length,
-    rings: buildRings(rows, {
-      rings_manual: policy.rings_manual,
-      effective_radius_km: effective,
-      origin,
-      geoMode: mode,
-    }),
+    rings: includeDetails
+      ? buildRings(rows, {
+          rings_manual: policy.rings_manual,
+          effective_radius_km: effective,
+          origin,
+          geoMode: mode,
+        })
+      : [],
     local_result_count: local,
     liquidityRows: rows,
     territory: { mode, originId: origin.id, radiusKm: effective, uf: origin.state },

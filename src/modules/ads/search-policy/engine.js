@@ -801,7 +801,14 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
       timings.context_ms = elapsedMs(stepStarted);
 
       stepStarted = Date.now();
-      const scope = await resolveScope(ctx, ctx.policy, { db: client, cache: opts.cache });
+      const scope = await resolveScope(ctx, ctx.policy, {
+        db: client,
+        cache: opts.cache,
+        // Shadow only needs territorial selection + counters for comparison
+        // and telemetry. City labels/rings cost an extra DB round-trip and
+        // are discarded before any public response is built.
+        includeDetails: false,
+      });
       timings.scope_ms = elapsedMs(stepStarted);
 
       stepStarted = Date.now();
