@@ -149,6 +149,10 @@ function compactShadowTimings(timings = {}) {
     begin_ms: numericTiming(timings.begin_ms),
     set_timeout_ms: numericTiming(timings.set_timeout_ms),
     context_ms: numericTiming(timings.context_ms),
+    context_location_ms: numericTiming(timings.context_location_ms),
+    context_dictionaries_ms: numericTiming(timings.context_dictionaries_ms),
+    context_product_ms: numericTiming(timings.context_product_ms),
+    context_intent_geo_ms: numericTiming(timings.context_intent_geo_ms),
     scope_ms: numericTiming(timings.scope_ms),
     query_build_ms: numericTiming(timings.query_build_ms),
     comparison_query_ms: numericTiming(timings.comparison_query_ms),
@@ -349,20 +353,31 @@ function clampLimit(v) {
 export async function buildSearchContext(rawQuery = {}, deps = {}) {
   const db = deps.db || pool;
   const policy = deps.policy || (await loadSearchPolicy());
+  const timings = deps.timings || null;
 
+  let stepStarted = Date.now();
   const location = await resolveLocation(rawQuery, policy, { db });
+  if (timings) timings.context_location_ms = elapsedMs(stepStarted);
+
+  stepStarted = Date.now();
   const [brands, commercialModels] = await Promise.all([
     getBrandDictionary(db),
     getCommercialModelDictionary(db),
   ]);
+  if (timings) timings.context_dictionaries_ms = elapsedMs(stepStarted);
+
+  stepStarted = Date.now();
   const product = resolveProduct(location.q, rawQuery, { brands, commercialModels });
   const filters = { ...product.filters };
   if (product.residual_q) filters.q = product.residual_q;
+  if (timings) timings.context_product_ms = elapsedMs(stepStarted);
 
+  stepStarted = Date.now();
   const intent = resolveIntent(filters, product.residual_q, policy);
   const geoRequest = resolveGeoRequest(rawQuery, policy, Boolean(location.origin), {
     uf: location.uf,
   });
+  if (timings) timings.context_intent_geo_ms = elapsedMs(stepStarted);
 
   const sortRaw = String(rawQuery.sort || "relevance")
     .trim()
@@ -816,7 +831,11 @@ export async function runShadowComparison(rawQuery, legacyResult, opts = {}) {
     db,
     async (client) => {
       let stepStarted = Date.now();
-      const ctx = await buildSearchContext(rawQuery, { db: client, policy: opts.policy });
+      const ctx = await buildSearchContext(rawQuery, {
+        db: client,
+        policy: opts.policy,
+        timings,
+      });
       timings.context_ms = elapsedMs(stepStarted);
 
       stepStarted = Date.now();
