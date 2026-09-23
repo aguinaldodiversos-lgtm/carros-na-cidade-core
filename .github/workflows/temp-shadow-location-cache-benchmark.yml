@@ -1,4 +1,4 @@
-name: Temporary Shadow Location Cache Benchmark
+name: Temporary Shadow Location Cache Benchmark Run
 
 on:
   push:
