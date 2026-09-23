@@ -135,6 +135,28 @@ describe.sequential("F2 — motor em Postgres real", () => {
     expect(Math.abs(sent[0].km - 25.4)).toBeLessThanOrEqual(0.5);
   });
 
+  it("instrumenta subetapas do buildSearchContext sem alterar o contexto", async () => {
+    const timings = {};
+    const ctx = await buildSearchContext(
+      { city_slug: "atibaia-sp", q: "onix", sort: "relevance" },
+      { db, policy, timings }
+    );
+
+    expect(ctx.origin?.slug).toBe("atibaia-sp");
+    expect(ctx.intent).toBeDefined();
+    expect(ctx.geoRequest).toBeDefined();
+
+    for (const key of [
+      "context_location_ms",
+      "context_dictionaries_ms",
+      "context_product_ms",
+      "context_intent_geo_ms",
+    ]) {
+      expect(Number.isFinite(timings[key]), key).toBe(true);
+      expect(timings[key], key).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   // ── 8.1 ────────────────────────────────────────────────────────────────────
   it("8.1 paridade em 24 contextos + JOINs estruturais nas 5 queries", async () => {
     for (const c of CONTEXTS) {
