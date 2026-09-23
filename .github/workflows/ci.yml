@@ -242,3 +242,33 @@ jobs:
       - name: Job summary
         if: success()
         run: echo "### E2E full-flow passed" >> "$GITHUB_STEP_SUMMARY"
+
+
+  temp-context-breakdown-benchmark:
+    name: Temporary context-breakdown benchmark
+    if: github.event_name == 'pull_request' && github.head_ref == 'temp/context-breakdown-benchmark-20260923'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run controlled 20x4 load
+        shell: bash
+        run: |
+          set -u
+          URLS=(
+            "https://www.carrosnacidade.com/carros-em/braganca-paulista-sp"
+            "https://www.carrosnacidade.com/carros-em/braganca-paulista-sp?q=onix"
+            "https://www.carrosnacidade.com/carros-em/atibaia-sp"
+            "https://www.carrosnacidade.com/carros-em/atibaia-sp?q=onix"
+          )
+          echo "START_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          ok=0; fail=0
+          for cycle in $(seq 1 20); do
+            for url in "${URLS[@]}"; do
+              code="$(curl -L -sS --connect-timeout 10 --max-time 30 -o /dev/null -w '%{http_code}' "$url" || echo 000)"
+              if [ "$code" = "200" ]; then ok=$((ok+1)); else fail=$((fail+1)); fi
+            done
+            [ "$cycle" -lt 20 ] && sleep 2
+          done
+          echo "END_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "HTTP_200=$ok"
+          echo "FAILURES=$fail"
