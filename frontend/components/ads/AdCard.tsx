@@ -10,6 +10,7 @@ import { type AdBadge, inferAdTier, resolvePublicAdBadges } from "@/lib/ads/ad-b
 import { buildAdHref, coerceScalarField } from "@/lib/ads/build-ad-href";
 import { useFavorites } from "@/lib/favorites/FavoritesContext";
 import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
+import { distanceLabel } from "@/lib/search/search-policy";
 import { resolvePublicListingImageUrl } from "@/lib/vehicle/detail-utils";
 import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
 
@@ -52,6 +53,8 @@ export type BaseAdData = {
   year_model?: string | number | null;
   city?: string | null;
   state?: string | null;
+  /** Distância até a origem da busca (Search Policy Engine). 0/null = local. */
+  distance_km?: number | null;
   price?: number | string | null;
   mileage?: number | string | null;
   image?: string | null;
@@ -378,6 +381,7 @@ type NormalizedAd = {
   year?: string | number | null;
   /** Label "Cidade (UF)" pronto via buildPublicTerritoryLabel. */
   locationLabel: string;
+  distanceLabel: string | null;
   yearLabel: string;
   /** Texto pronto via formatPricePublic — "R$ 89.900" ou "Sob consulta". NUNCA "R$ 0". */
   priceLabel: string;
@@ -411,6 +415,10 @@ function normalizeAdData(source?: BaseAdData): NormalizedAd {
     // P2-E 2026-05-25: territorial via contrato público — nunca default
     // sintético "São Paulo (SP)" quando backend omite cidade.
     locationLabel: buildPublicTerritoryLabel({ city: item.city, state: item.state }),
+    // DEC-03/DEC-29: com território regional, o card precisa dizer a que
+    // distância o carro está. Só o motor v1 informa isso; no legado é null e
+    // nada é renderizado.
+    distanceLabel: distanceLabel(item.distance_km),
     yearLabel: String(item.yearLabel || item.year_model || item.year || "").trim(),
     // P2-E 2026-05-25: preço via contrato público — "Sob consulta" quando
     // ausente/zero, jamais "R$ 0" fake.
@@ -694,6 +702,11 @@ function VerticalLayout({
           <p className={locationClass}>
             <PinIcon />
             <span className="truncate">{normalized.locationLabel}</span>
+            {normalized.distanceLabel ? (
+              <span data-testid="ad-card-distance" className="shrink-0 whitespace-nowrap">
+                · {normalized.distanceLabel}
+              </span>
+            ) : null}
           </p>
         )}
 

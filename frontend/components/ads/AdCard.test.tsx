@@ -250,3 +250,33 @@ describe("AdCard", () => {
     expect(container.querySelector('[data-variant="carousel"]')).toBeTruthy();
   });
 });
+
+describe("AdCard — distância até a origem (DEC-03/DEC-29)", () => {
+  afterEach(cleanup);
+
+  const base = {
+    id: 1,
+    slug: "hb20-2015",
+    title: "HYUNDAI HB20",
+    city: "Bragança Paulista",
+    state: "SP",
+    price: 45900,
+  };
+
+  it("mostra a distância quando o anúncio é de outra cidade do território", () => {
+    render(<AdCard item={{ ...base, distance_km: 18.34 }} variant="grid" />);
+    expect(screen.getByTestId("ad-card-distance")).toHaveTextContent("a 18 km");
+  });
+
+  it("anúncio da própria cidade não ganha rótulo de distância", () => {
+    render(<AdCard item={{ ...base, distance_km: 0 }} variant="grid" />);
+    expect(screen.queryByTestId("ad-card-distance")).toBeNull();
+  });
+
+  it("caminho legado (sem distance_km) segue sem rótulo", () => {
+    render(<AdCard item={base} variant="grid" />);
+    expect(screen.queryByTestId("ad-card-distance")).toBeNull();
+    // e a cidade continua aparecendo, como sempre
+    expect(screen.getByText(/Bragança Paulista/)).toBeInTheDocument();
+  });
+});

@@ -35,6 +35,12 @@ export type CatalogResultsHeaderProps = {
   sort?: string;
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
   /**
+   * Declaração do território (DEC-03): "Mostrando ofertas em até 25 km de
+   * Atibaia…". Vem do bloco `search_policy`; no caminho legado é `null` e a
+   * linha não é renderizada — nunca inventar raio que o backend não declarou.
+   */
+  territoryNotice?: string | null;
+  /**
    * Hide the sort `<select>` (mobile shows it via the "Ordenar" action
    * bar bottom-sheet instead, to free horizontal space). Default false.
    */
@@ -46,6 +52,7 @@ export function CatalogResultsHeader({
   sort,
   onPatch,
   hideSort = false,
+  territoryNotice = null,
 }: CatalogResultsHeaderProps) {
   const handleSortChange = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -59,10 +66,17 @@ export function CatalogResultsHeader({
       data-testid="catalog-results-header"
       className="flex items-center justify-between gap-3 pb-3 pt-1 text-sm sm:pb-4"
     >
-      <p className="text-cnc-muted sm:text-[15px]">
-        <strong className="tabular-nums text-cnc-text-strong">{formatTotal(totalResults)}</strong>{" "}
-        ofertas encontradas
-      </p>
+      <div className="min-w-0">
+        <p className="text-cnc-muted sm:text-[15px]">
+          <strong className="tabular-nums text-cnc-text-strong">{formatTotal(totalResults)}</strong>{" "}
+          ofertas encontradas
+        </p>
+        {territoryNotice ? (
+          <p data-testid="catalog-territory-notice" className="mt-0.5 text-xs text-cnc-muted">
+            {territoryNotice}
+          </p>
+        ) : null}
+      </div>
 
       {hideSort ? null : (
         <label className="inline-flex items-center gap-2 text-cnc-muted">

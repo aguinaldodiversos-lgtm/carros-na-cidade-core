@@ -105,6 +105,13 @@ export function normalizeCatalogItem(
         ? parseNumber(item.price)
         : undefined;
 
+  // Distância do motor (F3). Este normalizador é uma allowlist: campo que não
+  // é copiado aqui simplesmente não chega ao card, sem erro nenhum.
+  const parsedDistance =
+    typeof item.distance_km === "number" && Number.isFinite(item.distance_km)
+      ? item.distance_km
+      : null;
+
   return {
     id: Number(item.id || 0),
     slug: sanitizeText(item.slug) || undefined,
@@ -137,6 +144,7 @@ export function normalizeCatalogItem(
     reviewed_after_below_fipe: item.reviewed_after_below_fipe === true,
     created_at: sanitizeText(item.created_at) || undefined,
     catalogWeight: item.catalogWeight,
+    distance_km: parsedDistance,
   };
 }
 
