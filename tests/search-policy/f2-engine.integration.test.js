@@ -365,8 +365,12 @@ describe.sequential("F2 — motor em Postgres real", () => {
       profile: "SEARCH_MODEL",
       total_result_count: 0,
       effective_radius_km: 0,
-      required_distance_km: 0,
-      reason: "LOCAL_LIQUIDITY_OK",
+      // DEC-28: required e effective descrevem a busca (liquidez JÁ filtrada),
+      // não o baseline da cidade. Zero candidatos em qualquer anel → o alvo
+      // nunca é atingido (required null) e nenhum anel externo acrescenta
+      // (effective 0), o que é o caminho de DEC-23.
+      required_distance_km: null,
+      reason: "AUTO_RADIUS_CAP_REACHED",
       location_source: "CITY_PAGE",
     });
     expect(r.relaxations.map((x) => x.dimension)).toEqual(["price", "transmission"]);

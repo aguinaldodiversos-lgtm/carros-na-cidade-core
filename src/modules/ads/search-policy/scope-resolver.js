@@ -29,7 +29,11 @@ import { pool } from "../../../infrastructure/database/db.js";
 import { logger } from "../../../shared/logger.js";
 import { baseClauses, buildProductClauses, createParamBag } from "./candidate-scope.js";
 import { POLICY_CACHE_PREFIX, policyCacheGet, policyCacheSet } from "./policy-cache.js";
-import { MANUAL_RADIUS_MAX_KM, isValidExplicitRadius } from "./policy-config.js";
+import {
+  MANUAL_RADIUS_MAX_KM,
+  SEARCH_POLICY_DEFAULT,
+  isValidExplicitRadius,
+} from "./policy-config.js";
 
 export const GEO_MODE = Object.freeze({
   EXACT_CITY: "EXACT_CITY",
@@ -43,6 +47,8 @@ export const REASON = Object.freeze({
   LOCAL_LIQUIDITY_OK: "LOCAL_LIQUIDITY_OK",
   LOW_LOCAL_LIQUIDITY: "LOW_LOCAL_LIQUIDITY",
   AUTO_RADIUS_CAP_REACHED: "AUTO_RADIUS_CAP_REACHED",
+  /** DEC-29: o território veio do piso regional, não da liquidez. */
+  REGIONAL_FLOOR: "REGIONAL_FLOOR",
   MANUAL: "MANUAL",
   GEO_FALLBACK: "GEO_FALLBACK",
   STATE: "STATE",
@@ -162,6 +168,45 @@ export function resolveAutoRadius(rows, { target, max_auto_radius, rings_auto })
     expanded: effective > 0,
     reason: REASON.AUTO_RADIUS_CAP_REACHED,
   };
+}
+
+/** Piso regional (DEC-29), limitado ao teto automático do perfil. Puro. */
+export function regionalFloorKm(policy, maxAutoRadius) {
+  const configured = Number(policy?.regional_floor_km);
+  // Chave ausente = política persistida anterior à DEC-29 (migration 071 ainda
+  // não rodou). Cai no valor da norma, não em zero: senão o deploy antes da
+  // migration serviria uma política sem piso, em silêncio.
+  const floor =
+    Number.isFinite(configured) && configured >= 0
+      ? configured
+      : Number(SEARCH_POLICY_DEFAULT.regional_floor_km) || 0;
+  const cap = Number(maxAutoRadius);
+  return Number.isFinite(cap) && cap > 0 ? Math.min(floor, cap) : floor;
+}
+
+/**
+ * Raio DECLARADO (DEC-28): o menor anel automático que contém integralmente o
+ * conjunto final de candidatos — não o território consultado. Puro.
+ *
+ * O território pode ser maior que o conjunto: o piso de DEC-29 e o baseline de
+ * DEC-18 consultam uma área que pode não ter candidato nenhum. Declarar essa
+ * área seria anunciar ao usuário uma região que os resultados não ocupam, que é
+ * o que DEC-23 proíbe e o que a interface mostra.
+ */
+export function declaredRadius(rows, territoryKm, { rings_auto, max_auto_radius }) {
+  let farthest = 0;
+  for (const row of rows) {
+    const km = Number(row.distance_km);
+    if (km > 0 && km <= territoryKm && Number(row.count || 0) > 0)
+      farthest = Math.max(farthest, km);
+  }
+  if (farthest <= 0) return 0;
+  const allowed = (rings_auto || [])
+    .map(Number)
+    .filter((r) => Number.isFinite(r) && r <= Number(max_auto_radius))
+    .sort((a, b) => a - b)
+    .filter((r) => r >= farthest);
+  return allowed.length ? allowed[0] : Math.max(territoryKm, farthest);
 }
 
 /** Contagem acumulada de candidatos até cada raio. Puro. */
@@ -346,24 +391,50 @@ export async function resolveScope(ctx, policy, deps = {}) {
   let expanded;
   let reason;
   if (mode === GEO_MODE.AUTO_RADIUS) {
-    // F2.2-A1 / DEC-18: o território automático sai do BASELINE de descoberta
-    // (política BROWSE_CITY, liquidez SEM filtros de produto), nunca do perfil
-    // de produto. É isso que impede que marca/modelo/ano/versão ampliem o
-    // território sozinhos. Com liquidez sem filtro, baseline === rows.
+    // F2.2-E1 / DEC-28 + DEC-29. O baseline de descoberta (política BROWSE_CITY
+    // sobre a liquidez SEM filtro de produto, DEC-18) é PISO, não teto: ele
+    // garante um território mínimo de descoberta, mas não pode encolher a busca
+    // de produto. O território é o maior entre três candidatos:
+    //
+    //   piso regional (DEC-29)   território mínimo, recíproco entre vizinhas;
+    //   baseline (DEC-18)        descoberta da origem, sem filtro de produto;
+    //   AUTO do perfil (DEC-28)  liquidez JÁ filtrada, com o alvo e o teto do
+    //                            perfil em jogo, parando no último anel que
+    //                            acrescenta candidatos (DEC-23).
+    //
+    // Lido como teto, o baseline invertia DEC-03/DEC-04: quanto MAIS estoque
+    // próprio a origem tinha, MENOR o território da busca de produto — uma
+    // cidade com 33 anúncios ficava em 0 km e não via o 4º carro do modelo
+    // procurado a 18,34 km, enquanto a vizinha com 1 anúncio via os 4.
     const baselineStarted = Date.now();
     const baselineRows = await loadBaselineLiquidity(ctx, policy, db, useCache, rows, timings);
     if (timings) timings.scope_baseline_ms = Date.now() - baselineStarted;
 
     const finalizeStarted = Date.now();
-    const auto = resolveAutoRadius(baselineRows, {
+    const profileCap = Number(intent.max_auto_radius) || 0;
+    const baseline = resolveAutoRadius(baselineRows, {
       target: baselineTarget(policy),
       max_auto_radius: baselineMaxAutoRadius(policy),
       rings_auto: policy.rings_auto,
     });
-    effective = auto.effective_radius_km;
-    required = auto.required_distance_km;
-    expanded = auto.expanded;
-    reason = auto.reason;
+    const product = resolveAutoRadius(rows, {
+      target: Number(intent.target),
+      max_auto_radius: profileCap,
+      rings_auto: policy.rings_auto,
+    });
+    const floor = regionalFloorKm(policy, profileCap);
+    const territory = Math.max(floor, baseline.effective_radius_km, product.effective_radius_km);
+    // O território é CONSULTADO; o declarado descreve o conjunto final (DEC-28).
+    effective = declaredRadius(rows, territory, {
+      rings_auto: policy.rings_auto,
+      max_auto_radius: Math.max(profileCap, territory),
+    });
+    required = product.required_distance_km;
+    expanded = effective > 0;
+    reason =
+      effective > Math.max(baseline.effective_radius_km, product.effective_radius_km)
+        ? REASON.REGIONAL_FLOOR
+        : product.reason;
     if (timings) timings.scope_finalize_ms = Date.now() - finalizeStarted;
   } else if (mode === GEO_MODE.MANUAL_RADIUS) {
     effective = Number(geoRequest.requested_radius_km);

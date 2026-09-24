@@ -303,15 +303,15 @@ describe("intent-resolver — §4.3", () => {
         "",
         p
       )
-    ).toMatchObject({ profile: "SEARCH_MODEL", specificity: 3, target: 12 });
+    ).toMatchObject({ profile: "SEARCH_MODEL", specificity: 3, target: 24 });
     expect(resolveIntent({ commercial_model: "Onix", year_from: 2020 }, "", p)).toMatchObject({
       profile: "SEARCH_MODEL_YEAR",
-      target: 8,
+      target: 16,
     });
     expect(resolveIntent({ commercial_model: "Onix" }, "ltz", p)).toMatchObject({
       profile: "SEARCH_VERSION",
       specificity: 2,
-      target: 4,
+      target: 12,
     });
   });
   it("empate resolve pela linha mais específica (versão > modelo+ano > modelo > marca)", () => {

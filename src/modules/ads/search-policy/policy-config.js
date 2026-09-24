@@ -58,17 +58,29 @@ export function isValidExplicitRadius(value) {
 }
 
 export const SEARCH_POLICY_DEFAULT = Object.freeze({
-  version: "v1",
+  version: "v2",
   rings_auto: [0, 25, 50, 75],
   rings_manual: [0, 25, 50, 75],
   profiles: {
     BROWSE_CITY: { target: 20, max_auto_radius: 75 },
     BROWSE_CATEGORY: { target: 16, max_auto_radius: 75 },
     SEARCH_BRAND: { target: 16, max_auto_radius: 75 },
-    SEARCH_MODEL: { target: 12, max_auto_radius: 75 },
-    SEARCH_MODEL_YEAR: { target: 8, max_auto_radius: 75 },
-    SEARCH_VERSION: { target: 4, max_auto_radius: 75 },
+    // DEC-28: alvos dos perfis de produto específico. A gradação por
+    // especificidade de DEC-17 continua; o patamar sobe porque o território
+    // desses perfis passou a ser calculado com a liquidez JÁ filtrada.
+    SEARCH_MODEL: { target: 24, max_auto_radius: 75 },
+    SEARCH_MODEL_YEAR: { target: 16, max_auto_radius: 75 },
+    SEARCH_VERSION: { target: 12, max_auto_radius: 75 },
   },
+  // DEC-29 — piso regional recíproco. Todo território automático parte deste
+  // raio, qualquer que seja o perfil e mesmo com liquidez local suficiente.
+  // Como region_memberships é simétrica, o piso torna a vizinhança recíproca:
+  // se B está a ≤ 25 km de A, os anúncios de B aparecem em A e os de A em B.
+  regional_floor_km: 25,
+  // DEC-29 — teto de participação de uma cidade EXTERNA por página. Regra de
+  // distribuição, não de truncamento: o excedente é adiado, e só perde a vaga
+  // quando existe candidato de outra cidade para ocupá-la.
+  city_share_cap: 0.4,
   liquidity_cache_ttl_seconds: 900,
   facets: {
     open_max: 3,
