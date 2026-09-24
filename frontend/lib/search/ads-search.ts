@@ -102,6 +102,12 @@ export interface AdItem {
    * dealership_id é fallback defensivo apenas.
    */
   priority_tier?: 1 | 2 | 3 | 4 | null;
+  /**
+   * Distância em km entre a cidade de origem da busca e a cidade do anúncio.
+   * Só vem do Search Policy Engine (v1) e só quando há origem resolvida; no
+   * caminho legado é `null`. 0 significa "na própria cidade de origem".
+   */
+  distance_km?: number | null;
   created_at?: string;
   updated_at?: string;
   image_url?: string | null;
@@ -150,6 +156,8 @@ export interface AdsSearchResponse {
    * loader regional não deve reordenar em JS (§4.5).
    */
   search_policy?: Record<string, unknown>;
+  /** Facetas calculadas pelo motor v1 — ausentes no caminho legado. */
+  engine_facets?: unknown[];
 }
 
 /**
@@ -317,6 +325,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
     highlight_until: toNullableText(item.highlight_until),
     plan: toNullableText(item.plan),
     priority_tier: toPriorityTier(item.priority_tier),
+    distance_km: toOptionalNumber(item.distance_km) ?? null,
     created_at: toText(item.created_at) || undefined,
     updated_at: toText(item.updated_at) || undefined,
     image_url: imageUrl,
@@ -388,6 +397,9 @@ function normalizeSearchPayload(json: unknown, filters: AdsSearchFilters): AdsSe
     ...(payload.search_policy && typeof payload.search_policy === "object"
       ? { search_policy: payload.search_policy as Record<string, unknown> }
       : {}),
+    // Facetas do motor (mesmo CandidateScope do grid, DEC-08). Só existem no
+    // caminho v1; no legado a sidebar segue com as do BFF territorial.
+    ...(Array.isArray(payload.facets) ? { engine_facets: payload.facets as unknown[] } : {}),
     error: toNullableText(payload.error),
   };
 }

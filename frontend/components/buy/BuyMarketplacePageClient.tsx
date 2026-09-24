@@ -19,6 +19,12 @@ import type {
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
+import {
+  engineControlTotals,
+  readSearchPolicy,
+  readSearchPolicyFacets,
+  territoryNotice,
+} from "@/lib/search/search-policy";
 import { DEFAULT_RADIUS_KM } from "@/lib/buy/regional-radius-config";
 import {
   DEFAULT_BRAND_OPTIONS,
@@ -141,7 +147,23 @@ export default function BuyMarketplacePageClient({
    * Necessário porque o BFF pode responder EMPTY_FACETS em erro/timeout, e
    * porque outras páginas montam a sidebar sem passar esta prop.
    */
+  // F3 / DEC-08 + DEC-13: quando o motor responde, as facetas vêm do MESMO
+  // CandidateScope do grid. As do BFF legado têm escopo territorial da cidade e
+  // passam a contradizer o grid assim que o território cresce — é o caso de
+  // "Abaixo da FIPE (9)" ao lado de 4 resultados, que originou este trecho.
+  const enginePolicy = useMemo(
+    () => readSearchPolicy(initialResults?.search_policy),
+    [initialResults?.search_policy]
+  );
+  const engineFacets = useMemo(
+    () => readSearchPolicyFacets(initialResults?.engine_facets),
+    [initialResults?.engine_facets]
+  );
+  const notice = useMemo(() => territoryNotice(enginePolicy), [enginePolicy]);
+
   const controlTotals = useMemo(() => {
+    const fromEngine = engineControlTotals(engineFacets);
+    if (fromEngine) return fromEngine;
     const sellerKindRows = initialFacets?.sellerKinds;
     const sellerKind =
       Array.isArray(sellerKindRows) && sellerKindRows.length > 0
@@ -158,7 +180,12 @@ export default function BuyMarketplacePageClient({
         : undefined;
 
     return { sellerKind, offers: initialFacets?.offers, transmission };
-  }, [initialFacets?.sellerKinds, initialFacets?.transmissions, initialFacets?.offers]);
+  }, [
+    engineFacets,
+    initialFacets?.sellerKinds,
+    initialFacets?.transmissions,
+    initialFacets?.offers,
+  ]);
 
   // `?raio=` (raio do bloco "Próximos") é ORTOGONAL aos filtros de veículo — não
   // faz parte de AdsSearchFilters. Ao re-navegar por um filtro de veículo,
@@ -486,6 +513,7 @@ export default function BuyMarketplacePageClient({
                 sort={initialFilters.sort}
                 onPatch={(patch) => pushFilters(patch)}
                 hideSort={false}
+                territoryNotice={notice}
               />
 
               <VehicleGrid

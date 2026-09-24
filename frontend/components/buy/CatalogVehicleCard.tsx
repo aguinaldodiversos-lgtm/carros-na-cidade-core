@@ -37,6 +37,8 @@ export type CatalogItem = AdItem & {
   body_type?: string | null;
   city?: string;
   state?: string;
+  /** Distância até a origem da busca; só o motor v1 envia. */
+  distance_km?: number | null;
   price?: number | string;
   image_url?: string | null;
   image?: string | null;
@@ -90,6 +92,7 @@ function toBaseAdData(item: CatalogItem, weight: 1 | 2 | 3 | 4): BaseAdData {
     mileage: item.mileage ?? null,
     city: item.city ?? null,
     state: item.state ?? null,
+    distance_km: item.distance_km ?? null,
     price: item.price ?? null,
     image: item.image ?? null,
     image_url: item.image_url ?? null,
