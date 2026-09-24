@@ -197,6 +197,28 @@ DEC-28 — O território-base de descoberta é **piso, não teto**. A busca de p
 
 · Supera a última frase de DEC-18, preservando o restante dela; reafirma DEC-23 quanto ao raio declarado; ajusta DEC-17 nos três perfis citados. Não altera DEC-03, DEC-04, DEC-05, DEC-07, DEC-10, DEC-11, DEC-20, DEC-24 nem DEC-26. · Vigente · 2026-09.
 
+### DEC-29
+
+DEC-29 — Piso regional recíproco e teto de participação por cidade.
+
+**Piso regional.** Todo território automático parte de um raio mínimo — inicialmente **25 km** —, qualquer que seja o perfil e independentemente de a liquidez local já atingir o alvo. O território final continua sendo o maior entre o piso, o baseline de descoberta e o AUTO do perfil (DEC-28); o piso apenas impede que ele seja menor. Como `region_memberships` é simétrica por construção — distância de A para B é a mesma de B para A —, o piso torna a vizinhança **recíproca**: se B está a 25 km ou menos de A, os anúncios de B aparecem na página de A e os de A na de B, sem depender de qual das duas tem mais estoque.
+
+**Motivo.** Sem piso, a liquidez produz alcance invertido. Uma origem com estoque próprio suficiente fica em 0 km e nunca mostra anúncio de vizinho; a vizinha pequena expande e mostra os anúncios dela. O alcance vai justamente para quem já está no mercado maior e é negado a quem está na cidade menor — que é quem mais precisa dele e de quem se espera que pague por ele. Além disso, o copy territorial "cidade e região" (DEC-03, v2.0 §52) só é verdadeiro quando existe região; com raio 0 permanente, ele é falso por construção.
+
+**Teto de participação por cidade.** Nenhuma cidade **diferente da cidade de origem** ocupa mais que **40%** dos resultados de uma página. O excedente é adiado para as páginas seguintes, de forma determinística, preservando a ordem relativa entre todos os demais anúncios. A cidade de origem **não** é limitada: o teto existe para impedir que uma praça externa domine a página territorial, não para rebaixar o estoque da própria cidade. Enquanto nenhuma cidade externa passar do limite, a ordenação é exatamente a de DEC-07.
+
+**Relação com DEC-07.** O teto é a única exceção admitida à ordenação por peso, e é limitada: ele **adia** anúncios excedentes de uma mesma cidade externa, nunca reordena anúncios entre si por outro critério, nunca limita a origem e nunca remove ninguém do conjunto. Fora dessa situação, peso comercial vence distância como sempre.
+
+**Escolha manual continua vencendo.** O piso é um mínimo do modo automático. Raio explícito — inclusive `raio=0`, "apenas esta cidade" — vence o piso e isola a origem (DEC-05, DEC-19, DEC-24). Escopo UF e Brasil seguem exigindo ação explícita.
+
+**Raio declarado.** O piso não altera a regra de DEC-28: `effective_radius_km` descreve o conjunto final de candidatos, não o território consultado. Uma página cujo resultado esteja todo na própria cidade declara 0 km mesmo tendo consultado 25 km. Onde a página exibir contagem — inclusive em metadados de SEO —, o número exibido deve ser o do mesmo conjunto que a página mostra.
+
+**Existência e indexação, inalteradas.** Anúncio de vizinho continua não criando cidade nem mantendo cidade viva (DEC-01, DEC-02), e o limiar de indexação continua contando apenas o estoque próprio. O piso muda o que a página **mostra**, nunca se ela existe.
+
+**Natureza dos valores.** Os 25 km e os 40% são parâmetros iniciais versionados de política, representáveis em `platform_settings`, revisáveis por nova decisão com telemetria — como os alvos de DEC-17. É normativo o conjunto estrutural: existir um piso simétrico, existir um teto por cidade externa, a origem não ser limitada por ele e a escolha manual vencer ambos. Em região de baixa densidade o piso pode não conter nenhuma cidade vizinha, e isso não é erro: o território fica com o que a malha oferece.
+
+· Complementa DEC-28; torna verdadeiro o copy de DEC-03; emenda DEC-07 apenas no caso do teto de participação, nos limites descritos. Não altera DEC-01, DEC-02, DEC-05, DEC-11, DEC-19, DEC-20, DEC-23, DEC-24 nem DEC-26. · Vigente · 2026-09.
+
 ---
 
 ## Adiamentos confirmados
