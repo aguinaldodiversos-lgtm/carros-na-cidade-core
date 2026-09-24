@@ -181,6 +181,22 @@ Nunca se emite `position = 1` artificialmente num evento de busca por se ter esc
 
 · Refina ADI-01, que segue vigente; corrige a granularidade do payload mínimo que a v3 §16 importara integralmente da v2.0 §44, sem reduzir a observabilidade semanticamente útil. Posterior às certificações MET-01 e DEC-26 da v3, que não a cobrem. · Aprovada · Vigente · 2026-09.
 
+### DEC-28
+
+DEC-28 — O território-base de descoberta é **piso, não teto**. A busca de produto com origem conhecida e sem escolha manual constrói o território em duas etapas e fica com a maior delas: (1) o baseline de descoberta da origem, calculado pela política BROWSE_CITY sobre a liquidez **sem** filtro de produto (DEC-18); (2) o território automático do **perfil de produto em jogo**, calculado sobre a liquidez **com** os filtros ativos, usando o alvo e o teto automático desse perfil, pelas mesmas regras de DEC-04 e DEC-20. O resultado é o menor território que atinge o alvo do perfil e nunca menor que o baseline. Continua valendo DEC-23: quando nenhum anel automático atinge o alvo, a expansão termina no último anel que efetivamente acrescentou candidatos, e anéis seguintes com delta zero não ampliam o território. Continuam valendo DEC-10 e DEC-11: acima do teto automático do perfil o sistema não expande sozinho — 150 km permanece concessão de Guided Relaxation —, e a escolha manual de raio ou escopo vence tudo (DEC-05, DEC-24).
+
+**Motivo.** A última frase de DEC-18 — "o sistema não amplia silenciosamente além do baseline" — foi escrita para impedir que preferências de produto ampliassem o território sem limite, e vinha sendo lida como teto. Lida assim, ela inverte o princípio de DEC-03/DEC-04: quanto **mais** estoque próprio a cidade de origem tem, **menor** o território da busca de produto, porque o baseline é satisfeito em 0 km por anúncios que nada têm a ver com a busca. Caso observado em produção em 2026-09: origem com 33 anúncios próprios e 3 do modelo procurado ficava em 0 km e não enxergava o 4º anúncio do mesmo modelo a 18,34 km, enquanto uma origem vizinha com 1 anúncio próprio, e por isso com baseline de 25 km, via os 4. A liquidez que decide o território passa a ser a da busca em questão, não a da cidade.
+
+**Raio declarado.** `effective_radius_km` é o menor anel que contém integralmente o conjunto final de candidatos, e `required_distance_km` é `null` quando o alvo não é atingido — ambos apurados sobre a liquidez com filtro de produto, nunca copiados do baseline. Uma busca cujos candidatos estão todos na própria cidade declara 0 km, mesmo que o baseline tenha sido maior. É o que DEC-23 já exigia; esta decisão fecha a divergência entre o território **usado** e o território **declarado**, que é o número que a interface mostra ao usuário (DEC-03).
+
+**Alvos por perfil.** Ajusta DEC-17 nos perfis de produto específico, mantendo a gradação por especificidade e o caráter transitório: SEARCH_MODEL 24 · SEARCH_MODEL_YEAR 16 · SEARCH_VERSION 12. BROWSE_CITY 20, BROWSE_CATEGORY 16 e SEARCH_BRAND 16 permanecem como estão. Continuam sendo configuração (`platform_settings`), não constante, e o gatilho de revisão de DEC-17 continua valendo — com catálogo pobre, alvos desta ordem levam a busca de modelo ao teto automático com frequência, e isso é deliberado enquanto durar a fase de formação de estoque.
+
+**Apresentação.** Quando o raio efetivo é maior que zero, a página declara o raio (DEC-03) e cada resultado exibe a distância até a origem. A ordenação permanece a de DEC-07 — peso comercial primeiro, distância entre anúncios de mesmo peso — em **lista única**: separar os resultados da cidade de origem dos das vizinhas rebaixaria um Destaque vizinho para baixo de um anúncio grátis local, o que DEC-07 proíbe. Resultados obtidos por concessão aceita pelo usuário podem aparecer em bloco próprio e rotulado, porque aí a ampliação foi pedida.
+
+**Fora do escopo.** Esta decisão não altera DEC-01, DEC-02, DEC-07, a página territorial sem busca, facetas, relaxação, SEO ou ranking. Nenhum parâmetro de lançamento — cidade piloto, allowlist de rollout ou raio de prospecção comercial — é norma: são operação, e não entram em `platform_settings` nem nesta política.
+
+· Supera a última frase de DEC-18, preservando o restante dela; reafirma DEC-23 quanto ao raio declarado; ajusta DEC-17 nos três perfis citados. Não altera DEC-03, DEC-04, DEC-05, DEC-07, DEC-10, DEC-11, DEC-20, DEC-24 nem DEC-26. · Vigente · 2026-09.
+
 ---
 
 ## Adiamentos confirmados
