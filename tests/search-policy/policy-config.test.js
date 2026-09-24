@@ -49,6 +49,10 @@ const MIGRATION_069 = path.resolve(
   here,
   "../../src/database/migrations/069_search_policy_relaxation_compat.sql"
 );
+const MIGRATION_071 = path.resolve(
+  here,
+  "../../src/database/migrations/071_search_policy_regional_floor_dec28_dec29.sql"
+);
 
 function jsonFromMigration() {
   const sql = fs.readFileSync(MIGRATION, "utf8");
@@ -86,6 +90,25 @@ function jsonFromMigration() {
   expect(relaxStart).toBeGreaterThan(-1);
   expect(relaxEnd).toBeGreaterThan(relaxStart);
   base.relaxations = JSON.parse(relaxed.slice(relaxStart + 1, relaxEnd + 1));
+  // Migration 071 (DEC-28/DEC-29): alvos dos perfis de produto específico,
+  // piso regional, teto por cidade e versão v2. Os valores são lidos do PRÓPRIO
+  // arquivo — se a migration e a constante divergirem, a comparação final
+  // acusa, que é o ponto deste teste.
+  const floored = fs.readFileSync(MIGRATION_071, "utf8");
+  const setValue = (jsonPath) => {
+    const marker = `'{${jsonPath}}'`;
+    const at = floored.indexOf(marker);
+    expect(at, `071 não grava ${marker}`).toBeGreaterThan(-1);
+    const raw = floored.slice(at + marker.length).match(/,\s*'([^']+)'::jsonb/);
+    expect(raw, `071 sem valor para ${marker}`).not.toBeNull();
+    return JSON.parse(raw[1]);
+  };
+  base.profiles.SEARCH_MODEL.target = setValue("profiles,SEARCH_MODEL,target");
+  base.profiles.SEARCH_MODEL_YEAR.target = setValue("profiles,SEARCH_MODEL_YEAR,target");
+  base.profiles.SEARCH_VERSION.target = setValue("profiles,SEARCH_VERSION,target");
+  base.regional_floor_km = setValue("regional_floor_km");
+  base.city_share_cap = setValue("city_share_cap");
+  base.version = setValue("version");
   return base;
 }
 
@@ -145,10 +168,30 @@ describe("search_policy — migration 065 × SEARCH_POLICY_DEFAULT", () => {
     expect(SEARCH_POLICY_DEFAULT.rings_auto).toEqual([0, 25, 50, 75]);
     expect(SEARCH_POLICY_DEFAULT.rings_manual).toEqual([0, 25, 50, 75]);
     expect(SEARCH_POLICY_DEFAULT.profiles.BROWSE_CITY).toEqual({ target: 20, max_auto_radius: 75 });
-    expect(SEARCH_POLICY_DEFAULT.profiles.SEARCH_VERSION).toEqual({
-      target: 4,
+    // DEC-28: alvos dos perfis de produto específico, com a gradação por
+    // especificidade preservada (modelo > modelo+ano > versão).
+    expect(SEARCH_POLICY_DEFAULT.profiles.SEARCH_MODEL).toEqual({
+      target: 24,
       max_auto_radius: 75,
     });
+    expect(SEARCH_POLICY_DEFAULT.profiles.SEARCH_MODEL_YEAR).toEqual({
+      target: 16,
+      max_auto_radius: 75,
+    });
+    expect(SEARCH_POLICY_DEFAULT.profiles.SEARCH_VERSION).toEqual({
+      target: 12,
+      max_auto_radius: 75,
+    });
+    expect(SEARCH_POLICY_DEFAULT.profiles.SEARCH_MODEL.target).toBeGreaterThan(
+      SEARCH_POLICY_DEFAULT.profiles.SEARCH_MODEL_YEAR.target
+    );
+    expect(SEARCH_POLICY_DEFAULT.profiles.SEARCH_MODEL_YEAR.target).toBeGreaterThan(
+      SEARCH_POLICY_DEFAULT.profiles.SEARCH_VERSION.target
+    );
+    // DEC-29: piso regional recíproco e teto por cidade externa.
+    expect(SEARCH_POLICY_DEFAULT.regional_floor_km).toBe(25);
+    expect(SEARCH_POLICY_DEFAULT.city_share_cap).toBe(0.4);
+    expect(SEARCH_POLICY_DEFAULT.version).toBe("v2");
     // INV-010: nenhum perfil pode passar de 75 km por automação.
     for (const p of Object.values(SEARCH_POLICY_DEFAULT.profiles))
       expect(p.max_auto_radius).toBeLessThanOrEqual(75);

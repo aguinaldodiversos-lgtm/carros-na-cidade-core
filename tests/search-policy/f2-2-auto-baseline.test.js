@@ -168,10 +168,11 @@ describe("resolveScope — território-base de /comprar (DEC-18)", () => {
   });
 
   for (const [profile, filters] of PRODUCT_PROFILES) {
-    it(`${profile}: cidade com estoque próprio suficiente → território fica em 0 km`, async () => {
+    it(`${profile}: cidade com estoque próprio suficiente NÃO trava o produto em 0 km (DEC-28)`, async () => {
       // Baseline: 25 ativos na própria cidade (≥ 20 do BROWSE_CITY) → 0 km.
-      // Produto: quase nada perto, muito a 60 km — antes isso puxava o
-      // território para 75 (ou 150); agora não pode puxar nada.
+      // Produto: quase nada perto, 40 a 60 km. Com o baseline lido como TETO, o
+      // território ficava em 0 e a busca via 1 anúncio. Como PISO, o AUTO do
+      // perfil alcança os 60 km e o território vai a 75.
       const db = fakeDb({
         baseline: rows([
           [0, 25],
@@ -193,16 +194,18 @@ describe("resolveScope — território-base de /comprar (DEC-18)", () => {
         { db, cache: false }
       );
       expect(scope.geo_mode).toBe(GEO_MODE.AUTO_RADIUS);
-      expect(scope.effective_radius_km).toBe(0);
-      expect(scope.territory.radiusKm).toBe(0);
+      expect(scope.effective_radius_km).toBe(75);
+      expect(scope.territory.radiusKm).toBe(75);
       expect(db.calls.baseline).toBe(1);
       expect(db.calls.product).toBe(1);
     });
   }
 
-  it("baseline que precisa expandir: produto herda o mesmo território, sem ampliar", async () => {
-    // Baseline: 5 na própria + 20 a 34 km → BROWSE_CITY exige 20 → efetivo 50.
-    // Produto (modelo raro): só 1 perto e 30 a 70 km. Território continua 50.
+  it("baseline expandido é piso: o produto pode ir além dele (DEC-28)", async () => {
+    // Baseline: 5 na própria + 20 a 34 km → BROWSE_CITY exige 20 → 50 km.
+    // Produto (modelo raro): 1 perto, 1 a 34 km e 30 a 70 km → o alvo do perfil
+    // só é atingido a 70 km, e o território vai a 75. O baseline garantiu o
+    // mínimo de 50; o perfil levou adiante.
     const db = fakeDb({
       baseline: rows([
         [0, 5],
@@ -224,15 +227,18 @@ describe("resolveScope — território-base de /comprar (DEC-18)", () => {
       policy,
       { db, cache: false }
     );
-    expect(scope.required_distance_km).toBe(34);
-    expect(scope.effective_radius_km).toBe(50);
-    expect(scope.territory.radiusKm).toBe(50);
-    // As contagens expostas continuam sendo as do produto, no território-base.
+    expect(scope.required_distance_km).toBe(70); // distância do PRODUTO, não do baseline
+    expect(scope.effective_radius_km).toBe(75);
+    expect(scope.territory.radiusKm).toBe(75);
+    // As contagens expostas continuam sendo as do produto.
     expect(scope.local_result_count).toBe(1);
-    expect(scope.cities.every((c) => c.distance_km <= 50)).toBe(true);
+    expect(scope.cities.every((c) => c.distance_km <= 75)).toBe(true);
   });
 
-  it("produto abaixo do alvo não move o território (fica para a Guided Relaxation)", async () => {
+  it("produto abaixo do alvo na origem alcança o anel que o atinge (DEC-28)", async () => {
+    // Antes: efetivo 0, porque o baseline (30 na própria) travava tudo e os 50
+    // anúncios do modelo a 40 km ficavam invisíveis até o usuário aceitar uma
+    // concessão. Agora o alvo do perfil é atingido a 40 km → anel 50.
     const db = fakeDb({
       baseline: rows([
         [0, 30],
@@ -253,8 +259,113 @@ describe("resolveScope — território-base de /comprar (DEC-18)", () => {
       policy,
       { db, cache: false }
     );
+    expect(scope.effective_radius_km).toBe(50);
+    expect(scope.required_distance_km).toBe(40);
+    expect(scope.local_result_count).toBe(2);
+  });
+
+  // ── DEC-29 — piso regional recíproco ──────────────────────────────────────
+  it("piso: origem líquida ainda enxerga o vizinho dentro de 25 km", async () => {
+    // Liquidez local sobra (33 ≥ 20) e não há filtro de produto: sem o piso, o
+    // território seria 0 e o anúncio do vizinho a 18 km nunca apareceria na
+    // página da cidade grande — a assimetria que DEC-29 corrige.
+    const db = fakeDb({
+      baseline: rows([
+        [0, 33],
+        [18.34, 1],
+      ]),
+      product: rows([]),
+    });
+    const scope = await resolveScope(
+      {
+        origin: ORIGIN,
+        filters: {},
+        intent: intentFor("BROWSE_CITY"),
+        geoRequest: { mode: GEO_MODE.AUTO_RADIUS, requested_radius_km: null },
+      },
+      policy,
+      { db, cache: false }
+    );
+    expect(scope.effective_radius_km).toBe(25);
+    expect(scope.reason).toBe(REASON.REGIONAL_FLOOR);
+    expect(scope.cities.map((c) => c.distance_km)).toContain(18.34);
+  });
+
+  it("piso não infla o raio declarado: conjunto todo na origem declara 0 km (DEC-28)", async () => {
+    // O território consultado é 25 (piso), mas nenhum candidato mora fora da
+    // origem. Declarar 25 anunciaria uma região que o resultado não ocupa.
+    const db = fakeDb({
+      baseline: rows([
+        [0, 33],
+        [18.34, 5],
+      ]),
+      product: rows([[0, 3]]),
+    });
+    const scope = await resolveScope(
+      {
+        origin: ORIGIN,
+        filters: { commercial_model: "Onix", price_max: 50000 },
+        intent: intentFor("SEARCH_MODEL"),
+        geoRequest: { mode: GEO_MODE.AUTO_RADIUS, requested_radius_km: null },
+      },
+      policy,
+      { db, cache: false }
+    );
     expect(scope.effective_radius_km).toBe(0);
-    expect(scope.local_result_count).toBe(2); // 2 < target 12: relaxação depois
+    expect(scope.required_distance_km).toBeNull();
+    expect(scope.territory.radiusKm).toBe(0);
+  });
+
+  it("caso HB20: 3 do modelo na origem e 1 a 18,34 km → território 25, os 4 visíveis", async () => {
+    const db = fakeDb({
+      baseline: rows([
+        [0, 33],
+        [18.34, 1],
+      ]),
+      product: rows([
+        [0, 3],
+        [18.34, 1],
+      ]),
+    });
+    const scope = await resolveScope(
+      {
+        origin: ORIGIN,
+        filters: { commercial_model: "HB20" },
+        intent: intentFor("SEARCH_MODEL"),
+        geoRequest: { mode: GEO_MODE.AUTO_RADIUS, requested_radius_km: null },
+      },
+      policy,
+      { db, cache: false }
+    );
+    expect(scope.effective_radius_km).toBe(25);
+    expect(scope.local_result_count).toBe(3);
+    expect(scope.cities.map((c) => c.count).reduce((a, b) => a + b, 0)).toBe(4);
+  });
+
+  it("raio=0 explícito vence o piso e isola a cidade (DEC-05/DEC-24)", async () => {
+    const db = fakeDb({
+      baseline: rows([
+        [0, 33],
+        [18.34, 9],
+      ]),
+      product: rows([
+        [0, 33],
+        [18.34, 9],
+      ]),
+    });
+    const scope = await resolveScope(
+      {
+        origin: ORIGIN,
+        filters: {},
+        intent: intentFor("BROWSE_CITY"),
+        geoRequest: { mode: GEO_MODE.EXACT_CITY, requested_radius_km: 0, user_geo_explicit: true },
+      },
+      policy,
+      { db, cache: false }
+    );
+    expect(scope.geo_mode).toBe(GEO_MODE.EXACT_CITY);
+    expect(scope.effective_radius_km).toBe(0);
+    expect(scope.territory.radiusKm).toBe(0);
   });
 
   it("sem filtro de produto o baseline é a própria liquidez — nenhuma query extra", async () => {

@@ -433,13 +433,67 @@ export async function buildSearchContext(rawQuery = {}, deps = {}) {
 }
 
 /** ORDER BY do v1 (§4.5). Só `relevance` muda; os demais seguem o legado. */
-export function buildEngineSortClause(sort, { hasOrigin, hasText }) {
+export function buildEngineSortClause(sort, { hasOrigin, hasText, cityShareCap = null }) {
   if (sort !== "relevance") return buildSortClause(sort, { useTextRank: false });
   const parts = [`${commercialLayerExpr} DESC`];
-  if (hasOrigin) parts.push("COALESCE(rm.distance_km, 0) ASC");
-  if (hasText) parts.push("text_rank DESC");
-  parts.push("a.created_at DESC", "a.id ASC");
-  return parts.join(",\n      ");
+  const tail = [];
+  if (hasOrigin) tail.push("COALESCE(rm.distance_km, 0) ASC");
+  if (hasText) tail.push("text_rank DESC");
+  tail.push("a.created_at DESC", "a.id ASC");
+  // DEC-29 — o teto por cidade entra DEPOIS do peso comercial e antes da
+  // distância. Dentro da faixa de peso ele diversifica; entre faixas, quem
+  // manda continua sendo DEC-07. Sem isso, um grátis da própria cidade subiria
+  // acima de anúncios pagos da vizinha assim que o teto mordesse — foi o que a
+  // primeira versão desta implementação fez, e o teste 8.4 pegou.
+  const slot = cityShareCap ? [cityShareCapExpr(cityShareCap, parts.concat(tail))] : [];
+  return [...parts, ...slot, ...tail].join(",\n      ");
+}
+
+export const CITY_SHARE_CAP_DEFAULT = 0.4;
+
+/** Quantas vagas de uma página uma cidade EXTERNA pode ocupar (DEC-29). Puro. */
+export function cityShareCapSlots(policy, limit) {
+  const configured = Number(policy?.city_share_cap);
+  const ratio =
+    Number.isFinite(configured) && configured > 0 && configured < 1
+      ? configured
+      : CITY_SHARE_CAP_DEFAULT;
+  return Math.max(1, Math.floor(ratio * (Number(limit) || 0)));
+}
+
+/**
+ * DEC-29 — teto de participação por cidade externa, como chave PRIMÁRIA de
+ * ordenação, aplicada antes de LIMIT/OFFSET (v2.0 §37: nada de re-sort depois
+ * da paginação).
+ *
+ * Cada anúncio recebe um "turno": a origem é sempre turno 1, e uma cidade
+ * externa distribui seus anúncios em turnos de `cap` em `cap`, na ordem de
+ * DEC-07. Ordenar por turno e, dentro dele, por DEC-07 produz três coisas ao
+ * mesmo tempo:
+ *
+ *   • enquanto houver candidato de outra cidade no turno 1, a cidade grande não
+ *     passa de `cap` vagas — o teto morde;
+ *   • quando NÃO houver alternativa, os turnos seguintes preenchem a mesma
+ *     página — distribuição, não truncamento, e a página não encolhe;
+ *   • a origem nunca é rebaixada, porque seu turno é sempre o primeiro.
+ *
+ * Fora disso, a ordem é exatamente a de DEC-07.
+ */
+export function cityShareCapExpr({ originCityId, cap, textRankExpr }, orderParts) {
+  const origin = Number(originCityId);
+  const slots = Number(cap);
+  // Dentro de OVER(...) não vale alias de SELECT: `text_rank` volta a ser a
+  // expressão. Fora dele, o alias continua.
+  const windowOrder = orderParts
+    .join(", ")
+    .replace(/text_rank/g, `(${textRankExpr})`)
+    .replace(/\s+/g, " ")
+    .trim();
+  return (
+    `CASE WHEN a.city_id = ${origin} THEN 1\n` +
+    `           ELSE CEIL((ROW_NUMBER() OVER (PARTITION BY a.city_id ORDER BY ${windowOrder}))::numeric / ${slots})\n` +
+    `      END ASC`
+  );
 }
 
 /**
@@ -462,9 +516,19 @@ export function buildEngineQueries(ctx, scope) {
   const textRank = candidate.qParam
     ? `ts_rank(a.search_vector, plainto_tsquery('portuguese', ${candidate.qParam}))`
     : "0";
+  // O teto só vale na ordenação de política (relevance) e com origem: nas
+  // ordenações escolhidas pelo usuário (preço, ano, km) quem manda é ele.
   const orderBy = buildEngineSortClause(ctx.sort, {
     hasOrigin,
     hasText: Boolean(candidate.qParam),
+    cityShareCap:
+      hasOrigin && ctx.sort === "relevance"
+        ? {
+            originCityId: ctx.origin.id,
+            cap: cityShareCapSlots(ctx.policy, ctx.limit),
+            textRankExpr: textRank,
+          }
+        : null,
   });
   const limitP = bag.p(ctx.limit);
   const offsetP = bag.p((ctx.page - 1) * ctx.limit);
