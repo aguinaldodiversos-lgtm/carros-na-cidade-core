@@ -158,6 +158,8 @@ export interface AdsSearchResponse {
   search_policy?: Record<string, unknown>;
   /** Facetas calculadas pelo motor v1 — ausentes no caminho legado. */
   engine_facets?: unknown[];
+  /** Chips de Ofertas contados pelo motor v1 — ausentes no caminho legado. */
+  engine_offer_counts?: Record<string, unknown>;
 }
 
 /**
@@ -400,6 +402,9 @@ function normalizeSearchPayload(json: unknown, filters: AdsSearchFilters): AdsSe
     // Facetas do motor (mesmo CandidateScope do grid, DEC-08). Só existem no
     // caminho v1; no legado a sidebar segue com as do BFF territorial.
     ...(Array.isArray(payload.facets) ? { engine_facets: payload.facets as unknown[] } : {}),
+    ...(payload.offer_counts && typeof payload.offer_counts === "object"
+      ? { engine_offer_counts: payload.offer_counts as Record<string, unknown> }
+      : {}),
     error: toNullableText(payload.error),
   };
 }

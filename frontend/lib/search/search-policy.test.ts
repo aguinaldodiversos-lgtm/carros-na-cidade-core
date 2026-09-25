@@ -3,6 +3,7 @@ import {
   distanceLabel,
   engineControlTotals,
   facetCounts,
+  readOfferCounts,
   readSearchPolicy,
   readSearchPolicyFacets,
   territoryNotice,
@@ -149,11 +150,54 @@ describe("engineControlTotals", () => {
     expect(engineControlTotals(facets)?.transmission).toEqual({ manual: 23, automatico: 11 });
   });
 
-  it("ofertas ficam SEM número: o motor não as calcula e o da cidade seria mentira", () => {
+  it("ofertas vêm do motor quando o bloco existe (F3-B)", () => {
+    const offers = readOfferCounts({ opportunity: 2, below_fipe: 5, highlight: 1 });
+    expect(engineControlTotals(facets, offers)?.offers).toEqual({
+      opportunity: 2,
+      below_fipe: 5,
+      highlight: 1,
+    });
+  });
+
+  it("sem o bloco do motor, ofertas ficam SEM número — nunca o da cidade", () => {
+    // Era o estado da F3-A e continua sendo o correto para backend antigo: o
+    // chip sem número diz "não contei"; com o número da cidade diria uma
+    // mentira confiante ao lado de um grid regional.
     expect(engineControlTotals(facets)?.offers).toBeUndefined();
+    expect(engineControlTotals(facets, null)?.offers).toBeUndefined();
   });
 
   it("sem facetas do motor devolve null e a sidebar segue com o BFF legado", () => {
     expect(engineControlTotals([])).toBeNull();
+    expect(engineControlTotals([], { opportunity: 1, below_fipe: 1, highlight: 1 })).toBeNull();
+  });
+});
+
+describe("readOfferCounts", () => {
+  it("lê o bloco do motor", () => {
+    expect(readOfferCounts({ opportunity: 2, below_fipe: 5, highlight: 1 })).toEqual({
+      opportunity: 2,
+      below_fipe: 5,
+      highlight: 1,
+    });
+  });
+
+  it("zeros reais são preservados — 0 é uma contagem, não uma ausência", () => {
+    expect(readOfferCounts({ opportunity: 0, below_fipe: 0, highlight: 0 })).toEqual({
+      opportunity: 0,
+      below_fipe: 0,
+      highlight: 0,
+    });
+  });
+
+  it("bloco ausente ou incompleto vira null, nunca zeros inventados", () => {
+    // Completar com zero afirmaria "não existe destaque nenhum" quando a
+    // verdade é que ninguém contou.
+    expect(readOfferCounts(undefined)).toBeNull();
+    expect(readOfferCounts(null)).toBeNull();
+    expect(readOfferCounts({})).toBeNull();
+    expect(readOfferCounts({ opportunity: 2, below_fipe: 5 })).toBeNull();
+    expect(readOfferCounts({ opportunity: "x", below_fipe: 5, highlight: 1 })).toBeNull();
+    expect(readOfferCounts([{ opportunity: 1 }])).toBeNull();
   });
 });

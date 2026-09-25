@@ -21,6 +21,7 @@ import type {
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
 import {
   engineControlTotals,
+  readOfferCounts,
   readSearchPolicy,
   readSearchPolicyFacets,
   territoryNotice,
@@ -159,10 +160,14 @@ export default function BuyMarketplacePageClient({
     () => readSearchPolicyFacets(initialResults?.engine_facets),
     [initialResults?.engine_facets]
   );
+  const engineOffers = useMemo(
+    () => readOfferCounts(initialResults?.engine_offer_counts),
+    [initialResults?.engine_offer_counts]
+  );
   const notice = useMemo(() => territoryNotice(enginePolicy), [enginePolicy]);
 
   const controlTotals = useMemo(() => {
-    const fromEngine = engineControlTotals(engineFacets);
+    const fromEngine = engineControlTotals(engineFacets, engineOffers);
     if (fromEngine) return fromEngine;
     const sellerKindRows = initialFacets?.sellerKinds;
     const sellerKind =
@@ -182,6 +187,7 @@ export default function BuyMarketplacePageClient({
     return { sellerKind, offers: initialFacets?.offers, transmission };
   }, [
     engineFacets,
+    engineOffers,
     initialFacets?.sellerKinds,
     initialFacets?.transmissions,
     initialFacets?.offers,
