@@ -451,20 +451,19 @@ export function buildEngineSortClause(sort, { hasOrigin, hasText, cityShareCap =
 
 export const CITY_SHARE_CAP_DEFAULT = 0.4;
 
-/** Quantas vagas de uma página uma cidade EXTERNA pode ocupar (DEC-29). Puro. */
-export function cityShareCapSlots(policy, limit) {
+/** Fração configurada do teto (DEC-29), com o default quando o valor não serve. Puro. */
+export function cityShareCapRatio(policy) {
   const configured = Number(policy?.city_share_cap);
-  const ratio =
-    Number.isFinite(configured) && configured > 0 && configured < 1
-      ? configured
-      : CITY_SHARE_CAP_DEFAULT;
-  return Math.max(1, Math.floor(ratio * (Number(limit) || 0)));
+  return Number.isFinite(configured) && configured > 0 && configured < 1
+    ? configured
+    : CITY_SHARE_CAP_DEFAULT;
 }
 
 /**
- * DEC-29 — teto de participação por cidade externa, como chave PRIMÁRIA de
- * ordenação, aplicada antes de LIMIT/OFFSET (v2.0 §37: nada de re-sort depois
- * da paginação).
+ * DEC-29 — teto de participação por cidade externa. NÃO é chave primária: entra
+ * DEPOIS do peso comercial e antes da distância (ver `buildEngineSortClause`),
+ * e é aplicado antes de LIMIT/OFFSET (v2.0 §37: nada de re-sort depois da
+ * paginação).
  *
  * Cada anúncio recebe um "turno": a origem é sempre turno 1, e uma cidade
  * externa distribui seus anúncios em turnos de `cap` em `cap`, na ordem de
@@ -477,11 +476,23 @@ export function cityShareCapSlots(policy, limit) {
  *     página — distribuição, não truncamento, e a página não encolhe;
  *   • a origem nunca é rebaixada, porque seu turno é sempre o primeiro.
  *
- * Fora disso, a ordem é exatamente a de DEC-07.
+ * O teto é POR FAIXA de peso, e o denominador é a CAPACIDADE da faixa: o menor
+ * entre o tamanho da página e quantos candidatos daquela faixa existem no
+ * CandidateScope, nunca menos que 1. Medir contra as vagas que a faixa ocupa na
+ * página seria circular — essas vagas dependem da ordenação, que depende do
+ * teto —, e medir contra a página inteira faria o teto quase nunca morder numa
+ * faixa pequena: numa página de 24, uma cidade externa levaria 9 dos 10 únicos
+ * Destaques. Pela capacidade, leva 4. O `COUNT(*) OVER (PARTITION BY faixa)`
+ * roda na mesma varredura e mantém a ordenação global, que é o que faz o
+ * adiamento atravessar as páginas.
  */
-export function cityShareCapExpr({ originCityId, cap, textRankExpr }, orderParts) {
+export function cityShareCapExpr(
+  { originCityId, ratio, pageLimit, bandExpr, textRankExpr },
+  orderParts
+) {
   const origin = Number(originCityId);
-  const slots = Number(cap);
+  const share = Number(ratio);
+  const limit = Math.max(1, Number(pageLimit) || 0);
   // Dentro de OVER(...) não vale alias de SELECT: `text_rank` volta a ser a
   // expressão. Fora dele, o alias continua.
   const windowOrder = orderParts
@@ -489,9 +500,12 @@ export function cityShareCapExpr({ originCityId, cap, textRankExpr }, orderParts
     .replace(/text_rank/g, `(${textRankExpr})`)
     .replace(/\s+/g, " ")
     .trim();
+  const band = bandExpr.replace(/\s+/g, " ").trim();
+  const capacity = `LEAST(${limit}, COUNT(*) OVER (PARTITION BY ${band}))`;
+  const cap = `GREATEST(1, FLOOR(${share} * ${capacity}))`;
   return (
     `CASE WHEN a.city_id = ${origin} THEN 1\n` +
-    `           ELSE CEIL((ROW_NUMBER() OVER (PARTITION BY a.city_id ORDER BY ${windowOrder}))::numeric / ${slots})\n` +
+    `           ELSE CEIL((ROW_NUMBER() OVER (PARTITION BY a.city_id, ${band} ORDER BY ${windowOrder}))::numeric / ${cap})\n` +
     `      END ASC`
   );
 }
@@ -604,7 +618,9 @@ export function buildEngineQueries(ctx, scope) {
       hasOrigin && ctx.sort === "relevance"
         ? {
             originCityId: ctx.origin.id,
-            cap: cityShareCapSlots(ctx.policy, ctx.limit),
+            ratio: cityShareCapRatio(ctx.policy),
+            pageLimit: ctx.limit,
+            bandExpr: commercialLayerExpr,
             textRankExpr: textRank,
           }
         : null,

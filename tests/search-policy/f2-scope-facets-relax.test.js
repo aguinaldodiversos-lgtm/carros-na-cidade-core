@@ -478,6 +478,68 @@ describe("CandidateScope (§4.1, D3) e ORDER BY (§4.5)", () => {
       );
     }
   });
+
+  // DEC-29 — o teto é POR FAIXA e o denominador é a CAPACIDADE da faixa:
+  // LEAST(tamanho da página, candidatos da faixa), nunca menos que 1. Medir
+  // contra a página inteira faria o teto quase não morder numa faixa pequena.
+  describe("teto de participação por cidade (DEC-29)", () => {
+    const capOptions = {
+      originCityId: 7,
+      ratio: 0.4,
+      pageLimit: 24,
+      bandExpr: "priority_band",
+      textRankExpr: "ts_rank(a.search_vector, q)",
+    };
+    const clause = () =>
+      buildEngineSortClause("relevance", {
+        hasOrigin: true,
+        hasText: false,
+        cityShareCap: capOptions,
+      }).replace(/\s+/g, " ");
+
+    it("entra depois do peso e antes da distância, nunca como chave primária", () => {
+      const c = clause();
+      const peso = c.indexOf("GREATEST(");
+      const teto = c.indexOf("CASE WHEN a.city_id = 7");
+      const distancia = c.indexOf("COALESCE(rm.distance_km, 0) ASC");
+      expect(peso).toBeGreaterThanOrEqual(0);
+      expect(teto).toBeGreaterThan(peso);
+      expect(distancia).toBeGreaterThan(teto);
+    });
+
+    it("os turnos são por cidade E faixa, não por cidade apenas", () => {
+      expect(clause()).toContain(
+        "ROW_NUMBER() OVER (PARTITION BY a.city_id, priority_band ORDER BY"
+      );
+    });
+
+    it("o denominador é a capacidade da faixa, não o tamanho da página", () => {
+      const c = clause();
+      expect(c).toContain("LEAST(24, COUNT(*) OVER (PARTITION BY priority_band))");
+      expect(c).toContain("GREATEST(1, FLOOR(0.4 * LEAST(24,");
+      // guarda contra a regressão para o teto por página: 0.4 × 24 = 9 vagas,
+      // que numa faixa de 10 Destaques deixaria a cidade externa levar 9.
+      expect(c).not.toMatch(/\/ 9\b/);
+    });
+
+    it("a fração vem da política quando configurada", () => {
+      const c = buildEngineSortClause("relevance", {
+        hasOrigin: true,
+        hasText: false,
+        cityShareCap: { ...capOptions, ratio: 0.25 },
+      }).replace(/\s+/g, " ");
+      expect(c).toContain("FLOOR(0.25 * LEAST(24,");
+    });
+
+    it("sem origem ou fora de relevance, não há teto", () => {
+      expect(
+        buildEngineSortClause("relevance", { hasOrigin: false, hasText: false })
+      ).not.toContain("ROW_NUMBER");
+      expect(buildEngineSortClause("price_asc", { hasOrigin: true, hasText: false })).not.toContain(
+        "ROW_NUMBER"
+      );
+    });
+  });
 });
 
 describe("policy-cache — LRU em memória (instrução A, E4)", () => {

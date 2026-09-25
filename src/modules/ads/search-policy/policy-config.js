@@ -77,7 +77,8 @@ export const SEARCH_POLICY_DEFAULT = Object.freeze({
   // Como region_memberships é simétrica, o piso torna a vizinhança recíproca:
   // se B está a ≤ 25 km de A, os anúncios de B aparecem em A e os de A em B.
   regional_floor_km: 25,
-  // DEC-29 — teto de participação de uma cidade EXTERNA por página. Regra de
+  // DEC-29 — teto de participação de uma cidade EXTERNA, por FAIXA de peso: fração da
+  // capacidade da faixa (menor entre a página e os candidatos da faixa). Regra de
   // distribuição, não de truncamento: o excedente é adiado, e só perde a vaga
   // quando existe candidato de outra cidade para ocupá-la.
   city_share_cap: 0.4,
