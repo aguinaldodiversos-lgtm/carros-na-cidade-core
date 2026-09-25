@@ -83,6 +83,13 @@ describe.sequential("F2.2 — DEC-28/DEC-29: território (Postgres real)", () =>
     // mesma faixa de peso, o teto não teria o que redistribuir.
     for (let i = 0; i < 3; i++)
       await ad("Vgm", ids.advertisers.proBraganca, "vargem-sp", "Vargem", 55000);
+    // Faixa MENOR que a página, para separar os dois denominadores possíveis do
+    // teto (DEC-29). Modelo só desta faixa: 5 de Vargem (~15 km de Bragança) e
+    // 1 de Atibaia (~18 km), todos do mesmo peso. Vargem é a mais PERTO, então
+    // sem teto ela vem inteira antes — é o que torna o caso observável.
+    for (let i = 0; i < 5; i++)
+      await ad("Capz", ids.advertisers.proBraganca, "vargem-sp", "Vargem", 51000);
+    await ad("Capz", ids.advertisers.ittmotors, "atibaia-sp", "Atibaia", 52000);
   }, 300000);
 
   afterAll(async () => {
@@ -146,6 +153,22 @@ describe.sequential("F2.2 — DEC-28/DEC-29: território (Postgres real)", () =>
     const cidades = r.data.map(cityOf);
     expect(cidades.filter((c) => c === "Vargem").length).toBe(2);
     expect(cidades.filter((c) => c === "Atibaia").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("o teto mede pela CAPACIDADE da faixa, não pelo tamanho da página", async () => {
+    // 6 candidatos na faixa (5 Vargem + 1 Atibaia) e página de 24 vagas.
+    //   • por capacidade da faixa: teto = floor(0.4 × LEAST(24, 6)) = 2, então
+    //     Vargem entrega 2 e o Atibaia sobe para a 3ª posição;
+    //   • pelo tamanho da página: teto = floor(0.4 × 24) = 9, maior que a faixa
+    //     inteira, e os 5 Vargem viriam juntos por estarem mais perto.
+    // A posição do anúncio de Atibaia é, portanto, o que separa as duas leituras.
+    const r = await run({ city_slug: "braganca-paulista-sp", commercial_model: "Capz", limit: 24 });
+    expect(r.pagination.total).toBe(6);
+    const tiers = new Set(r.data.map((item) => Number(item.priority_tier)));
+    expect(tiers.size).toBe(1); // o caso só mede o teto se a faixa for uma só
+    const cidades = r.data.map(cityOf);
+    expect(cidades).toEqual(["Vargem", "Vargem", "Atibaia", "Vargem", "Vargem", "Vargem"]);
+    expect(cidades.indexOf("Atibaia")).toBe(2);
   });
 
   it("teto não trunca: sem alternativa, a página continua cheia", async () => {
