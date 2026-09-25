@@ -497,6 +497,85 @@ export function cityShareCapExpr({ originCityId, cap, textRankExpr }, orderParts
 }
 
 /**
+ * Chips de OFERTAS — Destaques, Oportunidades, Abaixo da FIPE (F3-B).
+ *
+ * Não são facetas adaptativas: não competem por `open_max`, não têm entropia e
+ * a sidebar sempre os desenha no mesmo bloco fixo. Por isso saem num bloco
+ * próprio (`offer_counts`) em vez de entrar no array de facetas.
+ *
+ * As EXPRESSÕES são as mesmas de `ads-filter.facets.js` de propósito: o número
+ * tem de significar a mesma coisa nos dois caminhos. O que muda é só o escopo —
+ * aqui é o CandidateScope com o território efetivo (DEC-08), lá é o escopo da
+ * cidade. Era exatamente essa divergência que fazia "Abaixo da FIPE (9)"
+ * aparecer ao lado de um grid regional de 4 resultados.
+ */
+const OFFER_COUNT_EXPRS = Object.freeze({
+  highlight: `${commercialLayerExpr} = 4`,
+  opportunity: opportunityExpr,
+  below_fipe: "a.below_fipe = true",
+});
+
+/** Filtro interno que cada chip representa (self-excluding, DEC-13). */
+const OFFER_FILTER_KEYS = Object.freeze({
+  highlight: "priority_tier",
+  opportunity: "opportunity",
+  below_fipe: "below_fipe",
+});
+
+export const OFFER_COUNT_KEYS = Object.freeze(Object.keys(OFFER_COUNT_EXPRS));
+
+/** Colunas `offer_*` para embutir na countQuery — zero round-trip a mais. */
+export function offerCountColumns() {
+  return OFFER_COUNT_KEYS.map(
+    (key) => `COUNT(*) FILTER (WHERE ${OFFER_COUNT_EXPRS[key]})::int AS offer_${key}`
+  ).join(",\n           ");
+}
+
+/**
+ * Chips que precisam de uma query própria para respeitar a DEC-13.
+ *
+ * Nem todo filtro ativo precisa: contar `X` dentro de um escopo já restrito a
+ * `X` dá o MESMO número que contar `X` sem a restrição — é a mesma interseção.
+ * A self-exclusion só muda a resposta quando o filtro ativo NEGA a condição
+ * contada, e aí sem ela o chip diria 0:
+ *
+ *   • `below_fipe=false` na URL   → zeraria "Abaixo da FIPE"
+ *   • `priority_tier` 1, 2 ou 3   → zeraria "Destaques" (que conta a camada 4)
+ *
+ * `opportunity` só entra no WHERE quando é `true`, que é exatamente a condição
+ * contada — nunca precisa. Na prática os três chips da sidebar mandam
+ * `below_fipe=true`, `opportunity=true` e `priority_tier=4`, então a interação
+ * normal do usuário não gasta nenhuma query extra.
+ */
+export function activeOfferKeys(filters = {}) {
+  const keys = [];
+  if (filters.below_fipe !== undefined && Boolean(filters.below_fipe) !== true) {
+    keys.push("below_fipe");
+  }
+  if (filters.priority_tier !== undefined && Number(filters.priority_tier) !== 4) {
+    keys.push("highlight");
+  }
+  return keys;
+}
+
+/**
+ * Contagem de UM chip ativo, sem a própria restrição (DEC-13, self-excluding).
+ * Sem isto, "Abaixo da FIPE" ativo mostraria o total do próprio filtro em vez
+ * de quantos anúncios o chip alcança — e o usuário perderia a informação de
+ * que existe algo fora dele.
+ */
+export function buildOfferCountQuery(scopeCtx, key) {
+  const scope = buildCandidateScope(scopeCtx, { exclude: [OFFER_FILTER_KEYS[key]] });
+  return {
+    sql: `
+    SELECT COUNT(*) FILTER (WHERE ${OFFER_COUNT_EXPRS[key]})::int AS count
+    FROM ads a ${scope.joins}
+    ${scope.whereClause}`,
+    params: scope.params,
+  };
+}
+
+/**
  * dataQuery + countQuery a partir do MESMO CandidateScope (§4.1).
  * countParams = só os parâmetros do WHERE (snapshot antes de rm/limit/offset).
  */
@@ -556,9 +635,12 @@ export function buildEngineQueries(ctx, scope) {
   // seller_count (DEC-27 / V3-INV-052) sai da MESMA query de `total`: mesmo
   // CandidateScope, mesmo território, antes do LIMIT/OFFSET, sem peso comercial
   // e sem round-trip a mais.
+  // Os três chips de OFERTAS (F3-B) entram na mesma varredura, pelo mesmo
+  // motivo: mesmo CandidateScope, mesmo território, sem round-trip a mais.
   const countQuery = `
     SELECT COUNT(*)::int AS total,
-           COUNT(DISTINCT a.advertiser_id)::int AS seller_count
+           COUNT(DISTINCT a.advertiser_id)::int AS seller_count,
+           ${offerCountColumns()}
     FROM ads a ${candidate.joins}
     ${candidate.whereClause}`;
 
@@ -764,13 +846,26 @@ export async function runSearchPolicyEngine(rawQuery, opts = {}) {
   const scope = await resolveScope(ctx, ctx.policy, { db, cache: opts.cache });
   const queries = buildEngineQueries(ctx, scope);
 
-  const [dataResult, countResult, facetsResult] = await Promise.all([
+  // Chip de oferta ATIVO conta sem a própria restrição (DEC-13). No caso comum
+  // — nenhum ativo — isto é uma lista vazia e nenhuma query extra.
+  const offerActive = activeOfferKeys(ctx.filters);
+  const offerQueries = offerActive.map((key) => buildOfferCountQuery(queries.scopeCtx, key));
+
+  const [dataResult, countResult, facetsResult, ...offerResults] = await Promise.all([
     db.query(queries.dataQuery, queries.params),
     db.query(queries.countQuery, queries.countParams),
     computeFacets(queries.scopeCtx, ctx.policy, { db }),
+    ...offerQueries.map((q) => db.query(q.sql, q.params)),
   ]);
   const total = Number(countResult.rows[0]?.total || 0);
   const sellerCount = Number(countResult.rows[0]?.seller_count || 0);
+
+  const offerCounts = Object.fromEntries(
+    OFFER_COUNT_KEYS.map((key) => [key, Number(countResult.rows[0]?.[`offer_${key}`] || 0)])
+  );
+  offerActive.forEach((key, i) => {
+    offerCounts[key] = Number(offerResults[i]?.rows[0]?.count || 0);
+  });
 
   const relax = await computeRelaxations(ctx, scope, total, ctx.policy, { db, cache: opts.cache });
 
@@ -797,6 +892,7 @@ export async function runSearchPolicyEngine(rawQuery, opts = {}) {
     search_policy: buildSearchPolicyBlock(ctx, scope, total, flagMode),
     chips: buildChips(ctx, scope),
     facets: facetsResult.facets,
+    offer_counts: offerCounts,
     relaxations: relax.relaxations,
   };
 
@@ -812,7 +908,7 @@ export async function runSearchPolicyEngine(rawQuery, opts = {}) {
       cacheBackend: policyCacheBackend(),
     });
     payload.engine_ms = Date.now() - started;
-    payload.queries = 2 + facetsResult.queries + relax.queries + 1;
+    payload.queries = 2 + facetsResult.queries + relax.queries + 1 + offerQueries.length;
     recordSearchExecuted({ path: opts.path, ctx, payload }, { db }).catch(() => {});
   }
 

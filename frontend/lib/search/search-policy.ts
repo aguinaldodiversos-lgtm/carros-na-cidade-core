@@ -144,28 +144,51 @@ export function territoryNotice(policy: SearchPolicySummary | null): string | nu
     : `${base}, incluindo ${neighbours} cidades vizinhas`;
 }
 
+export type EngineOfferCounts = { opportunity: number; below_fipe: number; highlight: number };
+
 export type EngineControlTotals = {
   sellerKind?: { dealer: number; private: number };
-  offers?: { opportunity: number; below_fipe: number; highlight: number };
+  offers?: EngineOfferCounts;
   transmission?: Record<string, number>;
 };
+
+/**
+ * Bloco `offer_counts` do motor (F3-B): Destaques, Oportunidades e Abaixo da
+ * FIPE contados sobre o MESMO CandidateScope do grid.
+ *
+ * `null` quando o bloco não veio — motor antigo ou caminho legado. Devolver
+ * zeros nesse caso seria pior que devolver nada: "Destaques (0)" afirma que não
+ * existe destaque nenhum, quando a verdade é que ninguém contou.
+ */
+export function readOfferCounts(raw: unknown): EngineOfferCounts | null {
+  const block = asRecord(raw);
+  if (!block) return null;
+  const opportunity = asNumber(block.opportunity);
+  const belowFipe = asNumber(block.below_fipe);
+  const highlight = asNumber(block.highlight);
+  if (opportunity === null || belowFipe === null || highlight === null) return null;
+  return { opportunity, below_fipe: belowFipe, highlight };
+}
 
 /**
  * Contagens dos controles da sidebar a partir das facetas do MOTOR.
  *
  * `null` quando o motor não respondeu — aí quem manda é a facet do BFF legado.
- * `offers` fica `undefined` de propósito: o motor ainda não calcula Destaques,
- * Oportunidades e Abaixo da FIPE, e a sidebar renderiza sem número quando o
- * dado falta. Exibir o número da cidade ao lado de um grid regional seria
- * mentir com confiança — que é justamente o defeito que esta camada corrige.
+ * `offers` continua `undefined` quando o motor não mandou `offer_counts`: a
+ * sidebar renderiza o chip sem número, que é o certo quando ninguém contou.
+ * Repetir ali o número da cidade ao lado de um grid regional seria mentir com
+ * confiança — o defeito que esta camada existe para corrigir.
  */
-export function engineControlTotals(facets: SearchPolicyFacet[]): EngineControlTotals | null {
+export function engineControlTotals(
+  facets: SearchPolicyFacet[],
+  offers: EngineOfferCounts | null = null
+): EngineControlTotals | null {
   if (!facets.length) return null;
   const sellers = facetCounts(facets, "seller_kind");
   const transmissions = facetCounts(facets, "transmission");
   return {
     sellerKind: { dealer: sellers.dealer ?? 0, private: sellers.private ?? 0 },
-    offers: undefined,
+    offers: offers ?? undefined,
     transmission: Object.keys(transmissions).length > 0 ? transmissions : undefined,
   };
 }
