@@ -59,14 +59,12 @@ export function resolveSellerKind(item: SellerKindInput | null | undefined): Sel
   const accountType = String(item.account_type || "")
     .trim()
     .toUpperCase();
-  if (accountType === "CNPJ") return "dealer";
-  if (accountType === "CPF") return "private";
 
-  // 3. Fallback: conta legada sem documento — `company_name` (exposto como
-  //    `dealership_name`) só existe em conta de loja.
-  if (String(item.dealership_name || "").trim() !== "") return "dealer";
-
-  return "private";
+  // Sem CNPJ, é particular — inclusive quando o documento não veio. Padrão
+  // seguro: errar para menos não promete uma loja que não existe. O
+  // desempate por `company_name` foi removido junto com o do backend (ver
+  // `deriveSellerKind`): nenhuma conta sem documento tem anúncio.
+  return accountType === "CNPJ" ? "dealer" : "private";
 }
 
 /**

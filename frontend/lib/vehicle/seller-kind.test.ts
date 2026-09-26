@@ -64,14 +64,12 @@ describe("resolveSellerKind — dealership_id não é sinal de tipo", () => {
   });
 });
 
-describe("resolveSellerKind — fallback company_name", () => {
-  // `dealership_name` é `advertisers.company_name`, que só conta de loja tem —
-  // diferente de `seller_name`, que é o nome de qualquer anunciante.
-  it("sem documento, company_name preenchido → dealer", () => {
-    expect(resolveSellerKind({ dealership_name: "AutoCar Veículos" })).toBe("dealer");
+describe("resolveSellerKind — documento é a fonte única", () => {
+  it("sem documento → private, mesmo com company_name preenchido", () => {
+    expect(resolveSellerKind({ dealership_name: "AutoCar Veículos" })).toBe("private");
   });
 
-  it("documento vence o nome: CPF com company_name → private", () => {
+  it("CPF com company_name → private", () => {
     expect(resolveSellerKind({ account_type: "CPF", dealership_name: "AutoCar" })).toBe("private");
   });
 });
