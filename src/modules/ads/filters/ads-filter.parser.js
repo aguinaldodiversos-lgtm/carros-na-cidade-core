@@ -87,8 +87,50 @@ function normalizeHighlightFilter(data) {
  * Mantém a regra atual de city_slug intacta — pré-requisito da trava
  * "não quebrar city_slug atual".
  */
+/**
+ * Parâmetros territoriais do Search Policy Engine (`origem`, `raio`, `escopo`,
+ * `origem_src`) numa requisição que o motor NÃO atendeu — flag `off`, origem
+ * fora da allowlist, falha do motor, ou rota que nem chama o motor
+ * (`GET /api/ads` e `/api/ads/facets`).
+ *
+ * O caminho legado não sabe honrá-los, e simplesmente ignorá-los AMPLIAVA o
+ * escopo em silêncio: `?origem=mairipora-sp&raio=0` — que pede UMA cidade —
+ * devolvia os 36 anúncios do país, e `?origem=condado-pb&raio=25` devolvia os
+ * mesmos 36. Parâmetro que o servidor não entende nunca pode alargar o
+ * recorte; no máximo estreitar.
+ *
+ * Resolução: `origem` vira o território (`city_slug`) quando a requisição não
+ * trouxe território explícito, e os demais caem. O resultado é igual ou mais
+ * estreito que o pedido — nunca mais largo.
+ *
+ * Por que não 400: `/api/ads/search` cai aqui justamente quando uma cidade
+ * nova ainda não está na allowlist do motor. Responder 400 quebraria a página
+ * dessa cidade; estreitar para a própria cidade a mantém correta e honesta.
+ */
+function applyUnhonoredEngineTerritory(data) {
+  const engineKeys = ["origem", "origem_src", "raio", "escopo"];
+  if (!engineKeys.some((k) => data[k] != null && data[k] !== "")) return data;
+
+  const next = { ...data };
+  const origem = typeof next.origem === "string" ? next.origem.trim() : "";
+  const temTerritorioExplicito =
+    (typeof next.city_slug === "string" && next.city_slug.trim() !== "") ||
+    (Array.isArray(next.city_slugs) && next.city_slugs.length > 0) ||
+    next.city_id != null ||
+    (typeof next.city === "string" && next.city.trim() !== "");
+
+  if (origem && !temTerritorioExplicito) {
+    next.city_slug = origem;
+  }
+
+  for (const k of engineKeys) delete next[k];
+  return next;
+}
+
 function normalizeTerritoryFilters(data) {
   if (!data || typeof data !== "object") return data;
+
+  data = applyUnhonoredEngineTerritory(data);
 
   // Strip defensivo: base_city_id NUNCA é input público. Idem base_city_slug.
   // Belt-and-suspenders contra futuros consumers que esquecam de filtrar.

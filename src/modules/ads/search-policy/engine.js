@@ -975,9 +975,27 @@ export function findUnsupportedParams(rawQuery = {}) {
 }
 
 export async function runSearchPolicyEngineIfAllowed(rawQuery, opts = {}) {
-  if (findUnsupportedParams(rawQuery).length > 0) return null;
+  const unsupported = findUnsupportedParams(rawQuery);
+  if (unsupported.length > 0) {
+    logger.info(
+      { unsupported, path: opts.path },
+      "[search-policy] v1 não atendeu: parâmetro fora do contrato do motor"
+    );
+    return null;
+  }
   const ctx = await buildSearchContext(rawQuery, { db: opts.db, policy: opts.policy });
-  if (!isOriginAllowed(ctx.origin?.slug)) return null;
+  if (!isOriginAllowed(ctx.origin?.slug)) {
+    // Sem este log, cidade nova fora da allowlist cai no caminho legado em
+    // silêncio: foi o que aconteceu com piracaia-sp e mairipora-sp, que
+    // serviram só o próprio estoque por horas sem nenhum sinal — a página
+    // parecia funcionar e o motor parecia ligado. Ver
+    // SEARCH_POLICY_ENGINE_CITIES (env do Render, fora do render.yaml).
+    logger.warn(
+      { origin: ctx.origin?.slug || null, path: opts.path },
+      "[search-policy] v1 não atendeu: origem fora da allowlist — respondendo pelo caminho legado"
+    );
+    return null;
+  }
   return runSearchPolicyEngine(rawQuery, { ...opts, policy: ctx.policy });
 }
 
