@@ -92,29 +92,39 @@ export function isReviewedAfterBelowFipe(row) {
  * Tipo canônico do anunciante para exibição pública.
  *
  * Regra (mais forte → mais fraca):
- *   1. dealership_id válido → "dealer" (registro em advertisers existe)
- *   2. account_type === 'CNPJ' → "dealer" (loja sem advertiser ainda
- *      cadastrado, mas o usuário é CNPJ; mantemos como loja para evitar
- *      que CNPJ apareça como particular)
+ *   1. account_type === 'CNPJ' → "dealer" (documento do dono da conta)
+ *   2. dealership_name preenchido → "dealer" (é `advertisers.company_name`,
+ *      que só existe em conta de loja; cobre lojas antigas sem
+ *      `document_type` gravado)
  *   3. caso contrário → "private"
  *
- * NÃO usamos `dealership_name`/`seller_name` heurístico — frontend já
- * caía nessa armadilha (nome "ittmotors" exibido como particular). A
- * fonte é estritamente o id do registro `advertisers` + document_type
- * do dono.
+ * `dealership_id` NÃO entra: ele é `advertisers.id`, e TODO anúncio pende de
+ * um advertiser — `ads` não tem `user_id`, o vínculo de dono é só o
+ * `advertiser_id`. Enquanto a regra 1 foi "dealership_id > 0 → dealer", ela
+ * era verdadeira para todo mundo: anúncio de pessoa física saía com selo
+ * "LOJA" e pílula "Loja parceira", e o teste de CNPJ abaixo era inalcançável
+ * (produção, 2026-09-25: anúncio 124, advertiser 70, `document_type='cpf'`,
+ * `company_name=null`, servido como `seller_kind:"dealer"`).
+ *
+ * Também não usamos `seller_name`: é o nome do anunciante, não o tipo — uma
+ * pessoa física pode se chamar como uma loja e vice-versa. `company_name` é
+ * diferente: só a conta de loja tem.
  */
 export function deriveSellerKind(row) {
   if (!row) return "private";
-
-  const dealershipId = Number(row.dealership_id);
-  if (Number.isInteger(dealershipId) && dealershipId > 0) {
-    return "dealer";
-  }
 
   const accountType = String(row.account_type || "")
     .trim()
     .toUpperCase();
   if (accountType === "CNPJ") {
+    return "dealer";
+  }
+  if (accountType === "CPF") {
+    return "private";
+  }
+
+  // Sem documento gravado (contas legadas): `company_name` decide.
+  if (String(row.dealership_name || "").trim() !== "") {
     return "dealer";
   }
 

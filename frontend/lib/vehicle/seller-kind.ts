@@ -8,8 +8,8 @@
  *
  * Fallback (apenas para payloads antigos que ainda não passaram pelo trust
  * pass — possível em cache stale durante deploy de transição):
- *   1. dealership_id válido → "dealer"
- *   2. account_type === 'CNPJ' → "dealer"
+ *   1. account_type === 'CNPJ' → "dealer"; 'CPF' → "private"
+ *   2. sem documento: dealership_name (company_name) preenchido → "dealer"
  *   3. caso contrário → "private"
  *
  * NÃO USAMOS heurística por nome (`dealership_name`, `seller_name`,
@@ -29,10 +29,15 @@ type SellerKindInput = {
   seller_kind?: string | null;
   /** Compat com frontend legado (mesma string). */
   seller_type?: string | null;
-  /** Fallback 1: id da advertisers row (loja registrada). */
-  dealership_id?: string | number | null;
-  /** Fallback 2: 'CPF' | 'CNPJ' (do users.document_type). */
+  /** Fallback 1: 'CPF' | 'CNPJ' (do users.document_type). */
   account_type?: string | null;
+  /** Fallback 2: `advertisers.company_name` — só conta de loja tem. */
+  dealership_name?: string | null;
+  /**
+   * Presente no payload por compatibilidade, mas NÃO é sinal de tipo: é
+   * `advertisers.id`, que todo anúncio possui, inclusive os de PF.
+   */
+  dealership_id?: string | number | null;
 };
 
 function asString(value: unknown): string {
@@ -47,19 +52,19 @@ export function resolveSellerKind(item: SellerKindInput | null | undefined): Sel
   if (kindFromBackend === "dealer" || kindFromBackend === "dealership") return "dealer";
   if (kindFromBackend === "private" || kindFromBackend === "particular") return "private";
 
-  // 2. Fallback: dealership_id existe e é válido → loja registrada.
-  const dealershipIdRaw = item.dealership_id;
-  if (dealershipIdRaw != null && dealershipIdRaw !== "") {
-    const id = typeof dealershipIdRaw === "number" ? dealershipIdRaw : Number(dealershipIdRaw);
-    if (Number.isFinite(id) && id > 0) return "dealer";
-  }
-
-  // 3. Fallback: CNPJ sem advertiser ainda — tratar como loja para
-  //    evitar que CNPJ apareça como particular.
+  // 2. Fallback: documento da conta. `dealership_id` NÃO serve — é
+  //    `advertisers.id`, e todo anúncio tem um, inclusive os de pessoa
+  //    física, então ele classificava qualquer anúncio como loja (mesmo
+  //    defeito que havia no backend, corrigido em `deriveSellerKind`).
   const accountType = String(item.account_type || "")
     .trim()
     .toUpperCase();
   if (accountType === "CNPJ") return "dealer";
+  if (accountType === "CPF") return "private";
+
+  // 3. Fallback: conta legada sem documento — `company_name` (exposto como
+  //    `dealership_name`) só existe em conta de loja.
+  if (String(item.dealership_name || "").trim() !== "") return "dealer";
 
   return "private";
 }

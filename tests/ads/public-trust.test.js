@@ -102,8 +102,27 @@ describe("isReviewedAfterBelowFipe — selo 'Anúncio analisado'", () => {
 });
 
 describe("deriveSellerKind", () => {
-  it("dealership_id válido → dealer", () => {
-    expect(deriveSellerKind({ dealership_id: 42 })).toBe("dealer");
+  // REGRA INVERTIDA em 2026-09-25. Antes: "dealership_id válido → dealer".
+  // Como `ads` não tem `user_id` e todo anúncio pende de um advertiser,
+  // aquilo classificava TODO anúncio como loja — inclusive os de pessoa
+  // física, que saíam com badge "LOJA" e pílula "Loja parceira".
+  it("dealership_id sozinho NÃO é prova de loja: todo anúncio tem advertiser", () => {
+    expect(deriveSellerKind({ dealership_id: 42 })).toBe("private");
+  });
+
+  it("regressão de produção: PF com advertiser próprio → private", () => {
+    // Anúncio 124 (Mairiporã): advertiser 70, users.document_type='cpf',
+    // advertisers.company_name=null. Era servido como seller_kind:"dealer".
+    expect(
+      deriveSellerKind({ dealership_id: 70, account_type: "cpf", dealership_name: null })
+    ).toBe("private");
+  });
+
+  it("loja real: CNPJ com advertiser → dealer", () => {
+    // Advertiser 64 (Ittmotors), document_type='cnpj', company_name='Ittmotors'.
+    expect(
+      deriveSellerKind({ dealership_id: 64, account_type: "cnpj", dealership_name: "Ittmotors" })
+    ).toBe("dealer");
   });
 
   it("account_type CNPJ sem dealership_id → dealer", () => {
@@ -114,13 +133,22 @@ describe("deriveSellerKind", () => {
     expect(deriveSellerKind({ account_type: "CPF" })).toBe("private");
   });
 
-  it("nada além de dealership_name → private (não usar heurística por nome)", () => {
-    expect(deriveSellerKind({ dealership_name: "AutoCar" })).toBe("private");
+  // Também invertido: `dealership_name` é `advertisers.company_name`, que só
+  // existe em conta de loja — diferente de `seller_name`, que é o nome de
+  // qualquer anunciante. Serve de desempate para contas legadas sem
+  // `document_type` gravado (56 em produção).
+  it("sem documento, company_name preenchido → dealer", () => {
+    expect(deriveSellerKind({ dealership_name: "AutoCar" })).toBe("dealer");
   });
 
-  it("dealership_id zero/string vazia NÃO conta", () => {
+  it("documento vence o nome: CPF com company_name preenchido → private", () => {
+    expect(deriveSellerKind({ account_type: "CPF", dealership_name: "AutoCar" })).toBe("private");
+  });
+
+  it("sem documento e sem company_name → private", () => {
     expect(deriveSellerKind({ dealership_id: 0 })).toBe("private");
     expect(deriveSellerKind({ dealership_id: "" })).toBe("private");
+    expect(deriveSellerKind({ dealership_id: 99, dealership_name: "   " })).toBe("private");
   });
 });
 
@@ -138,6 +166,9 @@ describe("applyPublicTrustFields — sanitização", () => {
     correction_requested_reason: "interno",
     structural_change_count: 4,
     dealership_id: 42,
+    // O que faz desta row uma LOJA é o documento da conta, não o
+    // `dealership_id` — que todo anúncio tem, inclusive os de PF.
+    account_type: "cnpj",
   };
 
   it("remove campos internos sensíveis (risk_*, reviewed_by, rejection_reason)", () => {
