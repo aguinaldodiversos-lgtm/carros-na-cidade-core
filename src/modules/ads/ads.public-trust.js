@@ -91,12 +91,16 @@ export function isReviewedAfterBelowFipe(row) {
 /**
  * Tipo canônico do anunciante para exibição pública.
  *
- * Regra (mais forte → mais fraca):
- *   1. account_type === 'CNPJ' → "dealer" (documento do dono da conta)
- *   2. dealership_name preenchido → "dealer" (é `advertisers.company_name`,
- *      que só existe em conta de loja; cobre lojas antigas sem
- *      `document_type` gravado)
- *   3. caso contrário → "private"
+ * FONTE ÚNICA: `account_type`, que é `users.document_type`.
+ *   CNPJ → "dealer"; qualquer outra coisa (inclusive ausente) → "private".
+ *
+ * O desempate por `company_name` que existiu brevemente aqui foi removido:
+ * levantamento em produção (2026-09-25) mostrou que as 56 contas sem
+ * `document_type` não têm `document_number` — não há o que inferir — e
+ * nenhuma delas tem advertiser, logo nenhuma consegue ter anúncio. A muleta
+ * não protegia ninguém e criava uma segunda fonte de verdade para o selo.
+ * Conta sem documento cai em "private", que é o padrão seguro: errar para
+ * menos não promete ao comprador uma loja que não existe.
  *
  * `dealership_id` NÃO entra: ele é `advertisers.id`, e TODO anúncio pende de
  * um advertiser — `ads` não tem `user_id`, o vínculo de dono é só o
@@ -116,19 +120,8 @@ export function deriveSellerKind(row) {
   const accountType = String(row.account_type || "")
     .trim()
     .toUpperCase();
-  if (accountType === "CNPJ") {
-    return "dealer";
-  }
-  if (accountType === "CPF") {
-    return "private";
-  }
 
-  // Sem documento gravado (contas legadas): `company_name` decide.
-  if (String(row.dealership_name || "").trim() !== "") {
-    return "dealer";
-  }
-
-  return "private";
+  return accountType === "CNPJ" ? "dealer" : "private";
 }
 
 /**

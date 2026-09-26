@@ -133,12 +133,12 @@ describe("deriveSellerKind", () => {
     expect(deriveSellerKind({ account_type: "CPF" })).toBe("private");
   });
 
-  // Também invertido: `dealership_name` é `advertisers.company_name`, que só
-  // existe em conta de loja — diferente de `seller_name`, que é o nome de
-  // qualquer anunciante. Serve de desempate para contas legadas sem
-  // `document_type` gravado (56 em produção).
-  it("sem documento, company_name preenchido → dealer", () => {
-    expect(deriveSellerKind({ dealership_name: "AutoCar" })).toBe("dealer");
+  // Documento é a FONTE ÚNICA. O desempate por company_name foi removido:
+  // as 56 contas sem document_type em produção não têm document_number nem
+  // advertiser, então nenhuma consegue ter anúncio — a muleta não protegia
+  // ninguém e criava uma segunda fonte de verdade.
+  it("sem documento → private, mesmo com company_name preenchido", () => {
+    expect(deriveSellerKind({ dealership_name: "AutoCar" })).toBe("private");
   });
 
   it("documento vence o nome: CPF com company_name preenchido → private", () => {
