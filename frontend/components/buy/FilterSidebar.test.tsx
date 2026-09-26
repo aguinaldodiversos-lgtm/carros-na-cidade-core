@@ -227,11 +227,14 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
   // Na página de cidade isso é a URL corrente, então o clique era um no-op — e
   // mesmo navegando o motor compõe a região pelo piso de DEC-29. Quem isola é
   // `raio=0` (EXACT_CITY).
-  it("atalho de cidade pede raio=0 (é o que significa 'Apenas')", () => {
+  it("atalho de cidade pede raio=0 e mostra o nome da cidade", () => {
     renderSidebar({}, vi.fn());
     const cityLink = screen.getByTestId("sidebar-city-link");
     expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp?raio=0");
-    expect(cityLink.textContent).toContain("Apenas");
+    expect(cityLink.textContent).toContain("Atibaia");
+    // A ação fica no title: a coluna tem ~133px na sidebar de 296px e não
+    // cabe frase, só o nome (truncado quando o nome é longo).
+    expect(cityLink.getAttribute("title")).toBe("Apenas Atibaia");
   });
 
   it("com raio=0 ativo o atalho inverte: volta para cidade e região", () => {
@@ -239,6 +242,23 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
     const cityLink = screen.getByTestId("sidebar-city-link");
     expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp");
     expect(cityLink.textContent).toContain("e região");
+    expect(cityLink.getAttribute("title")).toBe("Ver Atibaia e região");
+  });
+
+  // O defeito visual de 2026-09-25: "Ver Bragança Paulista e região" quebrava
+  // em três linhas e invadia o filtro MARCA. A correção é truncar no desktop,
+  // e o truncamento só funciona se o `min-w-0` estiver na cadeia inteira —
+  // item do grid, link e span.
+  it("o rótulo é truncável no desktop (min-w-0 na cadeia + truncate)", () => {
+    renderSidebar({}, vi.fn());
+    const cityLink = screen.getByTestId("sidebar-city-link");
+    const span = cityLink.querySelector("span");
+    expect(cityLink.className).toContain("lg:min-w-0");
+    expect(cityLink.parentElement?.className).toContain("lg:min-w-0");
+    expect(span?.className).toContain("lg:truncate");
+    expect(span?.className).toContain("lg:min-w-0");
+    // tudo com prefixo lg: — abaixo disso quem renderiza é o drawer mobile
+    expect(span?.className).not.toMatch(/(^|\s)truncate/);
   });
 
   it("o atalho NUNCA aponta para a URL em que o visitante já está", () => {

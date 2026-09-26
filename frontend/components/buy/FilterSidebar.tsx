@@ -508,6 +508,14 @@ export function FilterSidebar({
   // lado.
   const cityOnly = filters.raio === 0;
   const cityOnlyHref = `/carros-em/${encodeURIComponent(currentCitySlug)}${cityOnly ? "" : "?raio=0"}`;
+  const cityOnlyTitulo = cityOnly
+    ? `Ver ${currentCityName || currentCitySlug} e região`
+    : `Apenas ${currentCityName || currentCitySlug}`;
+  // Rótulo curto porque a coluna tem ~133px na sidebar de 296px. O estado
+  // padrão mostra o nome da cidade (é o que o campo "Cidade" quer dizer); o
+  // isolado não repete o nome, senão o truncamento comeria justamente o "e
+  // região", que é o que o clique faz. A frase inteira fica no `title`.
+  const cityOnlyRotulo = cityOnly ? "Cidade e região" : currentCityName || currentCitySlug;
 
   // Anos: De/Até como dropdowns (mock de referência) com validação De ≤ Até.
   const yearOptions = useMemo(() => {
@@ -765,7 +773,11 @@ export function FilterSidebar({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-3.5 min-[360px]:grid-cols-2">
+            {/* No desktop (sidebar de 296px) o nome da cidade não cabe em
+                metade da linha e quebrava em três linhas, invadindo MARCA.
+                `lg:` porque a sidebar só existe a partir daí — abaixo disso
+                quem renderiza é o drawer (`lg:hidden`), que fica intacto. */}
+            <div className="grid grid-cols-1 gap-3.5 min-[360px]:grid-cols-2 lg:grid-cols-[2fr_3fr]">
               <SelectField
                 label="Estado"
                 id="fs-state"
@@ -775,7 +787,7 @@ export function FilterSidebar({
                 lead={<PinIcon />}
               />
               {currentCitySlug ? (
-                <div className="space-y-2">
+                <div className="space-y-2 lg:min-w-0">
                   <p className="block text-[12px] font-semibold uppercase tracking-[0.07em] text-cnc-muted">
                     Cidade
                   </p>
@@ -783,12 +795,11 @@ export function FilterSidebar({
                     href={cityOnlyHref}
                     data-testid="sidebar-city-link"
                     aria-pressed={cityOnly}
-                    className="flex h-[52px] w-full items-center justify-between rounded-xl border border-cnc-line-strong bg-cnc-surface px-4 text-[15px] font-semibold text-primary transition hover:border-primary motion-reduce:transition-none"
+                    title={cityOnlyTitulo}
+                    className="flex h-[52px] w-full items-center justify-between rounded-xl border border-cnc-line-strong bg-cnc-surface px-4 text-[15px] font-semibold text-primary transition hover:border-primary motion-reduce:transition-none lg:min-w-0"
                   >
-                    {cityOnly
-                      ? `Ver ${currentCityName || currentCitySlug} e região`
-                      : `Apenas ${currentCityName || currentCitySlug}`}
-                    <ChevronDownIcon className="h-[18px] w-[18px] -rotate-90 text-cnc-muted" />
+                    <span className="lg:min-w-0 lg:truncate">{cityOnlyRotulo}</span>
+                    <ChevronDownIcon className="h-[18px] w-[18px] -rotate-90 text-cnc-muted lg:shrink-0" />
                   </Link>
                 </div>
               ) : null}
