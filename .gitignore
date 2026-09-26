@@ -34,3 +34,6 @@ scripts/data/*.json
 
 # Snapshots locais de produção (dados reais — nunca versionar)
 .local/
+
+# Estado local do seed de E2E (gerado por scripts de teste, aponta para o banco local)
+frontend/e2e/.seed-state.json
