@@ -496,3 +496,32 @@ describe("filtros canônicos — roundtrip build → parse", () => {
     expect(parsed.brand).toBe("Honda");
   });
 });
+
+/**
+ * Raio explícito (regressão 2026-09-25).
+ *
+ * `raio=0` significa "apenas esta cidade" (EXACT_CITY, DEC-05/DEC-19/DEC-24) e
+ * vence o piso regional de DEC-29. Como 0 é falsy, ele morria em qualquer
+ * tratamento por veracidade — e sem ele o atalho "Apenas {cidade}" não tinha
+ * como isolar nada.
+ */
+describe("raio", () => {
+  it("parseia raio=0 como 0, não como ausente", () => {
+    const parsed = parseAdsSearchFiltersFromSearchParams(new URLSearchParams("raio=0"));
+    expect(parsed.raio).toBe(0);
+  });
+
+  it("parseia raio numérico e ignora lixo ou fora do teto de 150", () => {
+    expect(parseAdsSearchFiltersFromSearchParams(new URLSearchParams("raio=25")).raio).toBe(25);
+    expect(
+      parseAdsSearchFiltersFromSearchParams(new URLSearchParams("raio=abc")).raio
+    ).toBeUndefined();
+    expect(
+      parseAdsSearchFiltersFromSearchParams(new URLSearchParams("raio=999")).raio
+    ).toBeUndefined();
+    expect(
+      parseAdsSearchFiltersFromSearchParams(new URLSearchParams("raio=-1")).raio
+    ).toBeUndefined();
+    expect(parseAdsSearchFiltersFromSearchParams(new URLSearchParams("")).raio).toBeUndefined();
+  });
+});

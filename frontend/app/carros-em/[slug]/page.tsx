@@ -104,13 +104,18 @@ export default async function CarrosEmCidadePage({ params, searchParams = {} }: 
   // Fase 5.0B — catálogo limpo. Caíram daqui, junto com os blocos que
   // alimentavam, `loadNearbyRadiusAds` e `loadCitySeoOverview`: eram duas
   // chamadas de rede por request servindo conteúdo que a página não renderiza
-  // mais. `?raio=` deixa de ser lido porque o único consumidor era o bloco
-  // "Próximos".
+  // mais. Sobram DUAS cargas: o conteúdo local (metadata + JSON-LD) e o
+  // catálogo.
   //
-  // Sobram DUAS cargas: o conteúdo local (metadata + JSON-LD) e o catálogo.
+  // `?raio=` voltou a ser lido (via `normalizeCityFilters`). A 5.0B o removeu
+  // porque o único consumidor era o bloco "Próximos"; depois disso o Search
+  // Policy Engine entrou em v1 e passou a compor a região pelo piso de DEC-29,
+  // e sem o parâmetro a página não tinha como pedir "apenas esta cidade" —
+  // o atalho da sidebar apontava para a própria URL e não filtrava nada.
   const [model, catalog] = await Promise.all([
     loadSeoModel(slug),
-    // applyTerritoryFallback=false: o catálogo é só a própria cidade (0 km).
+    // applyTerritoryFallback=false: sem raio explícito, o território de quem
+    // decide é o motor (AUTO_RADIUS + piso); com `raio=0`, EXACT_CITY.
     loadCityCatalogData(slug, searchParams, { applyTerritoryFallback: false }),
   ]);
 

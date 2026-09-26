@@ -175,3 +175,14 @@ describe("fetchAdsFacets — facets de controle (sellerKinds/transmissions/offer
     expect(res.facets.sellerKinds ?? []).toHaveLength(2);
   });
 });
+
+describe("buildAdsSearchParams — raio", () => {
+  it("emite raio=0 (o valor que isola a cidade) e não o descarta como falsy", () => {
+    expect(buildAdsSearchParams({ city_slug: "mairipora-sp", raio: 0 }).get("raio")).toBe("0");
+  });
+
+  it("emite raio numérico e omite quando ausente", () => {
+    expect(buildAdsSearchParams({ city_slug: "mairipora-sp", raio: 25 }).get("raio")).toBe("25");
+    expect(buildAdsSearchParams({ city_slug: "mairipora-sp" }).get("raio")).toBeNull();
+  });
+});

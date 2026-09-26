@@ -223,11 +223,38 @@ describe("FilterSidebar — seções do briefing 2026-05-22", () => {
     expect(screen.queryByTestId("sidebar-distance-slider")).toBeNull();
   });
 
-  it("seção Localização renderiza atalho 'Apenas [cidade]' quando há cidade no contexto", () => {
+  // Regressão 2026-09-25: o atalho apontava para `/carros-em/{slug}` puro.
+  // Na página de cidade isso é a URL corrente, então o clique era um no-op — e
+  // mesmo navegando o motor compõe a região pelo piso de DEC-29. Quem isola é
+  // `raio=0` (EXACT_CITY).
+  it("atalho de cidade pede raio=0 (é o que significa 'Apenas')", () => {
     renderSidebar({}, vi.fn());
     const cityLink = screen.getByTestId("sidebar-city-link");
-    expect(cityLink).toBeTruthy();
+    expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp?raio=0");
+    expect(cityLink.textContent).toContain("Apenas");
+  });
+
+  it("com raio=0 ativo o atalho inverte: volta para cidade e região", () => {
+    renderSidebar({ raio: 0 }, vi.fn());
+    const cityLink = screen.getByTestId("sidebar-city-link");
     expect(cityLink.getAttribute("href")).toBe("/carros-em/atibaia-sp");
+    expect(cityLink.textContent).toContain("e região");
+  });
+
+  it("o atalho NUNCA aponta para a URL em que o visitante já está", () => {
+    // Nos dois estados o destino tem de diferir da URL corrente, senão o
+    // controle volta a ser um no-op — o defeito original.
+    const semRaio = (() => {
+      renderSidebar({}, vi.fn());
+      const href = screen.getByTestId("sidebar-city-link").getAttribute("href");
+      cleanup();
+      return href;
+    })();
+    renderSidebar({ raio: 0 }, vi.fn());
+    const comRaio = screen.getByTestId("sidebar-city-link").getAttribute("href");
+    expect(semRaio).not.toBe("/carros-em/atibaia-sp");
+    expect(comRaio).not.toBe("/carros-em/atibaia-sp?raio=0");
+    expect(semRaio).not.toBe(comRaio);
   });
 
   // Briefing P0 2026-05-24 removeu Opcionais/Cor/"Apenas com foto" do

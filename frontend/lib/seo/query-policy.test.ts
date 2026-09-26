@@ -147,6 +147,11 @@ describe("paginação", () => {
 describe("filtros arbitrários", () => {
   it.each([
     "raio=25",
+    // `raio=0` é o atalho "Apenas {cidade}" da sidebar. Vale o mesmo: é
+    // recorte da mesma cidade, não pode virar uma segunda URL indexável —
+    // e o `0`, sendo falsy, é exatamente o caso que escaparia de um
+    // tratamento por veracidade.
+    "raio=0",
     "radius=75",
     "seller_kind=dealer",
     "opportunity=true",

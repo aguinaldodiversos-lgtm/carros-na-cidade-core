@@ -116,6 +116,18 @@ function toPriorityTierFromString(value: string | null): 1 | 2 | 3 | 4 | undefin
   return undefined;
 }
 
+/**
+ * `raio` da URL → número. `"0"` é válido e significa "apenas esta cidade"
+ * (EXACT_CITY), então NÃO pode cair no teste de veracidade junto com `""`.
+ * Teto de 150 km espelha o máximo que o motor aceita (DEC-11/DEC-23).
+ */
+function toRadiusFromString(value: string | null): number | undefined {
+  if (value == null || String(value).trim() === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 150) return undefined;
+  return Math.trunc(n);
+}
+
 function toSellerKindFromString(value: string | null): "dealer" | "private" | undefined {
   if (!value) return undefined;
   // Case-sensitive deliberadamente: espelha o schema Zod do backend
@@ -181,6 +193,7 @@ export function parseAdsSearchFiltersFromSearchParams(
     city_slugs: readCitySlugsFromSearchParams(searchParams),
     city: toStringOrUndefined(searchParams.get("city")),
     state: toStringOrUndefined(searchParams.get("state")),
+    raio: toRadiusFromString(searchParams.get("raio")),
     min_price: toNumber(searchParams.get("min_price")) ?? toNumber(searchParams.get("price_min")),
     max_price: toNumber(searchParams.get("max_price")) ?? toNumber(searchParams.get("price_max")),
     year_min: toNumber(searchParams.get("year_min")),

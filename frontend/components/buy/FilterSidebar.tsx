@@ -500,6 +500,15 @@ export function FilterSidebar({
   const currentCitySlug = filters.city_slug || city.slug || "";
   const currentCityName = city.name || "";
 
+  // Atalho de cidade. Antes o href era `/carros-em/{slug}` puro: na página de
+  // cidade isso é a URL em que o visitante JÁ está, então o clique não mudava
+  // nada — e, mesmo navegando, o motor compõe a região pelo piso de DEC-29.
+  // Quem isola a cidade é `raio=0` (EXACT_CITY, DEC-05/DEC-19/DEC-24). O
+  // controle alterna entre os dois estados para não virar um no-op do outro
+  // lado.
+  const cityOnly = filters.raio === 0;
+  const cityOnlyHref = `/carros-em/${encodeURIComponent(currentCitySlug)}${cityOnly ? "" : "?raio=0"}`;
+
   // Anos: De/Até como dropdowns (mock de referência) com validação De ≤ Até.
   const yearOptions = useMemo(() => {
     const now = new Date().getFullYear();
@@ -771,11 +780,14 @@ export function FilterSidebar({
                     Cidade
                   </p>
                   <Link
-                    href={`/carros-em/${encodeURIComponent(currentCitySlug)}`}
+                    href={cityOnlyHref}
                     data-testid="sidebar-city-link"
+                    aria-pressed={cityOnly}
                     className="flex h-[52px] w-full items-center justify-between rounded-xl border border-cnc-line-strong bg-cnc-surface px-4 text-[15px] font-semibold text-primary transition hover:border-primary motion-reduce:transition-none"
                   >
-                    Apenas {currentCityName || currentCitySlug}
+                    {cityOnly
+                      ? `Ver ${currentCityName || currentCitySlug} e região`
+                      : `Apenas ${currentCityName || currentCitySlug}`}
                     <ChevronDownIcon className="h-[18px] w-[18px] -rotate-90 text-cnc-muted" />
                   </Link>
                 </div>

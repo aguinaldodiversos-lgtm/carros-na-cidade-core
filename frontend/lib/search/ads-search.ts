@@ -28,6 +28,16 @@ export interface AdsSearchFilters {
   city_slugs?: string[];
   city?: string;
   state?: string;
+  /**
+   * Raio explícito em km, repassado ao Search Policy Engine como `raio`.
+   *
+   * `0` é valor SIGNIFICATIVO, não "ausente": é o "apenas esta cidade" de
+   * DEC-05/DEC-19/DEC-24, que o motor resolve como `EXACT_CITY` e vence o
+   * piso regional de DEC-29. Sem este campo a página de cidade não tinha
+   * como pedir isolamento, e o atalho "Apenas {cidade}" não filtrava nada.
+   * `undefined` = automático (o motor decide o território).
+   */
+  raio?: number;
   /** Anúncios do mesmo anunciante (ex.: loja). */
   advertiser_id?: number;
   min_price?: number;
@@ -546,6 +556,12 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
     if (cleaned.length > 0) {
       params.set("city_slugs", cleaned.join(","));
     }
+  }
+
+  // `raio` precisa de teste próprio: `appendIfPresent` descartaria o 0, que é
+  // justamente o valor que isola a cidade (EXACT_CITY).
+  if (typeof filters.raio === "number" && Number.isFinite(filters.raio) && filters.raio >= 0) {
+    params.set("raio", String(Math.trunc(filters.raio)));
   }
 
   appendIfPresent(params, "advertiser_id", filters.advertiser_id);
