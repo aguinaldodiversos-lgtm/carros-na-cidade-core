@@ -280,3 +280,51 @@ describe("AdCard — distância até a origem (DEC-03/DEC-29)", () => {
     expect(screen.getByText(/Bragança Paulista/)).toBeInTheDocument();
   });
 });
+
+/**
+ * Tipo de anunciante no card (regressão 2026-09-25).
+ *
+ * Anúncio criado por pessoa física aparecia com a pílula "Loja parceira" na
+ * foto e o badge "LOJA" no corpo, porque `deriveSellerKind` tratava
+ * `dealership_id` (= `advertisers.id`, que TODO anúncio tem) como prova de
+ * loja. Produção: anúncio 124 em Mairiporã, advertiser 70, document_type
+ * 'cpf', company_name null.
+ */
+describe("AdCard — tipo do anunciante", () => {
+  const pf = {
+    id: 124,
+    slug: "hyundai-hb20-2024",
+    title: "HYUNDAI HB20 Comfort 1.0 Flex",
+    city: "Mairiporã",
+    state: "SP",
+    price: 71900,
+    // O payload continua trazendo dealership_id por compatibilidade.
+    dealership_id: 70,
+    dealership_name: null,
+    account_type: "cpf",
+    seller_kind: "private",
+  };
+
+  it("anúncio de pessoa física não exibe 'LOJA' nem 'Loja parceira'", () => {
+    render(<AdCard item={pf} variant="grid" />);
+    expect(screen.queryByText("LOJA")).toBeNull();
+    expect(screen.queryByText(/Loja parceira/i)).toBeNull();
+  });
+
+  it("anúncio de loja continua exibindo o selo", () => {
+    render(
+      <AdCard
+        item={{
+          ...pf,
+          id: 99,
+          dealership_id: 64,
+          dealership_name: "Ittmotors",
+          account_type: "cnpj",
+          seller_kind: "dealer",
+        }}
+        variant="grid"
+      />
+    );
+    expect(screen.getByText("Ittmotors")).toBeInTheDocument();
+  });
+});

@@ -41,24 +41,38 @@ describe("resolveSellerKind — backend trust pass tem precedência", () => {
   });
 });
 
-describe("resolveSellerKind — fallback dealership_id", () => {
-  it("dealership_id numérico válido → dealer", () => {
-    expect(resolveSellerKind({ dealership_id: 42 })).toBe("dealer");
+describe("resolveSellerKind — dealership_id não é sinal de tipo", () => {
+  // REGRA INVERTIDA em 2026-09-25, junto com `deriveSellerKind` no backend:
+  // `dealership_id` é `advertisers.id`, e TODO anúncio pende de um advertiser
+  // (a tabela `ads` não tem `user_id`). Usá-lo como prova classificava
+  // qualquer anúncio como loja, incluindo os de pessoa física.
+  it("dealership_id sozinho → private, seja número ou string", () => {
+    expect(resolveSellerKind({ dealership_id: 42 })).toBe("private");
+    expect(resolveSellerKind({ dealership_id: "42" })).toBe("private");
   });
 
-  it("dealership_id como string '42' válido → dealer", () => {
-    expect(resolveSellerKind({ dealership_id: "42" })).toBe("dealer");
-  });
-
-  it("dealership_id zero/negativo NÃO conta como dealer", () => {
-    expect(resolveSellerKind({ dealership_id: 0 })).toBe("private");
-    expect(resolveSellerKind({ dealership_id: -1 })).toBe("private");
+  it("PF com advertiser próprio → private (regressão de produção)", () => {
+    expect(
+      resolveSellerKind({ dealership_id: 70, account_type: "cpf", dealership_name: null })
+    ).toBe("private");
   });
 
   it("dealership_id null/undefined/string vazia NÃO conta", () => {
     expect(resolveSellerKind({ dealership_id: null })).toBe("private");
     expect(resolveSellerKind({ dealership_id: "" })).toBe("private");
     expect(resolveSellerKind({})).toBe("private");
+  });
+});
+
+describe("resolveSellerKind — fallback company_name", () => {
+  // `dealership_name` é `advertisers.company_name`, que só conta de loja tem —
+  // diferente de `seller_name`, que é o nome de qualquer anunciante.
+  it("sem documento, company_name preenchido → dealer", () => {
+    expect(resolveSellerKind({ dealership_name: "AutoCar Veículos" })).toBe("dealer");
+  });
+
+  it("documento vence o nome: CPF com company_name → private", () => {
+    expect(resolveSellerKind({ account_type: "CPF", dealership_name: "AutoCar" })).toBe("private");
   });
 });
 
