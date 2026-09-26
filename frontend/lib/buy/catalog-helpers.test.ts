@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeCatalogItem, toSafeCatalogItems } from "./catalog-helpers";
+import {
+  buildSidebarControlTotals,
+  normalizeCatalogItem,
+  toSafeCatalogItems,
+} from "./catalog-helpers";
 
 const CITY = { slug: "atibaia-sp", name: "Atibaia", state: "SP" } as Parameters<
   typeof normalizeCatalogItem
@@ -39,5 +43,55 @@ describe("normalizeCatalogItem — campos que o motor acrescenta", () => {
       CITY
     );
     expect(items.map((item) => item.distance_km)).toEqual([0, 18.34]);
+  });
+});
+
+describe("buildSidebarControlTotals — motor primeiro, BFF como fallback", () => {
+  const legacyFacets = {
+    brands: [],
+    models: [],
+    fuelTypes: [],
+    bodyTypes: [],
+    sellerKinds: [
+      { seller_kind: "dealer" as const, total: 33 },
+      { seller_kind: "private" as const, total: 0 },
+    ],
+    transmissions: [{ transmission: "manual", total: 20 }],
+    offers: { opportunity: 1, below_fipe: 9, highlight: 0 },
+  };
+
+  it("com facetas do motor, contagens do MESMO escopo do grid (ignora o BFF)", () => {
+    const totals = buildSidebarControlTotals(
+      {
+        engine_facets: [
+          {
+            key: "seller_kind",
+            label: "Vendedor",
+            open: true,
+            active_value: null,
+            options: [{ value: "dealer", label: "Lojas", count: 4 }],
+          },
+        ],
+        engine_offer_counts: { opportunity: 0, below_fipe: 2, highlight: 0 },
+      },
+      legacyFacets
+    );
+    expect(totals.sellerKind).toEqual({ dealer: 4, private: 0 });
+    expect(totals.offers).toEqual({ opportunity: 0, below_fipe: 2, highlight: 0 });
+  });
+
+  it("sem motor, cai no BFF territorial", () => {
+    const totals = buildSidebarControlTotals({}, legacyFacets);
+    expect(totals).toEqual({
+      sellerKind: { dealer: 33, private: 0 },
+      offers: { opportunity: 1, below_fipe: 9, highlight: 0 },
+      transmission: { manual: 20 },
+    });
+  });
+
+  it("sem dado nenhum, tudo undefined — nunca um (0) inventado", () => {
+    expect(
+      buildSidebarControlTotals(undefined, { brands: [], models: [], fuelTypes: [], bodyTypes: [] })
+    ).toEqual({ sellerKind: undefined, offers: undefined, transmission: undefined });
   });
 });

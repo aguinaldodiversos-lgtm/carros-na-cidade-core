@@ -8,6 +8,15 @@ export interface AdsSearchFilters {
   q?: string;
   brand?: string;
   model?: string;
+  /**
+   * Modelo COMERCIAL ("Onix", "T-Cross") — igualdade case-insensitive com
+   * `ads.commercial_model`. É a chave de modelo que o Search Policy Engine
+   * entende; `model` (ILIKE na descrição FIPE) o faz recuar ao caminho legado.
+   *
+   * Hoje só a landing `/cidade/[slug]/marca/[brand]/modelo/[model]` envia, e
+   * sempre a partir do payload territorial — nunca da query da URL.
+   */
+  commercial_model?: string;
   city_id?: number;
   city_slug?: string;
   /**
@@ -535,6 +544,7 @@ export function buildAdsSearchParams(filters: AdsSearchFilters): URLSearchParams
   appendIfPresent(params, "q", filters.q);
   appendIfPresent(params, "brand", filters.brand);
   appendIfPresent(params, "model", filters.model);
+  appendIfPresent(params, "commercial_model", filters.commercial_model);
   const territory = canonicalTerritoryForApi(filters);
   if (territory.city_slug) params.set("city_slug", territory.city_slug);
   else if (territory.city_id != null) appendIfPresent(params, "city_id", territory.city_id);

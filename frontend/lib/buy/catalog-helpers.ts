@@ -4,7 +4,13 @@
  */
 
 import type { CatalogItem } from "@/components/buy/CatalogVehicleCard";
-import type { AdsSearchResponse } from "@/lib/search/ads-search";
+import type { AdsFacetsResponse, AdsSearchResponse } from "@/lib/search/ads-search";
+import {
+  engineControlTotals,
+  readOfferCounts,
+  readSearchPolicyFacets,
+  type EngineControlTotals,
+} from "@/lib/search/search-policy";
 
 export type BuyCityContext = {
   name: string;
@@ -186,6 +192,47 @@ export function toSafeModelFacets(value: unknown): ModelFacet[] {
       };
     })
     .filter((item) => item.model);
+}
+
+/**
+ * Contagem dos controles da sidebar (Ofertas, Vendedor, Câmbio).
+ *
+ * F3 / DEC-08 + DEC-13: quando o motor responde, as facetas vêm do MESMO
+ * CandidateScope do grid. As do BFF legado têm escopo territorial da cidade e
+ * passam a contradizer o grid assim que o território cresce — é o caso de
+ * "Abaixo da FIPE (9)" ao lado de 4 resultados.
+ *
+ * Cada bloco fica `undefined` quando a facet não veio, para a sidebar
+ * renderizar sem número em vez de "(0)": sem dado, "(0)" seria mentira.
+ * Necessário porque o BFF pode responder EMPTY_FACETS em erro/timeout, e
+ * porque outras páginas montam a sidebar sem passar esta prop.
+ */
+export function buildSidebarControlTotals(
+  results: Pick<AdsSearchResponse, "engine_facets" | "engine_offer_counts"> | undefined,
+  facets: AdsFacetsResponse["facets"] | undefined
+): EngineControlTotals {
+  const fromEngine = engineControlTotals(
+    readSearchPolicyFacets(results?.engine_facets),
+    readOfferCounts(results?.engine_offer_counts)
+  );
+  if (fromEngine) return fromEngine;
+
+  const sellerKindRows = facets?.sellerKinds;
+  const sellerKind =
+    Array.isArray(sellerKindRows) && sellerKindRows.length > 0
+      ? {
+          dealer: sellerKindRows.find((r) => r.seller_kind === "dealer")?.total ?? 0,
+          private: sellerKindRows.find((r) => r.seller_kind === "private")?.total ?? 0,
+        }
+      : undefined;
+
+  const transmissionRows = facets?.transmissions;
+  const transmission =
+    Array.isArray(transmissionRows) && transmissionRows.length > 0
+      ? Object.fromEntries(transmissionRows.map((r) => [r.transmission, r.total]))
+      : undefined;
+
+  return { sellerKind, offers: facets?.offers, transmission };
 }
 
 export function inferWeight(item: CatalogItem): 1 | 2 | 3 | 4 {

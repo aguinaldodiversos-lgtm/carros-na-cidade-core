@@ -186,3 +186,21 @@ describe("buildAdsSearchParams — raio", () => {
     expect(buildAdsSearchParams({ city_slug: "mairipora-sp" }).get("raio")).toBeNull();
   });
 });
+
+describe("buildAdsSearchParams — modelo comercial (landing de modelo)", () => {
+  it("emite commercial_model, a chave de modelo que o Search Policy Engine entende", () => {
+    const params = buildAdsSearchParams({
+      city_slug: "braganca-paulista-sp",
+      brand: "Hyundai",
+      commercial_model: "HB20",
+    });
+    expect(params.get("commercial_model")).toBe("HB20");
+    expect(params.get("city_slug")).toBe("braganca-paulista-sp");
+    // `model` (ILIKE na descrição FIPE) faria o motor recuar ao legado.
+    expect(params.has("model")).toBe(false);
+  });
+
+  it("sem commercial_model, nada é emitido (catálogo inalterado)", () => {
+    expect(buildAdsSearchParams({ city_slug: "atibaia-sp" }).has("commercial_model")).toBe(false);
+  });
+});

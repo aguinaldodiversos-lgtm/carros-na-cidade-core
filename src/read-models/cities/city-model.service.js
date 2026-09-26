@@ -4,13 +4,13 @@ import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { buildCityTerritorialLinks } from "./city-linking.service.js";
 import * as adsService from "../../modules/ads/ads.service.js";
 import { getFacetsWithFilters } from "../../modules/ads/filters/ads-filter.service.js";
-import {
-  brandModelSlug,
-  canonicalBrandSlug,
-  canonicalBrandLabel,
-} from "../../shared/utils/slugify.js";
+import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
 import { resolveCityModel } from "./territorial-resolve.service.js";
 import { buildClusterSeo } from "./territorial-cluster.logic.js";
+import {
+  evaluateCityModelSeoEligibility,
+  resolveCityModelListing,
+} from "./city-model-seo-eligibility.js";
 import { commercialModelSlug } from "../../shared/vehicle/commercial-model.js";
 import { getSeoThreshold, SEO_SURFACE } from "./city-thresholds.js";
 
@@ -80,8 +80,22 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
     );
   }
 
+  // Filtro de produto da listagem regional (Search Policy Engine). Sem rótulo,
+  // a landing mostra o estado vazio honesto.
+  const listing = await resolveCityModelListing(resolution);
+
+  // Indexação por DEC-30 — a mesma função que decide o sitemap de modelos.
+  const minInventory = getSeoThreshold(SEO_SURFACE.MODEL);
+  const eligibility = await evaluateCityModelSeoEligibility({
+    citySlug: city.slug,
+    listingFilters: listing.filters,
+    ownActiveCount: modelAgg.activeCount,
+    minInventory,
+  });
+
   const cityLabel = `${city.name}${city.state ? ` - ${city.state}` : ""}`;
-  const brandDisplay = canonicalBrandLabel(brandAgg.label);
+  const brandDisplay = listing.brandName;
+  const modelDisplay = listing.modelName;
 
   return {
     city: {
@@ -96,9 +110,10 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
       slug: brandSlug,
     },
     model: {
-      name: modelAgg.label,
+      name: modelDisplay,
       slug: modelSlug,
     },
+    listingFilters: listing.filters,
     stats: {
       totalAds: modelAgg.stats.total,
       totalHighlightAds: modelAgg.stats.highlight,
@@ -111,10 +126,11 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
     },
     seo: buildClusterSeo({
       canonicalPath: `/cidade/${city.slug}/marca/${brandSlug}/modelo/${modelSlug}`,
-      title: `${brandDisplay} ${modelAgg.label} usado em ${cityLabel} | Carros na Cidade`,
-      description: `Anúncios de ${brandDisplay} ${modelAgg.label} em ${city.name}: preços, ano, quilometragem e comparação com a tabela FIPE.`,
+      title: `Comprar ${brandDisplay} ${modelDisplay} em ${cityLabel} | Carros na Cidade`,
+      description: `${brandDisplay} ${modelDisplay} usados e seminovos à venda em ${cityLabel}. Compare preços, ano, quilometragem e ofertas em relação à Tabela FIPE.`,
       activeCount: modelAgg.activeCount,
-      minInventory: getSeoThreshold(SEO_SURFACE.MODEL),
+      minInventory,
+      eligibility,
     }),
     filters: adsFilters,
     sections: {

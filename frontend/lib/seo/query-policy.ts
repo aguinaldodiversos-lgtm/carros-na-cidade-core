@@ -73,6 +73,7 @@ export const SEO_QUERY_POLICY: Readonly<Record<string, SeoQueryCategory>> = Obje
   q: "filter",
   brand: "filter",
   model: "filter",
+  commercial_model: "filter",
   min_price: "filter",
   max_price: "filter",
   // Aliases aceitos por `parseAdsSearchFiltersFromSearchParams`. Um alias fora

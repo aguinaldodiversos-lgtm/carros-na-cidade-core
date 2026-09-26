@@ -225,6 +225,31 @@ Dentro da faixa, porém, o teto **delimita** a cláusula de distância de DEC-07
 
 · Complementa DEC-28; torna verdadeiro o copy de DEC-03 e o delimita: com piso, o território automático não parte mais de 0 km quando a liquidez local basta, embora o raio declarado ainda possa ser 0 (DEC-28). **Não** emenda DEC-07 quanto à precedência do peso — o teto age dentro da faixa, nunca entre faixas —, mas **delimita** a cláusula de distância de DEC-07 e o `V3-INV-047` dentro da faixa, pelo adiamento descrito acima. Supera DEC-04 e `V3-INV-005` no ponto em que exigem o menor território necessário: com piso, o automático parte de 25 km mesmo quando a liquidez local já atinge o alvo, e "menor território" passa a significar "o menor a partir do piso". Delimita DEC-20: o `effective_radius_km` deixa de ser produzido pela conversão de `required_distance_km` e passa a ser o menor anel que contém o conjunto final (DEC-23, DEC-28). Delimita DEC-26 quanto ao território de referência da concessão de distância, que passa a ser o consultado. Não altera DEC-01, DEC-02, DEC-05, DEC-11, DEC-19, DEC-23 nem DEC-24. · Vigente · 2026-09.
 
+### DEC-30
+
+DEC-30 — Elegibilidade SEO regional das landings cidade + marca + modelo.
+
+**Regra.** A elegibilidade da URL-base limpa `/cidade/[cidade]/marca/[marca]/modelo/[modelo]` depende de **quem serve a listagem** daquela landing — o modo servido efetivo:
+
+- **Servida pelo Search Policy Engine:** indexável se, e somente se, `local_model_count >= 1` **e** `regional_model_count >= CITY_INDEX_MIN_ADS`.
+- **Servida pelo caminho legado:** indexável se, e somente se, `local_model_count >= CITY_INDEX_MIN_ADS` — a regra de DEC-29, porque o conjunto exibido é só a cidade.
+
+`CITY_INDEX_MIN_ADS` é o limiar de sempre (hoje 3); nenhum número novo é criado. `local_model_count` é o estoque do modelo na própria cidade da URL; `regional_model_count` é o estoque do modelo no território canônico do motor para aquela origem — mesmas memberships, mesmo piso regional (DEC-29), mesmo baseline e AUTO do perfil (DEC-28), mesma interpretação de origem. Não existe algoritmo de raio próprio para SEO.
+
+**Motivo.** Com DEC-29 a landing servida pelo motor passou a mostrar o estoque regional elegível, e a regra histórica — 3 anúncios **próprios** — deixava `noindex` páginas com presença local real e oferta regional útil. Caso observado em 2026-09: Hyundai HB20 em Bragança Paulista, 1 próprio e 4 no território; a página mostrava os 4 e ficava fora do índice.
+
+**Modo servido efetivo.** É a mesma decisão que responde a busca da página: flag do motor em `v1`, parâmetros dentro do contrato do motor e origem habilitada no rollout (`SEARCH_POLICY_ENGINE_CITIES`). Qualquer uma dessas portas fechada, a listagem sai do legado, e a elegibilidade usa a regra do legado. A indexação acompanha o conjunto **exibido**, nunca um conjunto teórico: indexar pelo território do motor uma página que mostra só a cidade anunciaria ao buscador uma página que não existe (`V3-INV-089`). Esta decisão não amplia nem contorna a allowlist — com o legado servindo, o território do motor não é consultado. Uma mudança de allowlist muda, no mesmo ato, o conjunto exibido e a regra de indexação daquela landing, e é assim que robots e sitemap acompanham o rollout sem divergir. A falha pontual do motor em runtime, que também cai no legado, é transitória e não é modo servido.
+
+**Âncora local.** Com zero próprios a landing não indexa, qualquer que seja o estoque das vizinhas. Isso preserva a ligação real entre o modelo e a cidade nomeada na URL e impede landings regionais sem presença local.
+
+**Robots e sitemap.** Consomem a mesma função de elegibilidade e o mesmo modo servido; landing indexável entra no sitemap de landings, landing `noindex` não entra. Não há duas implementações.
+
+**Exemplos normativos.** Motor: local 3 / regional 3 → index; local 1 / regional 4 → index; local 1 / regional 2 → noindex; local 0 / regional 6 → noindex; local 0 / regional 0 → noindex. Legado: local 3 → index; local 1 (qualquer que seja o território teórico) → noindex; local 0 → noindex.
+
+**Variantes e vazio.** Filtros, ordenação, paginação e demais parâmetros continuam `noindex` pela política existente (v3 §18). Resultado vazio continua `noindex`, independentemente de qualquer outro critério.
+
+· Aplica-se só às landings cidade + marca + modelo; cidade e marca seguem o limiar de estoque próprio. Delimita, para essas landings **quando servidas pelo motor**, a frase de DEC-29 "o limiar de indexação continua contando apenas o estoque próprio" e o enunciado de `V3-INV-026` no mesmo ponto; servidas pelo legado, DEC-29 vale sem alteração. Mantém a separação entre existência (DEC-01, DEC-02) e indexação, e reafirma `V3-INV-089`. Não altera o algoritmo do motor, raio, piso, ordenação, resultados exibidos, allowlist, URL, canonical, metadados textuais, `/comprar` nem `/carros-em`. · Proposta · Não certificada · 2026-09.
+
 ---
 
 ## Adiamentos confirmados

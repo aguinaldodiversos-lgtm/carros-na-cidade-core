@@ -12,11 +12,13 @@
 // A URL de cidade é a CANÔNICA `/carros-em/[slug]` (não `/cidade` nem
 // `/comprar/cidade`) — auditoria SEO 2026-07-04.
 
+import { logger } from "../../shared/logger.js";
 import { canonicalBrandSlug } from "../../shared/utils/slugify.js";
 import { commercialModelSlug } from "../../shared/vehicle/commercial-model.js";
 import * as repo from "./territorial-inventory-sitemap.repository.js";
 import { getSitemapMinAds } from "./sitemap-min-ads.js";
 import { getSeoThreshold, SEO_SURFACE } from "../cities/city-thresholds.js";
+import { resolveCityModelSeoEligibility } from "../cities/city-model-seo-eligibility.js";
 
 const CLUSTER_TYPE_CITY = "city_home";
 const CLUSTER_TYPE_BELOW_FIPE = "city_below_fipe";
@@ -177,7 +179,60 @@ export async function listActiveCityBrandEntries(limit = 50000) {
   return buildBrandEntries(rows, getSeoThreshold(SEO_SURFACE.BRAND));
 }
 
-export async function listActiveCityBrandModelEntries(limit = 50000) {
+const MODEL_LOC_PATTERN = /^\/cidade\/([^/]+)\/marca\/([^/]+)\/modelo\/([^/]+)$/;
+const MODEL_ELIGIBILITY_CONCURRENCY = 4;
+
+/**
+ * Filtra entradas de modelo pela elegibilidade SEO (DEC-30). `evaluate` recebe
+ * os slugs da URL e devolve `{ indexable }` (ou null quando a URL não existe).
+ * Concorrência limitada: cada avaliação são poucas consultas ao pool, e o
+ * sitemap não pode disputar conexão com o tráfego.
+ */
+export async function filterEligibleModelEntries(
+  entries,
+  evaluate,
+  concurrency = MODEL_ELIGIBILITY_CONCURRENCY
+) {
+  const list = Array.isArray(entries) ? entries : [];
+  const keep = new Array(list.length).fill(false);
+  let next = 0;
+
+  async function worker() {
+    while (next < list.length) {
+      const i = next++;
+      const match = MODEL_LOC_PATTERN.exec(list[i].loc);
+      if (!match) continue;
+      try {
+        const verdict = await evaluate(match[1], match[2], match[3]);
+        keep[i] = verdict?.indexable === true;
+      } catch (err) {
+        // Fail-closed por entrada: uma URL que não deu para avaliar sai do
+        // sitemap, as outras continuam.
+        logger.error(
+          { err: err?.message || String(err), loc: list[i].loc },
+          "[sitemap-models] elegibilidade falhou — entrada omitida"
+        );
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(concurrency, list.length)) }, worker)
+  );
+  return list.filter((_, i) => keep[i]);
+}
+
+/**
+ * Sitemap de modelos. O estoque próprio só gera CANDIDATOS (âncora local ≥ 1,
+ * `minAds` 1); quem decide a entrada é a MESMA função do robots da landing
+ * (`resolveCityModelSeoEligibility`, DEC-30). Sitemap e robots não podem ter
+ * duas implementações da mesma pergunta.
+ */
+export async function listActiveCityBrandModelEntries(limit = 50000, deps = {}) {
   const rows = await repo.listActiveCityBrandModelRows(limit);
-  return buildModelEntries(rows, getSeoThreshold(SEO_SURFACE.MODEL));
+  const candidates = buildModelEntries(rows, 1);
+  return filterEligibleModelEntries(
+    candidates,
+    deps.evaluate || ((city, brand, model) => resolveCityModelSeoEligibility(city, brand, model))
+  );
 }

@@ -245,3 +245,70 @@ describe("buildTerritorialJsonLd canonical override", () => {
     expect(jsonLd.url).toBe("https://carrosnacidade.com/comprar/cidade/atibaia-sp");
   });
 });
+
+describe("buildTerritorialMetadata — landing de modelo sob DEC-30 (caso E)", () => {
+  // Payload do backend para HB20 em Bragança: 1 próprio, 4 no território do
+  // motor. O robots vem decidido pelo backend; o frontend só pode rebaixar.
+  const dec30Data = {
+    ...baseData,
+    city: { id: 2, name: "Bragança Paulista", slug: "braganca-paulista-sp", state: "SP" },
+    seo: {
+      title: "Comprar Hyundai HB20 em Bragança Paulista - SP | Carros na Cidade",
+      description: "...",
+      canonicalPath: "/cidade/braganca-paulista-sp/marca/hyundai/modelo/hb20",
+      robots: "index,follow",
+      indexable: true,
+      hasActiveInventory: true,
+      activeCount: 1,
+      noindexReason: null,
+      indexability: {
+        rule: "DEC-30",
+        reason: "LOCAL_ANCHOR_WITH_REGIONAL_INVENTORY",
+        localModelCount: 1,
+        regionalModelCount: 4,
+        minInventory: 3,
+      },
+    },
+  } as unknown as TerritorialPagePayload;
+
+  it("URL-base limpa → index,follow e canonical da própria landing", () => {
+    const meta = buildTerritorialMetadata(dec30Data, "model", { searchParams: {} });
+    expect(meta.robots).toMatchObject({ index: true, follow: true });
+    expect(String(meta.alternates?.canonical)).toMatch(
+      /\/cidade\/braganca-paulista-sp\/marca\/hyundai\/modelo\/hb20$/
+    );
+  });
+
+  it.each([{ sort: "price_asc" }, { preco_max: "80000" }, { page: "2" }, { raio: "0" }])(
+    "mesma landing com %o → noindex, canonical continua limpa",
+    (searchParams) => {
+      const meta = buildTerritorialMetadata(dec30Data, "model", { searchParams });
+      expect(meta.robots).toMatchObject({ index: false });
+      expect(String(meta.alternates?.canonical)).toMatch(/\/modelo\/hb20$/);
+    }
+  );
+
+  it("listagem vazia na renderização (forceNoindex) → noindex mesmo com backend index", () => {
+    const meta = buildTerritorialMetadata(dec30Data, "model", {
+      searchParams: {},
+      forceNoindex: true,
+    });
+    expect(meta.robots).toMatchObject({ index: false });
+  });
+
+  it("backend noindex (sem âncora local) → noindex", () => {
+    const noAnchor = {
+      ...dec30Data,
+      seo: {
+        ...dec30Data.seo,
+        robots: "noindex,follow",
+        indexable: false,
+        activeCount: 0,
+        noindexReason: "no_local_anchor",
+      },
+    } as unknown as TerritorialPagePayload;
+    expect(buildTerritorialMetadata(noAnchor, "model", { searchParams: {} }).robots).toMatchObject({
+      index: false,
+    });
+  });
+});

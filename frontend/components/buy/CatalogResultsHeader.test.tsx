@@ -31,3 +31,19 @@ describe("CatalogResultsHeader — declaração do território (DEC-03)", () => 
     expect(screen.queryByTestId("catalog-territory-notice")).toBeNull();
   });
 });
+
+describe("CatalogResultsHeader — ordenação só no desktop (landing de modelo)", () => {
+  it('sortVisibility="desktop": o select existe, escondido abaixo de lg', () => {
+    render(<CatalogResultsHeader totalResults={6} onPatch={vi.fn()} sortVisibility="desktop" />);
+    const label = screen.getByLabelText("Ordenar por").closest("label");
+    expect(label?.className).toContain("hidden");
+    expect(label?.className).toContain("lg:inline-flex");
+  });
+
+  it("default: select visível em qualquer largura (catálogo inalterado)", () => {
+    render(<CatalogResultsHeader totalResults={6} onPatch={vi.fn()} />);
+    const label = screen.getByLabelText("Ordenar por").closest("label");
+    expect(label?.className.split(" ")).toContain("inline-flex");
+    expect(label?.className).not.toContain("hidden");
+  });
+});

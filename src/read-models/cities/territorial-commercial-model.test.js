@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { matchModelRowsBySlug, aggregateMatchedRows } from "./territorial-cluster.logic.js";
+import {
+  matchModelRowsBySlug,
+  aggregateMatchedRows,
+  resolveModelListing,
+} from "./territorial-cluster.logic.js";
 import { buildModelEntries } from "../seo/territorial-inventory-sitemap.service.js";
 import { getSeoThreshold, SEO_SURFACE } from "./city-thresholds.js";
 
@@ -172,5 +176,109 @@ describe("buildModelEntries — sitemap por modelo comercial", () => {
       1
     );
     expect(entries[0].loc).toBe("/cidade/braganca-paulista-sp/marca/chevrolet/modelo/onix");
+  });
+});
+
+describe("resolveModelListing — filtro de produto da landing para o Search Policy Engine", () => {
+  // Estoque ativo NACIONAL (dicionário de commercial_model), como o do snapshot
+  // de produção: T-Cross só existe em Atibaia; a landing de Bragança não tem
+  // nenhum anúncio próprio dele.
+  const DICTIONARY = [
+    { label: "Onix", brand: "GM - Chevrolet" },
+    { label: "T-Cross", brand: "VW - VolksWagen" },
+    { label: "HB20", brand: "Hyundai" },
+    { label: "C3", brand: "Citroën" },
+  ];
+
+  it("modelo comercial resolvido na cidade → commercial_model + marca sem prefixo de grupo", () => {
+    const out = resolveModelListing({
+      brandSlug: "chevrolet",
+      modelSlug: "onix",
+      brandLabel: "GM - Chevrolet",
+      modelLabel: "Onix",
+      taxonomy: "commercial",
+    });
+    expect(out).toEqual({
+      brandName: "Chevrolet",
+      modelName: "Onix",
+      filters: { brand: "Chevrolet", commercial_model: "Onix" },
+    });
+  });
+
+  it("URL antiga por descrição FIPE → filtro legado `model` (o motor recusa e cai no legado)", () => {
+    const out = resolveModelListing({
+      brandSlug: "chevrolet",
+      modelSlug: "onix-hatch-lt-1-0-12v-flex-5p-mec",
+      brandLabel: "GM - Chevrolet",
+      modelLabel: "ONIX HATCH LT 1.0 12V Flex 5p Mec.",
+      taxonomy: "fipe",
+    });
+    expect(out.filters).toEqual({
+      brand: "Chevrolet",
+      model: "ONIX HATCH LT 1.0 12V Flex 5p Mec.",
+    });
+    expect(out.filters).not.toHaveProperty("commercial_model");
+  });
+
+  it("cidade SEM o modelo: rótulo exato vem do estoque nacional, não do titleize ('T Cross')", () => {
+    const out = resolveModelListing(
+      {
+        brandSlug: "volkswagen",
+        modelSlug: "t-cross",
+        // O que `aggregateMatchedRows` devolve quando a cidade não tem linha.
+        brandLabel: "Volkswagen",
+        modelLabel: "T Cross",
+        taxonomy: "none",
+      },
+      DICTIONARY
+    );
+    expect(out).toEqual({
+      brandName: "Volkswagen",
+      modelName: "T-Cross",
+      filters: { brand: "Volkswagen", commercial_model: "T-Cross" },
+    });
+  });
+
+  it("marca com acento sem estoque próprio: o rótulo real ('Citroën') vence o slug ('Citroen')", () => {
+    const out = resolveModelListing(
+      {
+        brandSlug: "citroen",
+        modelSlug: "c3",
+        brandLabel: "Citroen",
+        modelLabel: "C3",
+        taxonomy: "none",
+      },
+      DICTIONARY
+    );
+    expect(out.brandName).toBe("Citroën");
+    expect(out.filters).toEqual({ brand: "Citroën", commercial_model: "C3" });
+  });
+
+  it("o modelo existe, mas de OUTRA marca → não casa (sem 'Onix' da Fiat)", () => {
+    const out = resolveModelListing(
+      {
+        brandSlug: "fiat",
+        modelSlug: "onix",
+        brandLabel: "Fiat",
+        modelLabel: "Onix",
+        taxonomy: "none",
+      },
+      DICTIONARY
+    );
+    expect(out.filters).toBeNull();
+  });
+
+  it("modelo sem estoque ativo em lugar nenhum → filters null (a página não consulta)", () => {
+    const out = resolveModelListing(
+      {
+        brandSlug: "hyundai",
+        modelSlug: "azera",
+        brandLabel: "Hyundai",
+        modelLabel: "Azera",
+        taxonomy: "none",
+      },
+      DICTIONARY
+    );
+    expect(out).toEqual({ brandName: "Hyundai", modelName: "Azera", filters: null });
   });
 });

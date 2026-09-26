@@ -372,3 +372,134 @@ describe("FilterSidebar — contagem por controle (controlTotals)", () => {
     expect(screen.getByRole("button", { name: "Lojas" })).toBeTruthy();
   });
 });
+
+/**
+ * Props opcionais da landing cidade + marca + modelo. O default (nenhuma delas)
+ * é o catálogo de sempre — os testes acima continuam valendo sem alteração.
+ */
+describe("FilterSidebar — opcionais da landing de modelo", () => {
+  it("hideVehicleIdentity: Marca e Modelo somem (pertencem à rota)", () => {
+    render(<FilterSidebar filters={{}} onPatch={vi.fn()} {...baseProps} hideVehicleIdentity />);
+    expect(document.getElementById("fs-brand")).toBeNull();
+    expect(document.getElementById("fs-model")).toBeNull();
+    // O resto do refinamento continua.
+    expect(document.getElementById("fs-price")).toBeTruthy();
+  });
+
+  it("sem a prop, Marca e Modelo continuam (catálogo inalterado)", () => {
+    renderSidebar({}, vi.fn());
+    expect(document.getElementById("fs-brand")).toBeTruthy();
+    expect(document.getElementById("fs-model")).toBeTruthy();
+  });
+
+  it("popularBrandHref: marcas populares viram links rastreáveis, não botões", () => {
+    const onPatch = vi.fn();
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={onPatch}
+        {...baseProps}
+        popularBrands={[{ brand: "Fiat", total: 7 }]}
+        popularBrandHref={(brand) => `/cidade/atibaia-sp/marca/${brand.toLowerCase()}`}
+      />
+    );
+    const link = screen.getByRole("link", { name: /Fiat/ });
+    expect(link.getAttribute("href")).toBe("/cidade/atibaia-sp/marca/fiat");
+    expect(screen.queryByRole("button", { name: /Fiat/ })).toBeNull();
+  });
+
+  it("sem popularBrandHref, marcas populares seguem como filtro (botão)", () => {
+    const onPatch = vi.fn();
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={onPatch}
+        {...baseProps}
+        popularBrands={[{ brand: "Fiat", total: 7 }]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Fiat/ }));
+    expect(onPatch).toHaveBeenCalledWith({ brand: "Fiat", model: undefined, page: 1 });
+  });
+
+  it("sortShortcuts: 'O que te interessa ver hoje?' ordena e desmarca", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        sortShortcuts={{ value: "relevance", onChange }}
+      />
+    );
+    expect(screen.getByText("O que te interessa ver hoje?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Mais barato" }));
+    expect(onChange).toHaveBeenCalledWith("price_asc");
+
+    rerender(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        sortShortcuts={{ value: "price_asc", onChange }}
+      />
+    );
+    const active = screen.getByRole("button", { name: "Mais barato" });
+    expect(active.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Mais novo" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    fireEvent.click(active);
+    expect(onChange).toHaveBeenLastCalledWith("relevance");
+  });
+
+  it("sem sortShortcuts, a seção não existe (catálogo inalterado)", () => {
+    renderSidebar({}, vi.fn());
+    expect(screen.queryByText("O que te interessa ver hoje?")).toBeNull();
+  });
+
+  it("searchSlot entra logo abaixo do cabeçalho", () => {
+    render(
+      <FilterSidebar
+        filters={{}}
+        onPatch={vi.fn()}
+        {...baseProps}
+        searchSlot={<input aria-label="Buscar nos resultados" />}
+      />
+    );
+    expect(screen.getByRole("textbox", { name: "Buscar nos resultados" })).toBeTruthy();
+  });
+
+  it("cityScopeBasePath: 'Apenas {cidade}' isola a cidade SEM sair da landing", () => {
+    const base = "/cidade/atibaia-sp/marca/chevrolet/modelo/onix";
+    const { rerender } = render(
+      <FilterSidebar filters={{}} onPatch={vi.fn()} {...baseProps} cityScopeBasePath={base} />
+    );
+    expect(screen.getByTestId("sidebar-city-link").getAttribute("href")).toBe(`${base}?raio=0`);
+    rerender(
+      <FilterSidebar
+        filters={{ raio: 0 }}
+        onPatch={vi.fn()}
+        {...baseProps}
+        cityScopeBasePath={base}
+      />
+    );
+    expect(screen.getByTestId("sidebar-city-link").getAttribute("href")).toBe(base);
+  });
+
+  it("idPrefix: segunda instância (gaveta) com ids próprios e labels ligados a ela", () => {
+    render(
+      <>
+        <FilterSidebar filters={{}} onPatch={vi.fn()} {...baseProps} />
+        <FilterSidebar filters={{}} onPatch={vi.fn()} {...baseProps} idPrefix="fs-m" />
+      </>
+    );
+    expect(document.querySelectorAll("#fs-price")).toHaveLength(1);
+    expect(document.querySelectorAll("#fs-m-price")).toHaveLength(1);
+    const drawerLabel = document.querySelector('label[for="fs-m-price"]');
+    expect(drawerLabel?.textContent).toBe("Preço");
+    // Seções também não colidem: aria-labelledby aponta para o título da própria instância.
+    expect(document.querySelectorAll("#filter-ofertas")).toHaveLength(1);
+    expect(document.querySelectorAll("#fs-m-filter-ofertas")).toHaveLength(1);
+  });
+});

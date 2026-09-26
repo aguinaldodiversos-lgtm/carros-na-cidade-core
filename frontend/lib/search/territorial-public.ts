@@ -108,10 +108,27 @@ export interface TerritorialPagination {
   belowFipeAds?: AdsPagination;
 }
 
+/**
+ * Filtro de PRODUTO que a landing de modelo manda a `/api/ads/search` (o mesmo
+ * Search Policy Engine do catálogo). Território não entra — a página envia a
+ * própria cidade como origem. `null` = não há estoque ativo do modelo em lugar
+ * nenhum; a página não consulta e mostra o estado vazio.
+ *
+ * `model` só aparece nas URLs antigas por descrição FIPE: o motor recusa essa
+ * chave e a busca responde pelo caminho legado, como sempre respondeu.
+ */
+export interface TerritorialListingFilters {
+  brand: string;
+  commercial_model?: string;
+  model?: string;
+}
+
 export interface TerritorialPagePayload {
   city?: TerritorialCityIdentity;
   brand?: TerritorialEntityRef | null;
   model?: TerritorialEntityRef | null;
+  /** Só na página de modelo. Ver `TerritorialListingFilters`. */
+  listingFilters?: TerritorialListingFilters | null;
   stats?: TerritorialStats;
   signals?: TerritorialSignals;
   seo?: TerritorialSeoPayload;

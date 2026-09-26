@@ -13,7 +13,11 @@
 //   2. Agregar contagem/estatística de forma EXATA por slug.
 //   3. Construir o objeto `seo` com robots dinâmico baseado em estoque ativo.
 
-import { brandModelSlug, canonicalBrandSlug } from "../../shared/utils/slugify.js";
+import {
+  brandModelSlug,
+  canonicalBrandLabel,
+  canonicalBrandSlug,
+} from "../../shared/utils/slugify.js";
 import { deriveCommercialModel } from "../../shared/vehicle/commercial-model.js";
 
 /** Titulariza um slug (`"land-rover"` → `"Land Rover"`) para rótulo de fallback. */
@@ -97,6 +101,80 @@ export function matchModelRowsBySlug(rows, slug) {
     rows: fipeMatches,
     taxonomy: fipeMatches.length > 0 ? "fipe" : "none",
     commercialLabel: null,
+  };
+}
+
+/**
+ * Filtro de PRODUTO que a landing `/cidade/.../modelo/...` manda para
+ * `/api/ads/search` — o mesmo endpoint (e o mesmo Search Policy Engine) do
+ * catálogo. O TERRITÓRIO não entra aqui: a página envia a própria cidade como
+ * origem (`city_slug`) e o motor decide quais cidades participam.
+ *
+ * Existe porque a agregação da cidade olha só o estoque PRÓPRIO,
+ * enquanto a listagem regional precisa do valor exato de `ads.commercial_model`
+ * mesmo quando a cidade não tem nenhum anúncio do modelo. Sem isto, a landing
+ * "T-Cross em Bragança Paulista" pedia ao motor "T Cross" (o `titleizeSlug` do
+ * fallback) e voltava vazia, com T-Cross elegível a 18 km.
+ *
+ *   commercial  a cidade tem o modelo → rótulo comercial já resolvido.
+ *   fipe        URL antiga por descrição FIPE → filtro legado `model` (ILIKE).
+ *               O motor recusa essa chave e a busca cai no caminho legado,
+ *               que é exatamente o comportamento que essas URLs sempre tiveram.
+ *   none        a cidade não tem o modelo → procura o rótulo no estoque ATIVO
+ *               nacional (`commercialDictionary`). Não achou em lugar nenhum →
+ *               `filters: null`: não há o que listar, e a página não consulta.
+ *
+ * A marca vai no rótulo canônico ("GM - Chevrolet" → "Chevrolet"): o motor
+ * filtra marca por ILIKE, e o rótulo sem prefixo de grupo cobre as duas grafias
+ * que existem no banco ("VW - VolksWagen" e "Volkswagen").
+ *
+ * @param {{ brandSlug: string, modelSlug: string, brandLabel: string,
+ *           modelLabel: string, taxonomy: "commercial"|"fipe"|"none" }} resolved
+ * @param {Array<{ label: string, brand: string }>} commercialDictionary
+ *   `commercial_model` distintos do estoque ativo; só consultado em `none`.
+ * @returns {{ brandName: string, modelName: string,
+ *             filters: { brand: string, commercial_model?: string, model?: string } | null }}
+ */
+export function resolveModelListing(resolved, commercialDictionary = []) {
+  const { brandSlug, modelSlug, brandLabel, modelLabel, taxonomy } = resolved || {};
+  const brandName = canonicalBrandLabel(brandLabel);
+
+  if (taxonomy === "commercial") {
+    return {
+      brandName,
+      modelName: modelLabel,
+      filters: { brand: brandName, commercial_model: modelLabel },
+    };
+  }
+
+  if (taxonomy === "fipe") {
+    return {
+      brandName,
+      modelName: modelLabel,
+      filters: { brand: brandName, model: modelLabel },
+    };
+  }
+
+  const targetModel = brandModelSlug(modelSlug);
+  const targetBrand = canonicalBrandSlug(brandSlug);
+  const hit = targetModel
+    ? (Array.isArray(commercialDictionary) ? commercialDictionary : []).find(
+        (entry) =>
+          entry?.label &&
+          brandModelSlug(entry.label) === targetModel &&
+          canonicalBrandSlug(entry.brand) === targetBrand
+      )
+    : null;
+
+  if (!hit) {
+    return { brandName, modelName: modelLabel, filters: null };
+  }
+
+  const hitBrand = canonicalBrandLabel(hit.brand);
+  return {
+    brandName: hitBrand,
+    modelName: hit.label,
+    filters: { brand: hitBrand, commercial_model: hit.label },
   };
 }
 
@@ -193,6 +271,11 @@ export function aggregateMatchedRows(matchedRows, { labelKey, slug, labelOverrid
  *
  * `canonicalPath` é SEMPRE o path self resolvido (slugs canônicos). Nunca
  * retorna "/" — o frontend depende disso para não auto-canonicalizar p/ home.
+ *
+ * `eligibility` (opcional) substitui o limiar de estoque próprio por uma
+ * decisão tomada fora daqui — é o caso da landing cidade + marca + modelo, que
+ * segue DEC-30 (`city-model-seo-eligibility.js`). Sem ele, a regra histórica
+ * acima continua valendo para cidade e marca.
  */
 export function buildClusterSeo({
   canonicalPath,
@@ -200,10 +283,34 @@ export function buildClusterSeo({
   description,
   activeCount,
   minInventory = 1,
+  eligibility = null,
 }) {
   const count = toNumber(activeCount) || 0;
   const min = Math.max(1, toNumber(minInventory) || 1);
   const hasActiveInventory = count > 0;
+
+  if (eligibility) {
+    const eligible = eligibility.indexable === true;
+    return {
+      title,
+      description,
+      canonicalPath,
+      robots: eligible ? "index,follow" : "noindex,follow",
+      indexable: eligible,
+      hasActiveInventory,
+      activeCount: count,
+      noindexReason: eligible ? null : eligibility.noindexReason || "not_eligible",
+      indexability: {
+        rule: eligibility.rule,
+        servingMode: eligibility.serving_mode,
+        reason: eligibility.reason,
+        localModelCount: eligibility.local_model_count,
+        regionalModelCount: eligibility.regional_model_count,
+        minInventory: eligibility.min_inventory,
+      },
+    };
+  }
+
   const indexable = count >= min;
 
   return {

@@ -69,7 +69,45 @@ type FilterSidebarProps = {
   /** Muda o raio de vizinhança (ação do usuário → `?raio=`). */
   onRadiusChange?: (km: number) => void;
   className?: string;
+
+  /* ── Opcionais da landing cidade + marca + modelo ──────────────────────────
+     Todos ausentes nas cinco rotas do catálogo, que continuam renderizando
+     exatamente o que renderizavam. */
+
+  /** Conteúdo logo abaixo do cabeçalho — a busca "nos resultados" da landing. */
+  searchSlot?: ReactNode;
+  /**
+   * Marca e modelo pertencem à ROTA (a landing é "Onix em Atibaia"): os selects
+   * somem, porque trocar de marca ali seria trocar de página, não refinar.
+   */
+  hideVehicleIdentity?: boolean;
+  /**
+   * "Marcas populares" como LINKS (`<a href>`, rastreáveis) em vez de botões
+   * de filtro. Recebe o rótulo exibido e devolve o destino.
+   */
+  popularBrandHref?: (brand: string) => string;
+  /**
+   * Base do atalho "Apenas {cidade}" (`?raio=0`). Default: a vitrine da cidade
+   * (`/carros-em/{slug}`). A landing passa o próprio caminho — isolar a cidade
+   * não pode tirar o visitante do modelo que ele buscou.
+   */
+  cityScopeBasePath?: string;
+  /** Atalhos de ordenação "O que te interessa ver hoje?". */
+  sortShortcuts?: { value?: string; onChange: (sort: string) => void };
+  /**
+   * Prefixo dos `id` dos campos. A landing monta DUAS instâncias (sidebar e
+   * gaveta mobile); com o mesmo `id`, o `<label for>` da gaveta apontaria para
+   * o campo escondido da sidebar. Default "fs" = ids de sempre.
+   */
+  idPrefix?: string;
 };
+
+/** Ordenações oferecidas como atalho — valores da mesma lista do catálogo. */
+const SORT_SHORTCUTS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "year_desc", label: "Mais novo" },
+  { value: "price_asc", label: "Mais barato" },
+  { value: "mileage_asc", label: "Menos rodado" },
+];
 
 const PRICE_RANGES: SelectOption[] = [
   { label: "Qualquer preço", value: "" },
@@ -483,10 +521,22 @@ export function FilterSidebar({
   radiusKm,
   onRadiusChange,
   className = "",
+  searchSlot,
+  hideVehicleIdentity = false,
+  popularBrandHref,
+  cityScopeBasePath,
+  sortShortcuts,
+  idPrefix = "fs",
 }: FilterSidebarProps) {
   const router = useRouter();
   const { trigger: triggerGeo, state: geoState } = useNearbyRegionRedirect({ regionalEnabled });
   const [clearSpin, setClearSpin] = useState(false);
+
+  // Ids de campo e de seção. Com o prefixo default o resultado é idêntico ao
+  // de sempre ("fs-state", "filter-ofertas") — E2E e testes dependem disso.
+  const fieldId = (name: string) => `${idPrefix}-${name}`;
+  const sectionId = (name: string) =>
+    idPrefix === "fs" ? `filter-${name}` : `${idPrefix}-filter-${name}`;
 
   const stateOptions = useMemo<SelectOption[]>(
     () => [
@@ -507,7 +557,8 @@ export function FilterSidebar({
   // controle alterna entre os dois estados para não virar um no-op do outro
   // lado.
   const cityOnly = filters.raio === 0;
-  const cityOnlyHref = `/carros-em/${encodeURIComponent(currentCitySlug)}${cityOnly ? "" : "?raio=0"}`;
+  const cityScopeBase = cityScopeBasePath ?? `/carros-em/${encodeURIComponent(currentCitySlug)}`;
+  const cityOnlyHref = `${cityScopeBase}${cityOnly ? "" : "?raio=0"}`;
   const cityOnlyTitulo = cityOnly
     ? `Ver ${currentCityName || currentCitySlug} e região`
     : `Apenas ${currentCityName || currentCitySlug}`;
@@ -613,6 +664,10 @@ export function FilterSidebar({
     "inline-flex items-center justify-start gap-2.5 whitespace-nowrap rounded-[11px] border px-3 py-3.5 text-[15px] font-semibold transition motion-reduce:transition-none [&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:shrink-0";
   const segCls = (on: boolean) => `${segBase} ${on ? chipOn : chipOff}`;
 
+  /** Linha de atalho de ordenação: rótulo à esquerda, marcador de escolha à direita. */
+  const shortcutCls = (on: boolean) =>
+    `inline-flex w-full items-center justify-between gap-2.5 whitespace-nowrap rounded-[11px] border px-3 py-3 text-[15px] font-semibold transition motion-reduce:transition-none ${on ? chipOn : chipOff}`;
+
   /**
    * Contagem ao lado do rótulo do controle. `undefined` (facet ausente) →
    * não renderiza nada; 0 → renderiza "(0)", que é o caso útil. Mesmo peso
@@ -679,10 +734,12 @@ export function FilterSidebar({
         </div>
 
         <div className="space-y-5 px-5 py-5">
+          {searchSlot ? <div>{searchSlot}</div> : null}
+
           {/* ----------------------------------------------------- ofertas -- */}
-          <section aria-labelledby="filter-ofertas">
+          <section aria-labelledby={sectionId("ofertas")}>
             <Eyebrow>
-              <span id="filter-ofertas">Ofertas</span>
+              <span id={sectionId("ofertas")}>Ofertas</span>
             </Eyebrow>
             <div className="flex flex-wrap gap-2.5">
               <button
@@ -719,9 +776,9 @@ export function FilterSidebar({
           </section>
 
           {/* ---------------------------------------------------- vendedor -- */}
-          <section aria-labelledby="filter-vendedor">
+          <section aria-labelledby={sectionId("vendedor")}>
             <Eyebrow>
-              <span id="filter-vendedor">Vendedor</span>
+              <span id={sectionId("vendedor")}>Vendedor</span>
             </Eyebrow>
             <div className="grid grid-cols-1 gap-2.5">
               <button
@@ -756,10 +813,10 @@ export function FilterSidebar({
           <div className="h-px bg-cnc-line" />
 
           {/* ------------------------------------------------- localização -- */}
-          <section className="space-y-4" aria-labelledby="filter-localizacao">
+          <section className="space-y-4" aria-labelledby={sectionId("localizacao")}>
             <div>
               <Eyebrow>
-                <span id="filter-localizacao">Localização</span>
+                <span id={sectionId("localizacao")}>Localização</span>
               </Eyebrow>
               <button
                 type="button"
@@ -780,7 +837,7 @@ export function FilterSidebar({
             <div className="grid grid-cols-1 gap-3.5 min-[360px]:grid-cols-2 lg:grid-cols-[2fr_3fr]">
               <SelectField
                 label="Estado"
-                id="fs-state"
+                id={fieldId("state")}
                 value={currentUf}
                 onChange={handleStateChange}
                 options={stateOptions}
@@ -878,29 +935,69 @@ export function FilterSidebar({
             ) : null}
           </section>
 
-          {/* --------------------------------------------- veículo (campos) */}
-          <SelectField
-            label="Marca"
-            id="fs-brand"
-            value={filters.brand || ""}
-            onChange={(v) => onPatch({ brand: v || undefined, model: undefined, page: 1 })}
-            options={brandOptions}
-            lead={<BrandIcon />}
-          />
+          {/* ------------------------------------------ atalhos de ordenação -- */}
+          {sortShortcuts ? (
+            <section aria-labelledby={sectionId("interesse")}>
+              <Eyebrow>
+                <span id={sectionId("interesse")}>O que te interessa ver hoje?</span>
+              </Eyebrow>
+              <div className="grid grid-cols-1 gap-2.5">
+                {SORT_SHORTCUTS.map((shortcut) => {
+                  const on = sortShortcuts.value === shortcut.value;
+                  return (
+                    <button
+                      key={shortcut.value}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => sortShortcuts.onChange(on ? "relevance" : shortcut.value)}
+                      className={shortcutCls(on)}
+                    >
+                      <span className="inline-flex items-center gap-2.5">
+                        <ModelIcon className="h-[18px] w-[18px] shrink-0" />
+                        {shortcut.label}
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                          on ? "border-primary" : "border-cnc-line-strong"
+                        }`}
+                      >
+                        {on ? <span className="h-2 w-2 rounded-full bg-primary" /> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
 
-          <SelectField
-            label="Modelo"
-            id="fs-model"
-            value={filters.model || ""}
-            onChange={(v) => onPatch({ model: v || undefined, page: 1 })}
-            options={modelOptions}
-            lead={<ModelIcon />}
-            disabled={!filters.brand}
-          />
+          {/* --------------------------------------------- veículo (campos) */}
+          {hideVehicleIdentity ? null : (
+            <>
+              <SelectField
+                label="Marca"
+                id={fieldId("brand")}
+                value={filters.brand || ""}
+                onChange={(v) => onPatch({ brand: v || undefined, model: undefined, page: 1 })}
+                options={brandOptions}
+                lead={<BrandIcon />}
+              />
+
+              <SelectField
+                label="Modelo"
+                id={fieldId("model")}
+                value={filters.model || ""}
+                onChange={(v) => onPatch({ model: v || undefined, page: 1 })}
+                options={modelOptions}
+                lead={<ModelIcon />}
+                disabled={!filters.brand}
+              />
+            </>
+          )}
 
           <SelectField
             label="Preço"
-            id="fs-price"
+            id={fieldId("price")}
             value={String(filters.max_price || "")}
             onChange={(v) => onPatch({ max_price: v ? Number(v) : undefined, page: 1 })}
             options={PRICE_RANGES}
@@ -958,7 +1055,7 @@ export function FilterSidebar({
 
           <SelectField
             label="KM"
-            id="fs-km"
+            id={fieldId("km")}
             value={String(filters.mileage_max || "")}
             onChange={(v) => onPatch({ mileage_max: v ? Number(v) : undefined, page: 1 })}
             options={KM_RANGES}
@@ -967,7 +1064,7 @@ export function FilterSidebar({
 
           <SelectField
             label="Câmbio"
-            id="fs-trans"
+            id={fieldId("trans")}
             value={filters.transmission || ""}
             onChange={(v) => onPatch({ transmission: v || undefined, page: 1 })}
             options={transmissionOptions}
@@ -976,7 +1073,7 @@ export function FilterSidebar({
 
           <SelectField
             label="Combustível"
-            id="fs-fuel"
+            id={fieldId("fuel")}
             value={filters.fuel_type || ""}
             onChange={(v) => onPatch({ fuel_type: v || undefined, page: 1 })}
             options={FUEL_TYPES}
@@ -985,7 +1082,7 @@ export function FilterSidebar({
 
           <SelectField
             label="Carroceria"
-            id="fs-body"
+            id={fieldId("body")}
             value={filters.body_type || ""}
             onChange={(v) => onPatch({ body_type: v || undefined, page: 1 })}
             options={BODY_TYPES}
@@ -999,21 +1096,38 @@ export function FilterSidebar({
                 Marcas populares
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {popularBrands.slice(0, 8).map((item) => (
-                  <button
-                    key={`pop-${item.brand}`}
-                    type="button"
-                    onClick={() => onPatch({ brand: item.brand, model: undefined, page: 1 })}
-                    className="inline-flex items-center gap-1 rounded-full border border-cnc-line bg-cnc-bg px-2.5 py-1 text-[12px] font-semibold text-cnc-text transition hover:border-primary/40 hover:bg-cnc-surface hover:text-primary motion-reduce:transition-none"
-                  >
-                    {item.brand}
-                    {item.total > 0 ? (
-                      <span className="text-[11px] font-bold text-cnc-muted-soft">
-                        {formatTotal(item.total)}
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
+                {popularBrands.slice(0, 8).map((item) => {
+                  const pillClass =
+                    "inline-flex items-center gap-1 rounded-full border border-cnc-line bg-cnc-bg px-2.5 py-1 text-[12px] font-semibold text-cnc-text transition hover:border-primary/40 hover:bg-cnc-surface hover:text-primary motion-reduce:transition-none";
+                  const content = (
+                    <>
+                      {item.brand}
+                      {item.total > 0 ? (
+                        <span className="text-[11px] font-bold text-cnc-muted-soft">
+                          {formatTotal(item.total)}
+                        </span>
+                      ) : null}
+                    </>
+                  );
+                  return popularBrandHref ? (
+                    <Link
+                      key={`pop-${item.brand}`}
+                      href={popularBrandHref(item.brand)}
+                      className={pillClass}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <button
+                      key={`pop-${item.brand}`}
+                      type="button"
+                      onClick={() => onPatch({ brand: item.brand, model: undefined, page: 1 })}
+                      className={pillClass}
+                    >
+                      {content}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : null}

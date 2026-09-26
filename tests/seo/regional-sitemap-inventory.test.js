@@ -48,6 +48,16 @@ const legacyRepoMock = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/read-models/seo/sitemap-public.repository.js", () => legacyRepoMock);
+
+/**
+ * DEC-30: quem decide a entrada de modelo é a elegibilidade SEO (a mesma do
+ * robots da landing), não o estoque próprio. O mock devolve o veredito; o
+ * default é elegível para os testes que não são sobre modelo.
+ */
+const eligibilityMock = vi.hoisted(() => ({
+  resolveCityModelSeoEligibility: vi.fn(),
+}));
+vi.mock("../../src/read-models/cities/city-model-seo-eligibility.js", () => eligibilityMock);
 vi.mock("../../src/read-models/seo/sitemap-ads.repository.js", () => ({
   listActiveAdRows: vi.fn(async () => []),
 }));
@@ -77,6 +87,7 @@ beforeEach(() => {
   repoMock.listActiveCityBelowFipeRows.mockResolvedValue([ATIBAIA]);
   repoMock.listActiveCityBrandRows.mockResolvedValue([ATIBAIA]);
   repoMock.listActiveCityBrandModelRows.mockResolvedValue([ATIBAIA]);
+  eligibilityMock.resolveCityModelSeoEligibility.mockResolvedValue({ indexable: true });
   legacyRepoMock.listSitemapByRegion.mockClear();
 });
 
@@ -205,26 +216,45 @@ describe("regional ⊆ sitemaps por tipo", () => {
  * dele. Medido em 2026-08-07: o modelo mais frequente do estoque tem 2
  * anúncios e o limiar é 3.
  */
-describe("limiar de modelo — vazio legítimo", () => {
-  it("modelo com 2 anúncios não entra (limiar 3)", async () => {
-    repoMock.listActiveCityBrandModelRows.mockResolvedValue([{ ...ATIBAIA, total: 2 }]);
+describe("modelo — sitemap segue a elegibilidade DEC-30 (mesma do robots)", () => {
+  it("landing noindex não entra, mesmo com 3 anúncios próprios", async () => {
+    repoMock.listActiveCityBrandModelRows.mockResolvedValue([{ ...ATIBAIA, total: 3 }]);
+    eligibilityMock.resolveCityModelSeoEligibility.mockResolvedValue({ indexable: false });
     expect(await getPublicSitemapByType("city_brand_model")).toEqual([]);
   });
 
-  it("modelo com 3 anúncios entra", async () => {
-    repoMock.listActiveCityBrandModelRows.mockResolvedValue([{ ...ATIBAIA, total: 3 }]);
+  it("landing indexável entra, mesmo com 1 anúncio próprio (território do motor ≥ 3)", async () => {
+    repoMock.listActiveCityBrandModelRows.mockResolvedValue([{ ...ATIBAIA, total: 1 }]);
     const entries = await getPublicSitemapByType("city_brand_model");
     expect(entries).toHaveLength(1);
-    expect(entries[0].loc).toContain("/modelo/");
+    expect(entries[0].loc).toBe("/cidade/atibaia-sp/marca/fiat/modelo/argo");
+    expect(eligibilityMock.resolveCityModelSeoEligibility).toHaveBeenCalledWith(
+      "atibaia-sp",
+      "fiat",
+      "argo"
+    );
   });
 
-  it("o mesmo limiar vale no regional", async () => {
+  it("a mesma decisão vale no regional", async () => {
     repoMock.listActiveCityRows.mockResolvedValue([]);
     repoMock.listActiveCityBelowFipeRows.mockResolvedValue([]);
     repoMock.listActiveCityBrandRows.mockResolvedValue([]);
-    repoMock.listActiveCityBrandModelRows.mockResolvedValue([{ ...ATIBAIA, total: 2 }]);
+    eligibilityMock.resolveCityModelSeoEligibility.mockResolvedValue({ indexable: false });
 
     expect(await getPublicSitemapByRegion("SP")).toEqual([]);
+  });
+
+  it("falha ao avaliar uma URL omite só ela", async () => {
+    repoMock.listActiveCityBrandModelRows.mockResolvedValue([
+      ATIBAIA,
+      { ...ATIBAIA, brand: "Hyundai", model: "HB20 Sense 1.0" },
+    ]);
+    eligibilityMock.resolveCityModelSeoEligibility.mockImplementation(async (_c, brand) => {
+      if (brand === "fiat") throw new Error("db down");
+      return { indexable: true };
+    });
+    const entries = await getPublicSitemapByType("city_brand_model");
+    expect(entries.map((e) => e.loc)).toEqual(["/cidade/atibaia-sp/marca/hyundai/modelo/hb20"]);
   });
 });
 

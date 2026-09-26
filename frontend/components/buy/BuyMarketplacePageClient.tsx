@@ -19,15 +19,10 @@ import type {
   AdsSearchResponse,
 } from "@/lib/search/ads-search";
 import { buildSearchQueryString, mergeSearchFilters } from "@/lib/search/ads-search-url";
-import {
-  engineControlTotals,
-  readOfferCounts,
-  readSearchPolicy,
-  readSearchPolicyFacets,
-  territoryNotice,
-} from "@/lib/search/search-policy";
+import { readSearchPolicy, territoryNotice } from "@/lib/search/search-policy";
 import { DEFAULT_RADIUS_KM } from "@/lib/buy/regional-radius-config";
 import {
+  buildSidebarControlTotals,
   DEFAULT_BRAND_OPTIONS,
   DEFAULT_MODEL_OPTIONS,
   DEFAULT_POPULAR_BRANDS,
@@ -140,58 +135,20 @@ export default function BuyMarketplacePageClient({
   }, [brandFacets]);
 
   /**
-   * Contagem dos controles da sidebar (Ofertas, Vendedor, Câmbio). Escopo
-   * territorial — ver buildAdsFacetScopeWhere no backend.
-   *
-   * Cada bloco fica `undefined` quando a facet não veio, para a sidebar
-   * renderizar sem número em vez de "(0)": sem dado, "(0)" seria mentira.
-   * Necessário porque o BFF pode responder EMPTY_FACETS em erro/timeout, e
-   * porque outras páginas montam a sidebar sem passar esta prop.
+   * Contagem dos controles da sidebar (Ofertas, Vendedor, Câmbio): facetas do
+   * motor quando ele responde, senão as do BFF (escopo territorial). A regra
+   * vive em `buildSidebarControlTotals` — a landing de modelo usa a mesma.
    */
-  // F3 / DEC-08 + DEC-13: quando o motor responde, as facetas vêm do MESMO
-  // CandidateScope do grid. As do BFF legado têm escopo territorial da cidade e
-  // passam a contradizer o grid assim que o território cresce — é o caso de
-  // "Abaixo da FIPE (9)" ao lado de 4 resultados, que originou este trecho.
   const enginePolicy = useMemo(
     () => readSearchPolicy(initialResults?.search_policy),
     [initialResults?.search_policy]
   );
-  const engineFacets = useMemo(
-    () => readSearchPolicyFacets(initialResults?.engine_facets),
-    [initialResults?.engine_facets]
-  );
-  const engineOffers = useMemo(
-    () => readOfferCounts(initialResults?.engine_offer_counts),
-    [initialResults?.engine_offer_counts]
-  );
   const notice = useMemo(() => territoryNotice(enginePolicy), [enginePolicy]);
 
-  const controlTotals = useMemo(() => {
-    const fromEngine = engineControlTotals(engineFacets, engineOffers);
-    if (fromEngine) return fromEngine;
-    const sellerKindRows = initialFacets?.sellerKinds;
-    const sellerKind =
-      Array.isArray(sellerKindRows) && sellerKindRows.length > 0
-        ? {
-            dealer: sellerKindRows.find((r) => r.seller_kind === "dealer")?.total ?? 0,
-            private: sellerKindRows.find((r) => r.seller_kind === "private")?.total ?? 0,
-          }
-        : undefined;
-
-    const transmissionRows = initialFacets?.transmissions;
-    const transmission =
-      Array.isArray(transmissionRows) && transmissionRows.length > 0
-        ? Object.fromEntries(transmissionRows.map((r) => [r.transmission, r.total]))
-        : undefined;
-
-    return { sellerKind, offers: initialFacets?.offers, transmission };
-  }, [
-    engineFacets,
-    engineOffers,
-    initialFacets?.sellerKinds,
-    initialFacets?.transmissions,
-    initialFacets?.offers,
-  ]);
+  const controlTotals = useMemo(
+    () => buildSidebarControlTotals(initialResults, initialFacets),
+    [initialResults, initialFacets]
+  );
 
   // `?raio=` (raio do bloco "Próximos") é ORTOGONAL aos filtros de veículo — não
   // faz parte de AdsSearchFilters. Ao re-navegar por um filtro de veículo,

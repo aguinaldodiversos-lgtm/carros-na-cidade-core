@@ -22,7 +22,7 @@ import { buildCandidateScope } from "./candidate-scope.js";
 import { buildChips } from "./chips.js";
 import { getBrandDictionary, getCommercialModelDictionary } from "./dictionaries.js";
 import { computeFacets } from "./facets-policy.js";
-import { isOriginAllowed } from "./flag.js";
+import { FLAG_V1, getSearchPolicyFlag, isOriginAllowed } from "./flag.js";
 import { resolveIntent } from "./intent-resolver.js";
 import { resolveLocation } from "./location-resolver.js";
 import { policyCacheBackend } from "./policy-cache.js";
@@ -972,6 +972,84 @@ export function findUnsupportedParams(rawQuery = {}) {
       : 0;
   if (slugCount > 1) found.push("city_slugs");
   return found;
+}
+
+export const SERVING_MODE = Object.freeze({
+  ENGINE: "search_policy",
+  LEGACY: "legacy",
+});
+
+/**
+ * Quem serve esta busca em `/api/ads/search`: o motor ou o caminho legado.
+ *
+ * É a composição EXATA das três portas do controller (`ads.controller.js`
+ * `search`): flag `v1` → sem parâmetro fora do contrato → origem na allowlist.
+ * Qualquer uma fechada, a resposta sai do legado. Existe para que quem precisa
+ * saber "que conjunto esta página mostra" (DEC-30) pergunte à mesma regra que
+ * o serviu, em vez de supor. Não cobre a falha em runtime do motor (que também
+ * cai no legado) — essa é transitória e imprevisível por definição.
+ *
+ * @param {object} rawQuery   parâmetros da busca, como a página os envia
+ * @param {string|null} originSlug  origem resolvida (city_slug)
+ * @returns {{ mode: string, reason: string|null }}
+ */
+export function resolveSearchServingMode(rawQuery, originSlug, env = process.env) {
+  if (getSearchPolicyFlag(env) !== FLAG_V1) {
+    return { mode: SERVING_MODE.LEGACY, reason: "flag_not_v1" };
+  }
+  if (findUnsupportedParams(rawQuery).length > 0) {
+    return { mode: SERVING_MODE.LEGACY, reason: "unsupported_params" };
+  }
+  if (!isOriginAllowed(originSlug, env)) {
+    return { mode: SERVING_MODE.LEGACY, reason: "origin_not_allowed" };
+  }
+  return { mode: SERVING_MODE.ENGINE, reason: null };
+}
+
+/**
+ * Contagem do território canônico do motor para uma origem.
+ *
+ * Mesmo SearchContext, mesmo ScopeResolver (memberships, piso regional,
+ * baseline, AUTO do perfil) e a MESMA countQuery de `runSearchPolicyEngine` —
+ * só não busca linhas, facetas nem relaxações, e não grava telemetria.
+ *
+ * Não verifica o modo servido: quem chama decide antes, com
+ * `resolveSearchServingMode`, se o conjunto do motor é o que a página mostra.
+ * Não decide nada: devolve os números. Quem aplica regra sobre eles (a
+ * elegibilidade SEO, por exemplo) mora fora do motor.
+ *
+ * Parâmetro fora do contrato do motor (ENGINE_LEGACY_ONLY_KEYS) lança — o
+ * motor não sabe contar aquele conjunto, e responder um número de outro
+ * conjunto seria pior que falhar.
+ *
+ * @param {object} rawQuery
+ * @param {{ db?, policy?, cache?: boolean }} opts
+ */
+export async function countSearchPolicyTerritory(rawQuery, opts = {}) {
+  const unsupported = findUnsupportedParams(rawQuery);
+  if (unsupported.length > 0) {
+    throw new Error(
+      `[search-policy] contagem territorial fora do contrato do motor: ${unsupported.join(", ")}`
+    );
+  }
+  const db = opts.db || pool;
+  const ctx = await buildSearchContext(rawQuery, { db, policy: opts.policy });
+  const scope = await resolveScope(ctx, ctx.policy, {
+    db,
+    cache: opts.cache,
+    includeDetails: false,
+  });
+  const queries = buildEngineQueries(ctx, scope);
+  const { rows } = await db.query(queries.countQuery, queries.countParams);
+  return {
+    origin_city: ctx.origin
+      ? { slug: ctx.origin.slug, name: ctx.origin.name, state: ctx.origin.state }
+      : null,
+    geo_mode: scope.geo_mode,
+    reason: scope.reason,
+    local_result_count: scope.local_result_count,
+    total_result_count: Number(rows[0]?.total || 0),
+  };
 }
 
 export async function runSearchPolicyEngineIfAllowed(rawQuery, opts = {}) {

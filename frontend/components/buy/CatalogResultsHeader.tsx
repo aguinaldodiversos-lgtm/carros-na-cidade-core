@@ -45,6 +45,12 @@ export type CatalogResultsHeaderProps = {
    * bar bottom-sheet instead, to free horizontal space). Default false.
    */
   hideSort?: boolean;
+  /**
+   * `"desktop"`: o `<select>` só aparece a partir de `lg`. A landing de modelo
+   * leva a ordenação para a barra mobile ao lado de "Filtros" — sem isto o
+   * celular mostraria dois seletores de ordenação um embaixo do outro.
+   */
+  sortVisibility?: "always" | "desktop";
 };
 
 export function CatalogResultsHeader({
@@ -53,6 +59,7 @@ export function CatalogResultsHeader({
   onPatch,
   hideSort = false,
   territoryNotice = null,
+  sortVisibility = "always",
 }: CatalogResultsHeaderProps) {
   const handleSortChange = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => {
@@ -79,7 +86,11 @@ export function CatalogResultsHeader({
       </div>
 
       {hideSort ? null : (
-        <label className="inline-flex items-center gap-2 text-cnc-muted">
+        <label
+          className={`${
+            sortVisibility === "desktop" ? "hidden lg:inline-flex" : "inline-flex"
+          } items-center gap-2 text-cnc-muted`}
+        >
           <span className="hidden sm:inline">Ordenar por:</span>
           <select
             aria-label="Ordenar por"
