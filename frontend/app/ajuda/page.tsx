@@ -17,13 +17,13 @@ export default function AjudaPage() {
         {
           title: "O Carros na Cidade vende ou financia carros?",
           body: [
-            "Não. Somos um portal de classificados e conteúdo: você encontra anúncios e fala com vendedor ou loja. Compra, vistoria e pagamento são entre as partes, salvo quando uma loja oferece serviço próprio e isso estiver claro no anúncio.",
+            "Não. Somos um portal de classificados e conteúdo: aqui você encontra apenas anúncios e o contato é direto com o vendedor ou loja. Compra, vistoria e pagamento são entre as partes,Não intermediamos e não cobramos comissão pela venda.",
           ],
         },
         {
           title: "Como entro em contato com quem anuncia?",
           body: [
-            "No anúncio aparecem os canais disponibilizados pelo vendedor (telefone, WhatsApp, formulário etc.). Use sempre os dados do próprio anúncio e desconfie de terceiros que apareçam do nada pedindo adiantamento.",
+            "No anúncio aparecem os canais disponibilizados pelo vendedor (telefone, WhatsApp, formulário etc.). Use sempre os dados do próprio anúncio e desconfie de terceiros que apareçam do nada pedindo adiantamento. Importante, sempre veja e leve o carro para fazer laudo antes de fazer o pagamento e nunca pague em nome de terceiros.",
           ],
         },
         {
