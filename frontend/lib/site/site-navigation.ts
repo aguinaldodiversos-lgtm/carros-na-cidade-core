@@ -156,8 +156,8 @@ export const SITE_ROUTES = {
 
 export const SITE_CONTACT = {
   email: "contato@carrosnacidade.com",
-  phoneDisplay: "(11) 98768-4221",
-  phoneHref: "tel:+5511987684221",
+  phoneDisplay: "(11) 949301548",
+  phoneHref: "tel:+5511949301548",
 } as const;
 
 export type SiteNavSectionId =
