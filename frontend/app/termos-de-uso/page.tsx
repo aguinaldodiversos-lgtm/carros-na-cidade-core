@@ -377,7 +377,9 @@ export default function TermosDeUsoPage() {
                 className="font-semibold text-[#0e62d8] hover:underline"
               >
                 Política de Privacidade
-              </Link><Link
+              </Link>
+
+              <Link
                 href="/contato"
                 className="font-semibold text-[#0e62d8] hover:underline"
               >
