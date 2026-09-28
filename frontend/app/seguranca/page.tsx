@@ -90,7 +90,7 @@ export default function SegurancaPage() {
                 "Confirmar que a conta de destino pertence ao vendedor legítimo ou à empresa responsável.",
               ],
             },
-            "Pagamentos feitos fora da plataforma são de responsabilidade exclusiva das partes envolvidas. O Carros na Cidade não se responsabiliza por valores pagos diretamente entre compradores, vendedores, lojistas, intermediários ou terceiros.",
+            "Os pagamentos são feitos fora da plataforma e são de responsabilidade exclusiva das partes envolvidas. O Carros na Cidade não se responsabiliza por valores pagos diretamente entre compradores, vendedores, lojistas, intermediários ou terceiros.",
           ],
         },
         {
