@@ -346,7 +346,8 @@ export default function PoliticaDePrivacidadePage() {
               Documentos e informações relacionadas
             </p>
 
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2"><Link
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+              <Link
                 href="/termos-de-uso"
                 className="font-semibold text-[#0e62d8] hover:underline"
               >
