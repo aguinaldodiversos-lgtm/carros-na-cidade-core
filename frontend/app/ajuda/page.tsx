@@ -312,13 +312,6 @@ export default function AjudaPage() {
               </Link>
 
               <Link
-                href="/lgpd"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
-                LGPD
-              </Link>
-
-              <Link
                 href="/contato"
                 className="font-semibold text-[#0e62d8] hover:underline"
               >
