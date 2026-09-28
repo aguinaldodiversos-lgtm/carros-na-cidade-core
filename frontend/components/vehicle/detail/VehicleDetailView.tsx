@@ -334,13 +334,30 @@ export default function VehicleDetailView({
 
             {/* Aviso legal */}
             <section className="rounded-2xl border border-cnc-line bg-white p-4 shadow-card">
-              <h2 className="text-[15px] font-extrabold text-cnc-text-strong">Aviso Legal</h2>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
-                Carros na Cidade é um portal de anúncios classificados. Não intermedia negociações,
-                não recebe pagamentos e não se responsabiliza pelas ofertas ou informações
-                divulgadas pelos anunciantes.
-              </p>
-            </section>
+  <h2 className="text-[15px] font-extrabold text-cnc-text-strong">
+    Aviso Legal
+  </h2>
+
+  <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
+    O Carros na Cidade é um portal de anúncios automotivos. Não somos
+    proprietários dos veículos anunciados, não recebemos o pagamento da compra
+    e não intermediamos a negociação entre comprador e vendedor.
+  </p>
+
+  <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
+    As informações deste anúncio são fornecidas pelo anunciante e devem ser
+    verificadas pelo comprador antes da conclusão do negócio. A publicação do
+    anúncio não representa vistoria, certificação, garantia de procedência ou
+    recomendação de compra pelo Carros na Cidade.
+  </p>
+
+  <Link
+    href="/termos-de-uso"
+    className="mt-3 inline-flex text-[12.5px] font-semibold text-[#0e62d8] hover:underline"
+  >
+    Ver Termos de Uso
+  </Link>
+</section>
 
             {/* Denunciar */}
             <button
