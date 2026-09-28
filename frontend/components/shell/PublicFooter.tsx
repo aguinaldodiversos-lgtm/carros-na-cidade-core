@@ -63,9 +63,6 @@ function FooterLegalLinks({ className }: { className?: string }) {
       <Link href={SITE_ROUTES.terms} className="transition hover:text-white">
         Termos de uso
       </Link>
-      <Link href={SITE_ROUTES.lgpd} className="transition hover:text-white">
-        LGPD
-      </Link>
     </div>
   );
 }
