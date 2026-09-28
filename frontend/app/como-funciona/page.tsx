@@ -243,16 +243,7 @@ export default function ComoFuncionaPage() {
                 className="font-semibold text-[#0e62d8] hover:underline"
               >
                 Política de Privacidade
-              </Link>
-
-              <Link
-                href="/lgpd"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
-                LGPD
-              </Link>
-
-              <Link
+              </Link><Link
                 href="/termos-de-uso"
                 className="font-semibold text-[#0e62d8] hover:underline"
               >
