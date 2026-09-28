@@ -378,7 +378,6 @@ export default function PoliticaDePrivacidadePage() {
           </div>
 
           <p className="text-[13px] leading-6 text-[#7a8499]">
-            Última atualização: 27 de setembro de 2026.
           </p>
         </div>
       }
