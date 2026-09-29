@@ -71,6 +71,103 @@ describe("limiares territoriais — sincronia backend ↔ frontend", () => {
     expect(backend.getCityExistsMinAds()).toBeLessThanOrEqual(backend.getCityIndexMinAds());
   });
 
+  it("tabela de limiares por superfície é IDÊNTICA nos dois lados, em todo cenário de env", () => {
+    for (const { env } of CENARIOS) {
+      for (const k of ENV_KEYS) delete process.env[k];
+      Object.assign(process.env, env);
+      expect(frontend.getSeoInventoryThresholds()).toEqual(backend.getSeoInventoryThresholds());
+      for (const surface of Object.values(backend.SEO_SURFACE)) {
+        expect(frontend.getSeoThreshold(surface)).toBe(backend.getSeoThreshold(surface));
+      }
+    }
+  });
+
+  it("as superfícies declaradas batem (nenhuma só de um lado)", () => {
+    expect(Object.keys(frontend.getSeoInventoryThresholds()).sort()).toEqual(
+      Object.values(backend.SEO_SURFACE).sort()
+    );
+  });
+
+  it("taxonomia de modelo → superfície: mesmo mapeamento nos dois lados", () => {
+    for (const taxonomy of ["commercial", "none", "fipe", undefined, null, "", "outra"]) {
+      expect(frontend.seoSurfaceForModelTaxonomy(taxonomy)).toBe(
+        backend.seoSurfaceForModelTaxonomy(taxonomy)
+      );
+    }
+  });
+});
+
+describe("política SEO por superfície — valores com as envs padrão", () => {
+  const S = backend.SEO_SURFACE;
+
+  it("cidade=3, marca=3, modelo comercial=1, URL FIPE legada=3, categorias=4 (backend e frontend)", () => {
+    const esperado = {
+      [S.CITY]: 3,
+      [S.BRAND]: 3,
+      [S.MODEL]: 1,
+      [S.MODEL_FIPE_LEGACY]: 3,
+      [S.BODY_TYPE]: 4,
+      [S.TRANSMISSION]: 4,
+      [S.PRICE_RANGE]: 4,
+    };
+    expect(backend.getSeoInventoryThresholds()).toEqual(esperado);
+    expect(frontend.getSeoInventoryThresholds()).toEqual(esperado);
+    expect(backend.getSeoThreshold(S.MODEL)).toBe(1);
+    expect(frontend.getSeoThreshold("model")).toBe(1);
+  });
+
+  it("o limiar global de indexação continua 3", () => {
+    expect(backend.__testing.DEFAULT_INDEX_MIN_ADS).toBe(3);
+  });
+
+  it.each([
+    // F/G/H — cidade
+    [S.CITY, 1, false],
+    [S.CITY, 2, false],
+    [S.CITY, 3, true],
+    // I/J — marca
+    [S.BRAND, 1, false],
+    [S.BRAND, 2, false],
+    [S.BRAND, 3, true],
+    // modelo comercial: âncora de 1; zero nunca
+    [S.MODEL, 0, false],
+    [S.MODEL, 1, true],
+    // URL FIPE legada: preservada em base
+    [S.MODEL_FIPE_LEGACY, 1, false],
+    [S.MODEL_FIPE_LEGACY, 2, false],
+    [S.MODEL_FIPE_LEGACY, 3, true],
+    // K — categorias transversais: base + 1
+    [S.BODY_TYPE, 3, false],
+    [S.BODY_TYPE, 4, true],
+    [S.TRANSMISSION, 3, false],
+    [S.TRANSMISSION, 4, true],
+    [S.PRICE_RANGE, 3, false],
+    [S.PRICE_RANGE, 4, true],
+  ])("%s com %i anúncio(s) → qualifica=%s (backend = frontend)", (surface, count, ok) => {
+    expect(backend.qualifiesForSeoSurface(surface, count)).toBe(ok);
+    expect(frontend.qualifiesForSeoSurface(surface, count)).toBe(ok);
+  });
+
+  it("modelo comercial NÃO acompanha a env de cidade; o resto acompanha", () => {
+    process.env.CITY_INDEX_MIN_ADS = "5";
+    for (const side of [backend, frontend]) {
+      expect(side.getSeoThreshold("city")).toBe(5);
+      expect(side.getSeoThreshold("brand")).toBe(5);
+      expect(side.getSeoThreshold("modelFipeLegacy")).toBe(5);
+      expect(side.getSeoThreshold("bodyType")).toBe(6);
+      expect(side.getSeoThreshold("model")).toBe(1);
+    }
+  });
+
+  it("taxonomia → superfície", () => {
+    expect(backend.seoSurfaceForModelTaxonomy("commercial")).toBe(S.MODEL);
+    expect(backend.seoSurfaceForModelTaxonomy("none")).toBe(S.MODEL);
+    expect(backend.seoSurfaceForModelTaxonomy("fipe")).toBe(S.MODEL_FIPE_LEGACY);
+    expect(backend.seoSurfaceForModelTaxonomy(undefined)).toBe(S.MODEL_FIPE_LEGACY);
+  });
+});
+
+describe("limiares territoriais — alias legado", () => {
   it("o alias legado do frontend ainda devolve o limiar de indexação", () => {
     process.env.CITY_INDEX_MIN_ADS = "6";
     expect(frontend.getSitemapMinAds()).toBe(6);

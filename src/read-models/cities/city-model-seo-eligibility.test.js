@@ -10,6 +10,7 @@ import {
 import { resolveSearchServingMode } from "../../modules/ads/search-policy/engine.js";
 import { buildClusterSeo } from "./territorial-cluster.logic.js";
 import { filterEligibleModelEntries } from "../seo/territorial-inventory-sitemap.service.js";
+import { SEO_SURFACE, getSeoThreshold, seoSurfaceForModelTaxonomy } from "./city-thresholds.js";
 
 const HB20 = { brand: "Hyundai", commercial_model: "HB20" };
 const ENGINE = () => ({ mode: SERVING_MODE.ENGINE, reason: null });
@@ -90,7 +91,7 @@ describe("DEC-30 — regra pura por modo servido", () => {
     expect(out.regional_model_count).toBeNull();
   });
 
-  it("o limiar é o de indexação recebido (CITY_INDEX_MIN_ADS), não um número próprio", () => {
+  it("o limiar é o recebido da política central, não um número próprio", () => {
     expect(
       decideCityModelSeoEligibility({
         servingMode: SERVING_MODE.ENGINE,
@@ -162,6 +163,174 @@ describe("DEC-30 — matriz obrigatória (pelo caminho da landing)", () => {
   });
 });
 
+/**
+ * Mesma avaliação, mas SEM `minInventory` injetado: o limiar vem da política
+ * central pela taxonomia resolvida — é o caminho que a página e o sitemap
+ * usam em produção.
+ */
+async function byPolicy({ taxonomy, own, local, total, serving, listingFilters = HB20 }) {
+  const countTerritory = territory({ local, total });
+  const out = await evaluateCityModelSeoEligibility(
+    { citySlug: "braganca-paulista-sp", listingFilters, ownActiveCount: own, taxonomy },
+    { countTerritory, resolveServingMode: serving }
+  );
+  return { out, countTerritory };
+}
+
+const FIPE_FILTERS = { brand: "Chevrolet", model: "ONIX HATCH LT 1.0 12V Flex 5p Mec." };
+
+describe("política de MODEL — comercial = 1 (âncora local), URL FIPE legada = base", () => {
+  it("limiares resolvidos pela taxonomia", () => {
+    expect(getSeoThreshold(seoSurfaceForModelTaxonomy("commercial"))).toBe(1);
+    expect(getSeoThreshold(seoSurfaceForModelTaxonomy("none"))).toBe(1);
+    expect(getSeoThreshold(seoSurfaceForModelTaxonomy("fipe"))).toBe(3);
+    // Ausente/desconhecida → a mais estrita.
+    expect(seoSurfaceForModelTaxonomy(undefined)).toBe(SEO_SURFACE.MODEL_FIPE_LEGACY);
+    expect(seoSurfaceForModelTaxonomy("outra")).toBe(SEO_SURFACE.MODEL_FIPE_LEGACY);
+  });
+
+  // A — motor, 1 local, nenhum regional adicional.
+  it("A: comercial, motor, local=1 regional=1 → INDEX", async () => {
+    const { out } = await byPolicy({
+      taxonomy: "commercial",
+      own: 1,
+      local: 1,
+      total: 1,
+      serving: ENGINE,
+    });
+    expect(out).toMatchObject({
+      indexable: true,
+      serving_mode: "search_policy",
+      reason: CITY_MODEL_SEO_REASON.LOCAL_ANCHOR_WITH_REGIONAL_INVENTORY,
+      local_model_count: 1,
+      regional_model_count: 1,
+      min_inventory: 1,
+    });
+  });
+
+  // B — motor, 1 local + regionais.
+  it("B: comercial, motor, local=1 regional=4 → INDEX", async () => {
+    const { out } = await byPolicy({
+      taxonomy: "commercial",
+      own: 1,
+      local: 1,
+      total: 4,
+      serving: ENGINE,
+    });
+    expect(out).toMatchObject({ indexable: true, local_model_count: 1, regional_model_count: 4 });
+  });
+
+  // C — motor, estoque só nas vizinhas.
+  it("C: comercial, motor, local=0 regional=4 → NOINDEX no_local_anchor", async () => {
+    const { out } = await byPolicy({
+      taxonomy: "commercial",
+      own: 0,
+      local: 0,
+      total: 4,
+      serving: ENGINE,
+    });
+    expect(out.indexable).toBe(false);
+    expect(out.noindexReason).toBe(CITY_MODEL_SEO_REASON.NO_LOCAL_ANCHOR);
+  });
+
+  it("comercial, motor, local=0 regional=0 → NOINDEX", async () => {
+    const { out } = await byPolicy({
+      taxonomy: "commercial",
+      own: 0,
+      local: 0,
+      total: 0,
+      serving: ENGINE,
+    });
+    expect(out.indexable).toBe(false);
+    expect(out.noindexReason).toBe(CITY_MODEL_SEO_REASON.NO_ACTIVE_INVENTORY);
+  });
+
+  // D / E — legado (cidade fora da allowlist) com filtro comercial.
+  it("D: comercial, legado, local=1 → INDEX (sem consultar o motor)", async () => {
+    const { out, countTerritory } = await byPolicy({
+      taxonomy: "commercial",
+      own: 1,
+      local: 1,
+      total: 4,
+      serving: LEGACY,
+    });
+    expect(out).toMatchObject({
+      indexable: true,
+      serving_mode: "legacy",
+      reason: CITY_MODEL_SEO_REASON.LOCAL_INVENTORY,
+      local_model_count: 1,
+      min_inventory: 1,
+    });
+    expect(countTerritory).not.toHaveBeenCalled();
+  });
+
+  it("E: comercial, legado, local=0 → NOINDEX", async () => {
+    const { out } = await byPolicy({
+      taxonomy: "commercial",
+      own: 0,
+      local: 0,
+      total: 4,
+      serving: LEGACY,
+    });
+    expect(out.indexable).toBe(false);
+    expect(out.noindexReason).toBe(CITY_MODEL_SEO_REASON.NO_ACTIVE_INVENTORY);
+  });
+
+  // URL antiga por descrição FIPE: sempre legado (`model` fora do contrato),
+  // limiar base. Nada muda para ela.
+  it.each([
+    [1, false],
+    [2, false],
+    [3, true],
+    [5, true],
+  ])(
+    "URL FIPE legada, local=%i → indexable=%s (limiar base preservado)",
+    async (own, indexable) => {
+      process.env.SEARCH_POLICY_ENGINE = "v1";
+      process.env.SEARCH_POLICY_ENGINE_CITIES = "*";
+      const countTerritory = vi.fn();
+      const out = await evaluateCityModelSeoEligibility(
+        {
+          citySlug: "atibaia-sp",
+          listingFilters: FIPE_FILTERS,
+          ownActiveCount: own,
+          taxonomy: "fipe",
+        },
+        { countTerritory }
+      );
+      expect(out).toMatchObject({
+        indexable,
+        serving_mode: "legacy",
+        serving_reason: "unsupported_params",
+        min_inventory: 3,
+      });
+      if (!indexable) expect(out.noindexReason).toBe(CITY_MODEL_SEO_REASON.BELOW_MIN_INVENTORY);
+      expect(countTerritory).not.toHaveBeenCalled();
+    }
+  );
+
+  it("taxonomia ausente nunca indexa com o limiar comercial por acidente", async () => {
+    const { out } = await byPolicy({ own: 1, local: 1, total: 1, serving: LEGACY });
+    expect(out.indexable).toBe(false);
+    expect(out.min_inventory).toBe(3);
+  });
+
+  it("falha do motor continua fail-closed com o limiar comercial", async () => {
+    const out = await evaluateCityModelSeoEligibility(
+      { citySlug: "atibaia-sp", listingFilters: HB20, ownActiveCount: 5, taxonomy: "commercial" },
+      {
+        resolveServingMode: ENGINE,
+        countTerritory: vi.fn().mockRejectedValue(new Error("pool exhausted")),
+      }
+    );
+    expect(out).toMatchObject({
+      indexable: false,
+      noindexReason: CITY_MODEL_SEO_REASON.ELIGIBILITY_UNAVAILABLE,
+      min_inventory: 1,
+    });
+  });
+});
+
 describe("modo servido = as portas do controller de /api/ads/search", () => {
   const q = { city_slug: "braganca-paulista-sp", ...HB20 };
   const env = (flag, cities) => ({
@@ -185,19 +354,20 @@ describe("modo servido = as portas do controller de /api/ads/search", () => {
 });
 
 describe("trocar SEARCH_POLICY_ENGINE_CITIES muda modo e regra juntos, robots = sitemap", () => {
-  // Bragança: 1 próprio, 4 no território do motor. Nada injetado no modo
-  // servido: vale o `process.env` do momento, como no controller.
-  const deps = {
+  // Nada injetado no modo servido: vale o `process.env` do momento, como no
+  // controller. `own`/`local`/`total` descrevem a cidade e o território.
+  const depsFor = ({ own, local, total, taxonomy = "commercial" }) => ({
     resolveCityModel: async () => ({
       city: { slug: "braganca-paulista-sp" },
-      model: { activeCount: 1 },
+      model: { activeCount: own },
+      taxonomy,
     }),
     resolveListing: async () => ({ filters: HB20 }),
-    countTerritory: territory({ local: 1, total: 4 }),
-  };
+    countTerritory: territory({ local, total }),
+  });
   const LOC = "/cidade/braganca-paulista-sp/marca/hyundai/modelo/hb20";
 
-  async function snapshot() {
+  async function snapshot(deps) {
     const eligibility = await resolveCityModelSeoEligibility(
       "braganca-paulista-sp",
       "hyundai",
@@ -209,7 +379,7 @@ describe("trocar SEARCH_POLICY_ENGINE_CITIES muda modo e regra juntos, robots = 
       title: "t",
       description: "d",
       activeCount: 1,
-      minInventory: 3,
+      minInventory: eligibility.min_inventory,
       eligibility,
     }).robots;
     const sitemap = await filterEligibleModelEntries([{ loc: LOC }], (c, b, m) =>
@@ -218,36 +388,50 @@ describe("trocar SEARCH_POLICY_ENGINE_CITIES muda modo e regra juntos, robots = 
     return { mode: eligibility.serving_mode, robots, inSitemap: sitemap.length === 1 };
   }
 
-  it("dentro da allowlist → motor, index, no sitemap; fora → legado, noindex, fora", async () => {
-    process.env.SEARCH_POLICY_ENGINE = "v1";
-    process.env.SEARCH_POLICY_ENGINE_CITIES = "atibaia-sp,braganca-paulista-sp";
-    expect(await snapshot()).toEqual({
-      mode: "search_policy",
-      robots: "index,follow",
-      inSitemap: true,
-    });
+  const MATRIX = [
+    ["v1", "atibaia-sp,braganca-paulista-sp", "search_policy"],
+    ["v1", "atibaia-sp", "legacy"],
+    ["off", "*", "legacy"],
+    ["v1", "*", "search_policy"],
+  ];
 
-    process.env.SEARCH_POLICY_ENGINE_CITIES = "atibaia-sp";
-    expect(await snapshot()).toEqual({
-      mode: "legacy",
-      robots: "noindex,follow",
-      inSitemap: false,
-    });
+  it("comercial, 1 próprio + 4 no território: o modo segue a allowlist, a âncora de 1 indexa nos dois", async () => {
+    // Com o limiar comercial em 1, motor (local>=1 AND regional>=1) e legado
+    // (local>=1) coincidem para quem tem âncora local. Robots e sitemap
+    // continuam decidindo JUNTOS em cada modo.
+    const deps = depsFor({ own: 1, local: 1, total: 4 });
+    for (const [flag, cities, mode] of MATRIX) {
+      process.env.SEARCH_POLICY_ENGINE = flag;
+      process.env.SEARCH_POLICY_ENGINE_CITIES = cities;
+      expect(await snapshot(deps)).toEqual({ mode, robots: "index,follow", inSitemap: true });
+    }
+  });
 
-    process.env.SEARCH_POLICY_ENGINE = "off";
-    process.env.SEARCH_POLICY_ENGINE_CITIES = "*";
-    expect(await snapshot()).toEqual({
-      mode: "legacy",
-      robots: "noindex,follow",
-      inSitemap: false,
-    });
+  it("comercial, 0 próprio + 4 no território: noindex e fora do sitemap em qualquer modo", async () => {
+    const deps = depsFor({ own: 0, local: 0, total: 4 });
+    for (const [flag, cities, mode] of MATRIX) {
+      process.env.SEARCH_POLICY_ENGINE = flag;
+      process.env.SEARCH_POLICY_ENGINE_CITIES = cities;
+      expect(await snapshot(deps)).toEqual({ mode, robots: "noindex,follow", inSitemap: false });
+    }
+  });
 
-    process.env.SEARCH_POLICY_ENGINE = "v1";
-    expect(await snapshot()).toEqual({
-      mode: "search_policy",
-      robots: "index,follow",
-      inSitemap: true,
-    });
+  it("URL FIPE legada com 1-2 anúncios: robots noindex = fora do sitemap, mesmo com o motor ligado", async () => {
+    // O sitemap nunca GERA essa URL (candidatos são só comerciais); aqui a
+    // prova é que, se ela chegasse ao filtro, robots e sitemap diriam o mesmo.
+    for (const own of [1, 2]) {
+      const deps = {
+        ...depsFor({ own, local: own, total: own, taxonomy: "fipe" }),
+        resolveListing: async () => ({ filters: FIPE_FILTERS }),
+      };
+      process.env.SEARCH_POLICY_ENGINE = "v1";
+      process.env.SEARCH_POLICY_ENGINE_CITIES = "*";
+      expect(await snapshot(deps)).toEqual({
+        mode: "legacy",
+        robots: "noindex,follow",
+        inSitemap: false,
+      });
+    }
   });
 });
 

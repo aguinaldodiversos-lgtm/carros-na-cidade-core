@@ -9,9 +9,15 @@
 // decide a indexação tem de ser o do conjunto exibido (DEC-29):
 //
 //   modo servido = motor    local_model_count >= 1
-//                           AND regional_model_count >= CITY_INDEX_MIN_ADS
-//   modo servido = legado   local_model_count >= CITY_INDEX_MIN_ADS
+//                           AND regional_model_count >= LIMIAR
+//   modo servido = legado   local_model_count >= LIMIAR
 //                           (a página mostra só a cidade; regra de DEC-29)
+//
+// LIMIAR vem da política central pela TAXONOMIA já resolvida da URL
+// (`getSeoThreshold(seoSurfaceForModelTaxonomy(taxonomy))`, em
+// city-thresholds.js): modelo comercial → `model` (1); URL antiga por
+// descrição FIPE → `modelFipeLegacy` (base, 3). Este arquivo não conhece os
+// números.
 //
 // O modo vem de `resolveSearchServingMode` — as mesmas três portas do
 // controller de `/api/ads/search` (flag v1, contrato, allowlist). Aqui não se
@@ -35,7 +41,7 @@ import {
 import { getCommercialModelDictionary } from "../../modules/ads/search-policy/dictionaries.js";
 import { resolveCityModel } from "./territorial-resolve.service.js";
 import { resolveModelListing } from "./territorial-cluster.logic.js";
-import { getSeoThreshold, SEO_SURFACE } from "./city-thresholds.js";
+import { getSeoThreshold, seoSurfaceForModelTaxonomy } from "./city-thresholds.js";
 
 export const CITY_MODEL_SEO_RULE = "DEC-30";
 export { SERVING_MODE };
@@ -160,9 +166,19 @@ export async function countCityModelTerritory(
  * Elegibilidade da landing. Nunca lança: falha de contagem vira noindex
  * (fail-closed), com log — página fora do índice por um erro é recuperável;
  * página magra dentro dele, não.
+ *
+ * `taxonomy` ("commercial" | "fipe" | "none") é a de `resolveCityModel`; o
+ * limiar sai dela pela política central. Taxonomia ausente cai na família
+ * mais estrita. `minInventory` explícito sobrepõe (testes).
  */
 export async function evaluateCityModelSeoEligibility(
-  { citySlug, listingFilters, ownActiveCount, minInventory = getSeoThreshold(SEO_SURFACE.MODEL) },
+  {
+    citySlug,
+    listingFilters,
+    ownActiveCount,
+    taxonomy,
+    minInventory = getSeoThreshold(seoSurfaceForModelTaxonomy(taxonomy)),
+  },
   deps = {}
 ) {
   try {
@@ -239,6 +255,7 @@ export async function resolveCityModelSeoEligibility(citySlug, brandSlug, modelS
       citySlug: resolution.city.slug,
       listingFilters: listing.filters,
       ownActiveCount: resolution.model.activeCount,
+      taxonomy: resolution.taxonomy,
     },
     deps
   );

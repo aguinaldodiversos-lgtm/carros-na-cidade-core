@@ -21,6 +21,9 @@
 
 const DEFAULT_INDEX_MIN_ADS = 3;
 const DEFAULT_EXISTS_MIN_ADS = 1;
+// Landing por modelo COMERCIAL: âncora local de 1 anúncio. Não deriva do
+// limiar de cidade de propósito — ver "POR QUE CADA VALOR" abaixo.
+const DEFAULT_MODEL_INDEX_MIN_ADS = 1;
 
 function parsePositiveInt(raw, fallback) {
   const parsed = Number.parseInt(String(raw ?? ""), 10);
@@ -65,9 +68,10 @@ export function getCityExistsMinAds() {
    função que responde "esta família qualifica?" — e os motivos de cada
    valor ficam escritos aqui, não descobertos por grep.
 
-   Todos os limiares derivam de `getCityIndexMinAds()` (env
-   CITY_INDEX_MIN_ADS / SITEMAP_MIN_ADS) para que o operador continue
-   ajustando UM número no Render e a hierarquia se mova junto.
+   Os limiares derivam de `getCityIndexMinAds()` (env CITY_INDEX_MIN_ADS /
+   SITEMAP_MIN_ADS) para que o operador continue ajustando UM número no
+   Render e a hierarquia se mova junto — EXCETO `model`, fixo em 1
+   (DEFAULT_MODEL_INDEX_MIN_ADS), que não acompanha a env.
 
    POR QUE CADA VALOR:
 
@@ -79,10 +83,28 @@ export function getCityExistsMinAds() {
                          cidade evita o caso incoerente "cidade indexa com
                          3, marca com 3 dos mesmos 3 anúncios não indexa".
 
-     model  = base (3)   O modelo é a intenção MAIS específica que ainda tem
-                         volume de busca real ("Onix usado em Atibaia").
-                         Com a taxonomia corrigida, 3 anúncios do mesmo
-                         modelo comercial já formam uma página comparável.
+     model  = 1          Landing por modelo COMERCIAL ("Renegade em
+                         Atibaia"). É a intenção MAIS específica com volume
+                         de busca real: quem busca "comprar jeep renegade em
+                         atibaia" quer aquele carro, e 1 Renegade na cidade
+                         responde melhor que o catálogo geral com dezenas de
+                         outros modelos. O 1 é ÂNCORA LOCAL: com o motor
+                         servindo, DEC-30 continua exigindo local >= 1
+                         (estoque só nas vizinhas não indexa), e o motor
+                         segue livre para completar a listagem com o mesmo
+                         modelo no território.
+
+     modelFipeLegacy     URL antiga por descrição FIPE
+            = base (3)   (`/modelo/onix-hatch-lt-1-0-12v-flex-5p-mec`).
+                         Continua resolvendo (sem 404, sem redirect), é
+                         servida pelo legado, tem canonical própria e NUNCA
+                         entra no sitemap. Cada versão FIPE isolada tem 1-2
+                         anúncios: o limiar base é o que a mantém noindex e
+                         impede que duplique a landing comercial. Por isso
+                         NÃO acompanha `model` — são superfícies diferentes,
+                         e a escolha entre as duas sai da taxonomia já
+                         resolvida (`seoSurfaceForModelTaxonomy`), nunca do
+                         texto ou do slug.
 
      category = base+1   Carroceria/câmbio/faixa de preço são recortes
                 (4)      TRANSVERSAIS: o mesmo carro aparece em vários. Uma
@@ -92,7 +114,9 @@ export function getCityExistsMinAds() {
                          Não é um número mágico — é "estritamente mais
                          exigente que a cidade", derivado, não copiado.
 
-   NENHUM limiar foi REDUZIDO nesta fase. `category` é novo e mais estrito.
+   Fase 3: nenhum limiar foi reduzido; `category` nasceu mais estrito.
+   Depois: `model` (comercial) caiu de base para 1, com `modelFipeLegacy`
+   separado em base para que a URL FIPE antiga não mude de comportamento.
    ───────────────────────────────────────────────────────────────────────── */
 
 /** Famílias de superfície com regra de qualificação própria. */
@@ -100,6 +124,7 @@ export const SEO_SURFACE = Object.freeze({
   CITY: "city",
   BRAND: "brand",
   MODEL: "model",
+  MODEL_FIPE_LEGACY: "modelFipeLegacy",
   BODY_TYPE: "bodyType",
   TRANSMISSION: "transmission",
   PRICE_RANGE: "priceRange",
@@ -116,7 +141,8 @@ export function getSeoInventoryThresholds() {
   return {
     [SEO_SURFACE.CITY]: base,
     [SEO_SURFACE.BRAND]: base,
-    [SEO_SURFACE.MODEL]: base,
+    [SEO_SURFACE.MODEL]: DEFAULT_MODEL_INDEX_MIN_ADS,
+    [SEO_SURFACE.MODEL_FIPE_LEGACY]: base,
     [SEO_SURFACE.BODY_TYPE]: transversal,
     [SEO_SURFACE.TRANSMISSION]: transversal,
     [SEO_SURFACE.PRICE_RANGE]: transversal,
@@ -127,6 +153,34 @@ export function getSeoInventoryThresholds() {
 export function getSeoThreshold(surface) {
   const thresholds = getSeoInventoryThresholds();
   return thresholds[surface] ?? thresholds[SEO_SURFACE.CITY];
+}
+
+/**
+ * Taxonomia de modelo (`matchModelRowsBySlug` / `resolveCityModel`) → família
+ * SEO. É o ÚNICO lugar que decide "modelo comercial ou URL FIPE antiga" para
+ * fins de limiar: consumidores chamam
+ * `getSeoThreshold(seoSurfaceForModelTaxonomy(taxonomy))` em vez de recomparar
+ * a taxonomia.
+ *
+ *   commercial  landing por modelo comercial                 → model
+ *   none        cidade sem o modelo (rótulo do dicionário     → model
+ *               nacional ou nada a listar; local = 0, então
+ *               DEC-30 já nega por âncora/estoque)
+ *   fipe        URL antiga por descrição FIPE                → modelFipeLegacy
+ *
+ * Taxonomia desconhecida ou ausente cai na família MAIS estrita (fail-closed):
+ * um valor novo nunca indexa com o limiar baixo por acidente.
+ */
+const MODEL_TAXONOMY_SURFACE = Object.freeze({
+  commercial: SEO_SURFACE.MODEL,
+  none: SEO_SURFACE.MODEL,
+  fipe: SEO_SURFACE.MODEL_FIPE_LEGACY,
+});
+
+export function seoSurfaceForModelTaxonomy(taxonomy) {
+  return Object.prototype.hasOwnProperty.call(MODEL_TAXONOMY_SURFACE, taxonomy)
+    ? MODEL_TAXONOMY_SURFACE[taxonomy]
+    : SEO_SURFACE.MODEL_FIPE_LEGACY;
 }
 
 /**
@@ -141,4 +195,8 @@ export function qualifiesForSeoSurface(surface, activeCount) {
   return count >= getSeoThreshold(surface);
 }
 
-export const __testing = { DEFAULT_INDEX_MIN_ADS, DEFAULT_EXISTS_MIN_ADS };
+export const __testing = {
+  DEFAULT_INDEX_MIN_ADS,
+  DEFAULT_EXISTS_MIN_ADS,
+  DEFAULT_MODEL_INDEX_MIN_ADS,
+};

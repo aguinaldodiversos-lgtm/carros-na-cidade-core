@@ -77,10 +77,11 @@ describe("buildCommercialModelEntities", () => {
 
   it("agrupar pela descrição FIPE crua daria 4 clusters abaixo do limiar", () => {
     // Prova de que a camada de taxonomia é o que torna a página de modelo
-    // possível: sem ela, nenhum dos quatro recortes chega ao limiar.
+    // possível: sem ela, nenhum dos quatro recortes chega ao limiar que vale
+    // para a URL por descrição FIPE (`modelFipeLegacy`).
     const rawOnixRows = ATIBAIA_MODEL_ROWS.filter((r) => r.model.startsWith("ONIX"));
     expect(rawOnixRows.length).toBe(4);
-    for (const row of rawOnixRows) expect(row.total).toBeLessThan(T.model);
+    for (const row of rawOnixRows) expect(row.total).toBeLessThan(T.modelFipeLegacy);
   });
 
   it("soma Pulse (duas versões) e mantém marca correta", () => {

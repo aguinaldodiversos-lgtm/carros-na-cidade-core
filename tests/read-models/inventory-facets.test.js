@@ -79,6 +79,29 @@ describe("aggregateCommercialModels — o rodapé linka a ENTIDADE, não a vers�
     expect(models.map((m) => m.modelSlug)).toEqual(["argo"]);
   });
 
+  it("modelo comercial com 1 anúncio ativo é elegível; com 0 nunca aparece", () => {
+    // A coluna segue a MESMA política da landing (`model` = 1): o link
+    // aponta para uma página que agora é indexável. Zero estoque não gera
+    // link — não existe modelo exposto sem anúncio ativo.
+    expect(MODEL_MIN).toBe(1);
+    const models = aggregateCommercialModels([
+      { brand: "Jeep", model: "RENEGADE Longitude 1.8 4x2 Flex 16V Aut.", total: 1 },
+      { brand: "Jeep", model: "COMPASS LONGITUDE 2.0 4x2 Flex 16V Aut.", total: 0 },
+    ]);
+    expect(models.map((m) => m.modelSlug)).toEqual(["renegade"]);
+    expect(models[0].total).toBe(1);
+  });
+
+  it("o teto da coluna continua valendo com mais modelos elegíveis (padrão 6, máx. 12)", () => {
+    const names =
+      "Argo Mobi Pulse Strada Toro Cronos Fastback Uno Palio Siena Idea Doblo Punto Linea".split(
+        " "
+      );
+    const rows = names.map((m) => ({ brand: "Fiat", model: `${m} Drive 1.0`, total: 1 }));
+    expect(aggregateCommercialModels(rows)).toHaveLength(6);
+    expect(aggregateCommercialModels(rows, 1000)).toHaveLength(12);
+  });
+
   it("descarta linha sem marca ou sem modelo derivável (link morto)", () => {
     expect(
       aggregateCommercialModels([

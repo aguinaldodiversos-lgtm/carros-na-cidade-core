@@ -12,7 +12,6 @@ import {
   resolveCityModelListing,
 } from "./city-model-seo-eligibility.js";
 import { commercialModelSlug } from "../../shared/vehicle/commercial-model.js";
-import { getSeoThreshold, SEO_SURFACE } from "./city-thresholds.js";
 
 /**
  * Página de cluster cidade + marca + modelo.
@@ -84,14 +83,15 @@ export async function getCityModelPage(citySlug, brand, model, query = {}) {
   // a landing mostra o estado vazio honesto.
   const listing = await resolveCityModelListing(resolution);
 
-  // Indexação por DEC-30 — a mesma função que decide o sitemap de modelos.
-  const minInventory = getSeoThreshold(SEO_SURFACE.MODEL);
+  // Indexação por DEC-30 — a mesma função que decide o sitemap de modelos. O
+  // limiar sai da taxonomia (comercial vs URL FIPE antiga) na política central.
   const eligibility = await evaluateCityModelSeoEligibility({
     citySlug: city.slug,
     listingFilters: listing.filters,
     ownActiveCount: modelAgg.activeCount,
-    minInventory,
+    taxonomy,
   });
+  const minInventory = eligibility.min_inventory;
 
   const cityLabel = `${city.name}${city.state ? ` - ${city.state}` : ""}`;
   const brandDisplay = listing.brandName;

@@ -6,7 +6,10 @@ import {
   resolveModelListing,
 } from "./territorial-cluster.logic.js";
 import { buildModelEntries } from "../seo/territorial-inventory-sitemap.service.js";
-import { getSeoThreshold, SEO_SURFACE } from "./city-thresholds.js";
+import { getSeoThreshold, SEO_SURFACE, seoSurfaceForModelTaxonomy } from "./city-thresholds.js";
+
+/** Limiar que a política central aplica à URL resolvida com esta taxonomia. */
+const thresholdFor = (taxonomy) => getSeoThreshold(seoSurfaceForModelTaxonomy(taxonomy));
 
 /**
  * Linhas de agregação espelhando o inventário ativo real de Atibaia
@@ -84,8 +87,9 @@ describe("matchModelRowsBySlug — resolução por modelo comercial", () => {
     expect(agg.label).toBe("Onix");
   });
 
-  it("cruza o limiar de indexação que nenhuma versão isolada cruzava", () => {
-    const threshold = getSeoThreshold(SEO_SURFACE.MODEL);
+  it("a entidade comercial cruza até o limiar base que nenhuma versão isolada cruzava", () => {
+    // Onix já publicado (6 anúncios) indexava com o limiar antigo de MODEL
+    // (base) e continua indexando com qualquer um dos dois: sem regressão.
     const matched = matchModelRowsBySlug(ONIX_ROWS, "onix");
     const agg = aggregateMatchedRows(matched.rows, {
       labelKey: "model",
@@ -93,21 +97,28 @@ describe("matchModelRowsBySlug — resolução por modelo comercial", () => {
       labelOverride: matched.commercialLabel,
     });
 
-    expect(agg.activeCount).toBeGreaterThanOrEqual(threshold);
-    for (const row of ONIX_ROWS) expect(row.total).toBeLessThan(threshold);
+    expect(agg.activeCount).toBeGreaterThanOrEqual(thresholdFor(matched.taxonomy));
+    expect(agg.activeCount).toBeGreaterThanOrEqual(getSeoThreshold(SEO_SURFACE.MODEL_FIPE_LEGACY));
+    for (const row of ONIX_ROWS) {
+      expect(row.total).toBeLessThan(getSeoThreshold(SEO_SURFACE.MODEL_FIPE_LEGACY));
+    }
   });
 
-  it("URL antiga (descrição FIPE) ainda resolve, mas como recorte pequeno", () => {
+  it("URL antiga (descrição FIPE) ainda resolve, mas como recorte pequeno — limiar LEGADO", () => {
     // Compatibilidade: URLs já rastreadas não viram 404. Elas resolvem para o
-    // recorte de 2 anúncios, que fica abaixo do limiar → noindex + fora do
-    // sitemap. Sem duplicata no índice.
+    // recorte de 2 anúncios, julgado pela família `modelFipeLegacy` (base), não
+    // pela `model` comercial → noindex + fora do sitemap. Sem duplicata no
+    // índice.
     const matched = matchModelRowsBySlug(ONIX_ROWS, "onix-hatch-lt-1-0-12v-flex-5p-mec");
     expect(matched.taxonomy).toBe("fipe");
     expect(matched.rows.length).toBe(1);
 
     const agg = aggregateMatchedRows(matched.rows, { labelKey: "model", slug: "x" });
     expect(agg.activeCount).toBe(2);
-    expect(agg.activeCount).toBeLessThan(getSeoThreshold(SEO_SURFACE.MODEL));
+    expect(seoSurfaceForModelTaxonomy(matched.taxonomy)).toBe(SEO_SURFACE.MODEL_FIPE_LEGACY);
+    expect(agg.activeCount).toBeLessThan(thresholdFor(matched.taxonomy));
+    // A separação é o que segura: com o limiar comercial esse recorte indexaria.
+    expect(agg.activeCount).toBeGreaterThanOrEqual(getSeoThreshold(SEO_SURFACE.MODEL));
   });
 
   it("slug inexistente não casa nada", () => {
@@ -146,13 +157,21 @@ describe("buildModelEntries — sitemap por modelo comercial", () => {
   });
 
   it("REGRESSÃO: agrupar pela descrição FIPE crua daria sitemap vazio", () => {
-    // Este é o bug que a fase corrige. Cada linha isolada tem 1-2 anúncios;
-    // com o limiar de 3, nenhuma entraria. A dedup por `loc` só resolve
-    // quando as quatro produzem o MESMO loc — que é o que o modelo comercial
-    // garante.
-    const threshold = getSeoThreshold(SEO_SURFACE.MODEL);
-    for (const row of sitemapRows) expect(row.total).toBeLessThan(threshold);
-    expect(buildModelEntries(sitemapRows, threshold).length).toBe(1);
+    // Este é o bug que a Fase 3 corrigiu. Cada linha isolada tem 1-2
+    // anúncios; com o limiar base (o que hoje vale para a URL FIPE legada),
+    // nenhuma entraria. A dedup por `loc` só resolve quando as quatro
+    // produzem o MESMO loc — que é o que o modelo comercial garante.
+    const legacy = getSeoThreshold(SEO_SURFACE.MODEL_FIPE_LEGACY);
+    for (const row of sitemapRows) expect(row.total).toBeLessThan(legacy);
+    expect(buildModelEntries(sitemapRows, legacy).length).toBe(1);
+  });
+
+  it("candidatos do sitemap (minAds 1) são SÓ URLs comerciais — a URL FIPE nunca é gerada", () => {
+    // `listActiveCityBrandModelEntries` chama buildModelEntries(rows, 1). Com o
+    // limiar comercial em 1 isso não muda nada no conjunto de URLs: continua
+    // uma entrada por modelo comercial, nenhuma por descrição FIPE.
+    const entries = buildModelEntries(sitemapRows, 1);
+    expect(entries.map((e) => e.loc)).toEqual(["/cidade/atibaia-sp/marca/chevrolet/modelo/onix"]);
   });
 
   it("nenhuma entrada de sitemap usa a descrição FIPE como slug", () => {

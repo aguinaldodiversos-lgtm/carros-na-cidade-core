@@ -17,6 +17,8 @@
 
 const DEFAULT_INDEX_MIN_ADS = 3;
 const DEFAULT_EXISTS_MIN_ADS = 1;
+// Landing por modelo COMERCIAL: âncora local de 1. Fixo, não acompanha a env.
+const DEFAULT_MODEL_INDEX_MIN_ADS = 1;
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(String(raw ?? ""), 10);
@@ -57,12 +59,19 @@ export function getSitemapMinAds(): number {
    de cada valor está documentada LÁ (fonte única da política). Aqui fica só
    a derivação, para que rotas e módulos do frontend não recomparem `>= 3`
    espalhado.
+
+     city / brand      base (3)
+     model             1     landing por modelo COMERCIAL (âncora local)
+     modelFipeLegacy   base  URL antiga por descrição FIPE — mantém noindex
+                             o recorte de 1-2 anúncios de uma versão isolada
+     categorias        base + 1 (4)
    ───────────────────────────────────────────────────────────────────────── */
 
 export type SeoSurface =
   | "city"
   | "brand"
   | "model"
+  | "modelFipeLegacy"
   | "bodyType"
   | "transmission"
   | "priceRange";
@@ -75,7 +84,8 @@ export function getSeoInventoryThresholds(): Record<SeoSurface, number> {
   return {
     city: base,
     brand: base,
-    model: base,
+    model: DEFAULT_MODEL_INDEX_MIN_ADS,
+    modelFipeLegacy: base,
     bodyType: transversal,
     transmission: transversal,
     priceRange: transversal,
@@ -85,6 +95,24 @@ export function getSeoInventoryThresholds(): Record<SeoSurface, number> {
 export function getSeoThreshold(surface: SeoSurface): number {
   const thresholds = getSeoInventoryThresholds();
   return thresholds[surface] ?? thresholds.city;
+}
+
+/**
+ * Taxonomia de modelo → família SEO. Espelho de `seoSurfaceForModelTaxonomy`
+ * do backend: commercial/none → model, fipe → modelFipeLegacy, desconhecida →
+ * a mais estrita (fail-closed).
+ */
+const MODEL_TAXONOMY_SURFACE: Readonly<Record<string, SeoSurface>> = Object.freeze({
+  commercial: "model",
+  none: "model",
+  fipe: "modelFipeLegacy",
+});
+
+export function seoSurfaceForModelTaxonomy(taxonomy: unknown): SeoSurface {
+  return typeof taxonomy === "string" &&
+    Object.prototype.hasOwnProperty.call(MODEL_TAXONOMY_SURFACE, taxonomy)
+    ? MODEL_TAXONOMY_SURFACE[taxonomy]
+    : "modelFipeLegacy";
 }
 
 /**
