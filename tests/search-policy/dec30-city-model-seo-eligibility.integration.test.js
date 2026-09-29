@@ -9,6 +9,11 @@
 //
 // Fixture espelha o caso que motivou a decisão: 3 do modelo em Atibaia e 1 em
 // Bragança Paulista (18,34 km, dentro do piso de 25 km).
+//
+// O limiar NÃO é injetado: vem da política central pela taxonomia da URL
+// (`seoSurfaceForModelTaxonomy`) — modelo comercial = 1 (âncora local), URL
+// antiga por descrição FIPE = base (3). É o mesmo caminho da página e do
+// sitemap.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { withF2Fixture } from "./helpers/f2-fixture.js";
 import {
@@ -40,13 +45,20 @@ describe.sequential("DEC-30 — elegibilidade SEO pelo território do motor (Pos
     countSearchPolicyTerritory(query(citySlug), { db, policy, cache: false });
   // Estoque próprio de cada cidade na fixture — é o que o legado lista.
   const OWN = { "atibaia-sp": 3, "braganca-paulista-sp": 1, "vargem-sp": 0 };
+  // Taxonomia que `resolveCityModel` devolveria: cidade sem o modelo = "none"
+  // (rótulo sai do dicionário nacional), com o modelo = "commercial".
+  const TAXONOMY = {
+    "atibaia-sp": "commercial",
+    "braganca-paulista-sp": "commercial",
+    "vargem-sp": "none",
+  };
   const eligibility = (citySlug) =>
     evaluateCityModelSeoEligibility(
       {
         citySlug,
         listingFilters: { brand: "Hyundai", commercial_model: "Hb30s" },
         ownActiveCount: OWN[citySlug],
-        minInventory: 3,
+        taxonomy: TAXONOMY[citySlug],
       },
       { db, policy, cache: false }
     );
@@ -115,6 +127,8 @@ describe.sequential("DEC-30 — elegibilidade SEO pelo território do motor (Pos
       serving_mode: "search_policy",
       local_model_count: 1,
       regional_model_count: 4,
+      // Limiar do modelo comercial, vindo da política central.
+      min_inventory: 1,
     });
   });
 
@@ -139,7 +153,7 @@ describe.sequential("DEC-30 — elegibilidade SEO pelo território do motor (Pos
         citySlug: "braganca-paulista-sp",
         listingFilters: { brand: "Hyundai", commercial_model: "Naoexiste" },
         ownActiveCount: 0,
-        minInventory: 3,
+        taxonomy: "none",
       },
       { db, policy, cache: false }
     );
@@ -159,7 +173,10 @@ describe.sequential("DEC-30 — elegibilidade SEO pelo território do motor (Pos
     expect(page.search_policy.local_result_count).toBe(t.local_result_count);
   });
 
-  it("a allowlist decide o modo servido E a regra SEO juntos (porta real do controller)", async () => {
+  it("a allowlist decide o modo servido; a âncora local de 1 indexa nos dois modos (porta real do controller)", async () => {
+    // Com o limiar comercial em 1, motor (local>=1 AND regional>=1) e legado
+    // (local>=1) coincidem para Bragança (1 próprio). O que a allowlist muda é
+    // o modo servido e o conjunto exibido (regional só no motor).
     const q = query("braganca-paulista-sp");
     // O controller só chega a runSearchPolicyEngineIfAllowed com a flag v1; com
     // outra flag a resposta é legado sem nem perguntar.
@@ -171,8 +188,8 @@ describe.sequential("DEC-30 — elegibilidade SEO pelo território do motor (Pos
     const scenarios = [
       ["v1", "*", "search_policy", true, 4],
       ["v1", "atibaia-sp,braganca-paulista-sp", "search_policy", true, 4],
-      ["v1", "atibaia-sp", "legacy", false, null],
-      ["off", "*", "legacy", false, null],
+      ["v1", "atibaia-sp", "legacy", true, null],
+      ["off", "*", "legacy", true, null],
     ];
     for (const [flag, cities, mode, indexable, regional] of scenarios) {
       process.env.SEARCH_POLICY_ENGINE = flag;
@@ -196,6 +213,50 @@ describe.sequential("DEC-30 — elegibilidade SEO pelo território do motor (Pos
     process.env.SEARCH_POLICY_ENGINE = "off";
     const e = await eligibility("atibaia-sp");
     expect(e).toMatchObject({ serving_mode: "legacy", indexable: true, local_model_count: 3 });
+  });
+
+  it("motor OFF — Bragança com 1 próprio → index (âncora local, limiar comercial)", async () => {
+    process.env.SEARCH_POLICY_ENGINE = "off";
+    const e = await eligibility("braganca-paulista-sp");
+    expect(e).toMatchObject({
+      serving_mode: "legacy",
+      indexable: true,
+      local_model_count: 1,
+      min_inventory: 1,
+    });
+  });
+
+  it("motor OFF — Vargem com 0 próprios → noindex, mesmo com vizinhas", async () => {
+    process.env.SEARCH_POLICY_ENGINE = "off";
+    const e = await eligibility("vargem-sp");
+    expect(e).toMatchObject({ serving_mode: "legacy", indexable: false });
+  });
+
+  it("URL antiga por descrição FIPE (motor ligado) segue legado com limiar base", async () => {
+    // `model` está fora do contrato do motor: a URL é servida pelo legado e
+    // julgada pela família `modelFipeLegacy` — 1-2 anúncios não indexam.
+    const fipe = (own) =>
+      evaluateCityModelSeoEligibility(
+        {
+          citySlug: "atibaia-sp",
+          listingFilters: { brand: "Hyundai", model: "HB30S 1.0 FIPE 1" },
+          ownActiveCount: own,
+          taxonomy: "fipe",
+        },
+        { db, policy, cache: false }
+      );
+    for (const [own, indexable] of [
+      [1, false],
+      [2, false],
+      [3, true],
+    ]) {
+      expect(await fipe(own)).toMatchObject({
+        serving_mode: "legacy",
+        serving_reason: "unsupported_params",
+        indexable,
+        min_inventory: 3,
+      });
+    }
   });
 
   it("chave fora do contrato do motor (`model`) não é contada", async () => {
