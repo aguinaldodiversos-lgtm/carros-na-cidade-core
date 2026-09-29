@@ -124,8 +124,11 @@ const ROUTES = [
     forbidCityInTitle: "São Paulo",
   },
   {
+    // Cidade com estoque ativo responde 200; sem estoque próprio ativo, 404 real
+    // é o contrato esperado. Se voltar a 200, os checks de conteúdo abaixo
+    // continuam sendo executados normalmente.
     path: "/carros-em/campinas-sp",
-    expected: [200],
+    expected: [200, 404],
     extractAds: true,
     expectCityName: "Campinas",
     forbidCityInTitle: "São Paulo",
@@ -147,7 +150,12 @@ const ROUTES = [
   { path: "/veiculo/anuncio-inexistente-xyz-999", expected: [404], skipStringChecks: true },
   { path: "/anuncios/slug-fantasma", expected: [404], skipStringChecks: true },
   { path: "/simulador-financiamento", expected: [200] },
-  { path: "/simulador-financiamento/sao-paulo-sp", expected: [200], expectCityName: "São Paulo" },
+  {
+    // A rota territorial pode ser 404 quando a cidade não tem estoque ativo.
+    path: "/simulador-financiamento/sao-paulo-sp",
+    expected: [200, 404],
+    expectCityName: "São Paulo",
+  },
   {
     path: "/simulador-financiamento/atibaia-sp",
     expected: [200],
@@ -155,7 +163,12 @@ const ROUTES = [
     forbidCityInTitle: "São Paulo",
   },
   { path: "/tabela-fipe", expected: [200] },
-  { path: "/tabela-fipe/sao-paulo-sp", expected: [200], expectCityName: "São Paulo" },
+  {
+    // A rota territorial pode ser 404 quando a cidade não tem estoque ativo.
+    path: "/tabela-fipe/sao-paulo-sp",
+    expected: [200, 404],
+    expectCityName: "São Paulo",
+  },
   {
     path: "/tabela-fipe/atibaia-sp",
     expected: [200],
