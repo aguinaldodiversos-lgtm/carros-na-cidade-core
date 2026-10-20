@@ -45,48 +45,6 @@ function normalizePostHref(post: BlogPost, citySlug?: string | null) {
   return buildBlogPostHref(citySlug, slug);
 }
 
-const CATEGORY_STYLES: Record<
-  BlogCategoryId,
-  { ring: string; bg: string; icon: string; label: string }
-> = {
-  compra: {
-    ring: "ring-[#3F8CFF]/40",
-    bg: "bg-[#EAF2FF]",
-    icon: "text-[#2F67F6]",
-    label: "text-[#1D2440]",
-  },
-  venda: {
-    ring: "ring-[#9C7BFF]/40",
-    bg: "bg-[#F1ECFF]",
-    icon: "text-[#7E5BEF]",
-    label: "text-[#1D2440]",
-  },
-  manutencao: {
-    ring: "ring-[#FFB050]/40",
-    bg: "bg-[#FFF1DD]",
-    icon: "text-[#F59A1A]",
-    label: "text-[#1D2440]",
-  },
-  mercado: {
-    ring: "ring-[#3CC68A]/40",
-    bg: "bg-[#E3F8EE]",
-    icon: "text-[#1FAE6A]",
-    label: "text-[#1D2440]",
-  },
-  financiamento: {
-    ring: "ring-[#3CC0CF]/40",
-    bg: "bg-[#E2F6F8]",
-    icon: "text-[#1AA3B2]",
-    label: "text-[#1D2440]",
-  },
-  cidades: {
-    ring: "ring-[#3F8CFF]/40",
-    bg: "bg-[#E5F0FF]",
-    icon: "text-[#2F67F6]",
-    label: "text-[#1D2440]",
-  },
-};
-
 const CATEGORY_BADGE_COLORS: Record<BlogCategoryId, string> = {
   compra: "bg-[#2F67F6] text-white",
   venda: "bg-[#7E5BEF] text-white",
@@ -97,7 +55,7 @@ const CATEGORY_BADGE_COLORS: Record<BlogCategoryId, string> = {
 };
 
 function CategoryGlyph({ id }: { id: BlogCategoryId }) {
-  const className = "h-7 w-7";
+  const className = "h-6 w-6 sm:h-7 sm:w-7";
   const stroke = 1.8;
 
   switch (id) {
@@ -197,21 +155,15 @@ function CategoryGlyph({ id }: { id: BlogCategoryId }) {
 }
 
 function CategoryButton({ category }: { category: BlogCategory }) {
-  const styles = CATEGORY_STYLES[category.id];
-
   return (
     <Link
       href={normalizeHref(category.href, FALLBACK_BLOG_CITY_HREF)}
-      className="group flex shrink-0 flex-col items-center gap-1.5 outline-none md:gap-2"
+      className="group flex shrink-0 flex-col items-center gap-1.5 outline-none focus-visible:opacity-90 sm:gap-2"
     >
-      <span
-        className={`flex h-[52px] w-[52px] items-center justify-center rounded-full ${styles.bg} ring-2 ${styles.ring} transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_18px_rgba(20,30,60,0.10)] md:h-[72px] md:w-[72px]`}
-      >
-        <span className={`${styles.icon} [&_svg]:h-5 [&_svg]:w-5 md:[&_svg]:h-7 md:[&_svg]:w-7`}>
-          <CategoryGlyph id={category.id} />
-        </span>
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.30)] transition hover:bg-blue-700 active:scale-95 sm:h-16 sm:w-16">
+        <CategoryGlyph id={category.id} />
       </span>
-      <span className={`text-[11px] font-semibold ${styles.label} md:text-[14px]`}>
+      <span className="text-[12px] font-semibold text-slate-900 sm:text-[13px]">
         {category.label}
       </span>
     </Link>
