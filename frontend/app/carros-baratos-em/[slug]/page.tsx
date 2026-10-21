@@ -85,7 +85,7 @@ export default async function CarrosBaratosCidadePage({ params, searchParams = {
   }
 
   const breadcrumbJsonLd = buildBaratosBreadcrumbJsonLd(model);
-  const faqEntries = buildBelowFipeFaqEntries({ cityName: model.cityName });
+  const faqEntries = buildBelowFipeFaqEntries({ cityName: ctx.name });
   const faqJsonLd = faqEntries.length ? buildFaqPageJsonLd(faqEntries) : null;
 
   return (
@@ -118,10 +118,10 @@ export default async function CarrosBaratosCidadePage({ params, searchParams = {
         regionalEnabled={isRegionalPageEnabled()}
       />
 
-      <BelowFipeCatalogSeo model={model} />
+      <BelowFipeCatalogSeo model={model} cityName={ctx.name} catalogTotal={initialResults.pagination.total} />
       {faqEntries.length ? (
         <FaqBlock
-          title={`Perguntas frequentes sobre carros abaixo da FIPE em ${model.cityName}`}
+          title={`Perguntas frequentes sobre carros abaixo da FIPE em ${ctx.name}`}
           entries={faqEntries}
         />
       ) : null}
