@@ -1281,6 +1281,37 @@ export async function handleWebhookNotification({
     return { ok: true, warning: "payment intent not found" };
   }
 
+  // Recusa associação de um pagamento do MP a outro intent. O identificador
+  // do MP é consultado na API oficial; metadata/callback sozinho não aprova nada.
+  const reference = String(paymentData.externalReference || "").trim();
+  const metadataIntentId = String(paymentData.metadata?.intent_id || "").trim();
+  if (
+    (reference && reference !== String(intent.id)) ||
+    (metadataIntentId && metadataIntentId !== String(intent.id))
+  ) {
+    logger.warn({ intentId: intent.id, resourceId }, "[payments] divergência da referência do pagamento");
+    return { ok: true, ignored: true, reason: "payment_reference_mismatch" };
+  }
+
+  // Cobrança única precisa ter o valor exato persistido ao criar o checkout.
+  // Pagamentos de assinatura são conciliados pelo fluxo recorrente específico.
+  const isRecurringIntent =
+    intent.checkout_resource_type === "preapproval" ||
+    intent.metadata?.payment_type === "recurring";
+  if (paymentData.status === "approved" && !isRecurringIntent) {
+    const expectedCents = Math.round(Number(intent.amount) * 100);
+    const paidCents = Math.round(Number(paymentData.amount) * 100);
+    if (
+      !Number.isSafeInteger(expectedCents) ||
+      expectedCents <= 0 ||
+      !Number.isSafeInteger(paidCents) ||
+      paidCents !== expectedCents
+    ) {
+      logger.warn({ intentId: intent.id, resourceId }, "[payments] divergência do valor pago — benefício bloqueado");
+      return { ok: true, ignored: true, reason: "payment_amount_mismatch" };
+    }
+  }
+
   const mergedMetadata = {
     ...(intent.metadata || {}),
     ...(paymentData.metadata || {}),
@@ -1430,9 +1461,11 @@ export async function handleWebhookNotification({
     }
 
     if (lockedIntent.context === "boost" && paymentData.status === "approved" && !alreadyApproved) {
+      // Os dias do destaque vêm apenas do intent persistido no checkout.
+      // Dados recebidos do webhook não podem ampliar o benefício contratado.
       const boostIntent = {
         ...lockedIntent,
-        metadata: mergedMetadata,
+        metadata: lockedIntent.metadata,
       };
       await applyBoostApproval(client, boostIntent);
     }
