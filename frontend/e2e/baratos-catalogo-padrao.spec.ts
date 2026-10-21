@@ -83,6 +83,7 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
       if (viewport.width >= 1024) {
         const sidebar = page.locator("main aside");
         await expect(sidebar).toBeVisible();
+        await expect(sidebar.getByTestId("sidebar-city-fixed")).toBeVisible();
         const locked = sidebar.getByRole("button", { name: /Abaixo da FIPE/i });
         await expect(locked).toBeDisabled();
         await expect(locked).toHaveAttribute("aria-pressed", "true");
@@ -92,6 +93,7 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
           .first()
           .click();
         const modal = page.getByRole("dialog", { name: "Filtros" });
+        await expect(modal.getByTestId("sidebar-city-fixed")).toBeVisible();
         const locked = modal.getByRole("button", { name: /Abaixo da FIPE/i });
         await expect(locked).toBeDisabled();
         await expect(locked).toHaveAttribute("aria-pressed", "true");
