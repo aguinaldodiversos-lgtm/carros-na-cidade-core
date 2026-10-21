@@ -247,6 +247,20 @@ jobs:
           path: reports/screenshots/fase-4-11c/
           retention-days: 7
 
+      - name: Run E2E dealer bid screen (desktop + mobile)
+        run: npx playwright test e2e/dealer-opportunity-detail-premium.spec.ts --project=chromium
+        env:
+          CI: "true"
+          AUTH_SESSION_SECRET: cnc-dev-session-secret
+
+      - name: Upload dealer bid screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dealer-bid-pr81-screenshots
+          path: reports/screenshots/fase-4-11a/
+          retention-days: 7
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
