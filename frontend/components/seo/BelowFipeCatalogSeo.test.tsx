@@ -58,6 +58,23 @@ describe("BelowFipeCatalogSeo — texto coerente com a vitrine", () => {
     expect(html).toContain("10");
   });
 
+  it("omite contagens divergentes entre inventário SEO e catálogo", () => {
+    const html = renderToStaticMarkup(
+      <BelowFipeCatalogSeo
+        model={fixture({
+          totalAds: 10,
+          isEmptyCity: false,
+          paragraphs: ["Há exatamente 10 anúncios abaixo da FIPE."],
+        })}
+        cityName="Atibaia"
+        catalogTotal={9}
+      />
+    );
+    expect(html).toContain("Compare carros baratos em Atibaia");
+    expect(html).not.toContain("Há exatamente 10 anúncios");
+    expect(html).not.toContain("Anúncios ativos");
+  });
+
   it("não publica números antigos quando a vitrine está vazia", () => {
     const html = renderToStaticMarkup(
       <BelowFipeCatalogSeo
