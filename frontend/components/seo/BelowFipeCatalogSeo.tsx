@@ -13,11 +13,7 @@ type BelowFipeCatalogSeoProps = {
   catalogTotal: number;
 };
 
-export function BelowFipeCatalogSeo({
-  model,
-  cityName,
-  catalogTotal,
-}: BelowFipeCatalogSeoProps) {
+export function BelowFipeCatalogSeo({ model, cityName, catalogTotal }: BelowFipeCatalogSeoProps) {
   // A API territorial pode estar indisponível enquanto a busca continua
   // respondendo. Nunca publicar um texto "não há veículos" ao lado de cards.
   const sourcesAgreeOnInventory =
@@ -52,7 +48,7 @@ export function BelowFipeCatalogSeo({
         className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm"
       >
         <Link href={model.paths.em} className="font-semibold text-primary hover:underline">
-          Carros em {model.cityName}
+          Carros em {cityName}
         </Link>
         <Link href={model.paths.automaticos} className="font-semibold text-primary hover:underline">
           Carros automáticos
