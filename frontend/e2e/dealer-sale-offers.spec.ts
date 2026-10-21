@@ -101,10 +101,7 @@ async function findSeededSaleRequest(page: Page): Promise<string> {
   const res = await page.request.get("/api/account/opportunities/sale-requests");
 
   if (res.status() === 403) {
-    test.skip(
-      true,
-      "lojista sem loja elegível — o seed rodou? (npm run e2e:prepare)"
-    );
+    test.skip(true, "lojista sem loja elegível — o seed rodou? (npm run e2e:prepare)");
   }
   expect(res.ok(), `o feed do lojista respondeu ${res.status()}`).toBeTruthy();
 
@@ -133,7 +130,12 @@ async function openDetail(page: Page, saleRequestId: string) {
 /** Em solicitações antigas sem referência o primeiro lance é manual;
  * na disputa normal escolhe-se um incremento fixo a partir do líder. */
 async function submitOffer(page: Page, amount: number) {
-  if (await page.getByTestId("dealer-offer-legacy-entry").isVisible().catch(() => false)) {
+  if (
+    await page
+      .getByTestId("dealer-offer-legacy-entry")
+      .isVisible()
+      .catch(() => false)
+  ) {
     const field = page.getByTestId("dealer-offer-amount");
     await field.fill("");
     await field.type(String(amount * 100));
@@ -204,9 +206,7 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     await expect(page.getByTestId("dealer-offer-success")).toBeVisible({ timeout: 30_000 });
     // `toContainText`: o badge carrega um glifo de estado (✓/⚠) ao lado da
     // frase, para a posição não depender só de cor.
-    await expect(page.getByTestId("dealer-offer-standing")).toContainText(
-      "Você está liderando"
-    );
+    await expect(page.getByTestId("dealer-offer-standing")).toContainText("Você está liderando");
     await expect(page.getByTestId("dealer-offer-panel")).toContainText("50.000,00");
 
     // ── 5. Lojista B vê a maior proposta, sem saber de quem é ───────────────
@@ -227,9 +227,7 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     await expect(page.getByTestId("dealer-offer-success")).toBeVisible({ timeout: 30_000 });
     // `toContainText`: o badge carrega um glifo de estado (✓/⚠) ao lado da
     // frase, para a posição não depender só de cor.
-    await expect(page.getByTestId("dealer-offer-standing")).toContainText(
-      "Você está liderando"
-    );
+    await expect(page.getByTestId("dealer-offer-standing")).toContainText("Você está liderando");
     await expect(panel).toContainText("51.000,00");
 
     // ── 8. A recarrega: perdeu a liderança, e o rival continua invisível ────
