@@ -100,9 +100,7 @@ export default function DealerSaleOpportunityDetail({
     try {
       setOpportunity(await fetchSaleOpportunity(id, advertiserId));
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Não foi possível carregar o veículo."
-      );
+      setError(caught instanceof Error ? caught.message : "Não foi possível carregar o veículo.");
       setOpportunity(null);
     } finally {
       setLoading(false);
@@ -169,11 +167,11 @@ export default function DealerSaleOpportunityDetail({
 
   if (error || !opportunity) {
     return (
-      <section className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6" data-testid="dealer-detail-error">
-        <Link
-          href={backHref}
-          className="text-sm font-semibold text-[#0e62d8] hover:underline"
-        >
+      <section
+        className="mx-auto w-full max-w-[1480px] px-4 py-6 sm:px-6"
+        data-testid="dealer-detail-error"
+      >
+        <Link href={backHref} className="text-sm font-semibold text-[#0e62d8] hover:underline">
           ← Voltar para oportunidades
         </Link>
         <div className="mt-4 rounded-2xl border border-[#fecaca] bg-[#fef2f2] p-6 text-center">
@@ -296,7 +294,14 @@ export default function DealerSaleOpportunityDetail({
 
               <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-[#98A2B3]">
                 <span className="inline-flex items-center gap-1 font-medium text-[#475467]">
-                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden="true"
+                  >
                     <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
                     <circle cx="12" cy="10" r="2.4" />
                   </svg>
