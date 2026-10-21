@@ -276,7 +276,7 @@ jobs:
               tail -100 /tmp/cnc-pr81-api.log
               exit 1
             fi
-            if curl -sf http://127.0.0.1:4000/api/health > /dev/null; then
+            if curl -sf http://127.0.0.1:4000/health > /dev/null; then
               ready=1
               break
             fi
