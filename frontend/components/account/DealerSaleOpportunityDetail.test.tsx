@@ -262,6 +262,26 @@ describe("painel de lances com incremento fixo", () => {
     expect(panel.textContent).not.toMatch(/R\$\s?0,00/);
   });
 
+  it("outra loja muda o lance: refresh em foco atualiza valor e exige nova escolha", async () => {
+    fetchSaleOpportunity
+      .mockResolvedValueOnce(makeDetail({ current_highest_offer: "63000.00", offers_count: 1 }))
+      .mockResolvedValue(makeDetail({ current_highest_offer: "63400.00", offers_count: 2 }));
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-300"));
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("63.300,00");
+
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => {
+      expect(screen.getByTestId("dealer-offer-current").textContent).toContain("63.400,00");
+    });
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain(
+      "Selecione um incremento"
+    );
+    expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
+    expect(submitSaleOffer).not.toHaveBeenCalled();
+  });
+
   it("quatro incrementos fixos e nenhum campo manual com uma referência válida", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
