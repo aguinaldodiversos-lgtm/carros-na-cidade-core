@@ -56,6 +56,20 @@ afterEach(cleanup);
 
 // ============================================================================
 describe("os quatro números", () => {
+  it("usa Compradores Procurando sem inventar dados nem ampliar a definição de compras", async () => {
+    render(<OpportunityHubMetrics />);
+    await screen.findByTestId("dealer-hub-metrics");
+    expect(screen.getByTestId("dealer-hub-metric-buyers").textContent).toContain(
+      "Compradores Procurando"
+    );
+    expect(screen.getByTestId("dealer-hub-metric-buyers").textContent).not.toContain(
+      "Compradores ativos"
+    );
+    expect(screen.getByTestId("dealer-hub-metric-deals").textContent).toContain(
+      "Compras em andamento"
+    );
+  });
+
   it("mostram o total e a variação", async () => {
     render(<OpportunityHubMetrics />);
     await screen.findByTestId("dealer-hub-metrics");
