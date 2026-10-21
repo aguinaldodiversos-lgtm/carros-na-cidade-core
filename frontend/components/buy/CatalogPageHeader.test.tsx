@@ -28,7 +28,11 @@ const city = {
 
 function renderHeader(
   filters: AdsSearchFilters,
-  extra: { regionalEnabled?: boolean; softFallbackMessage?: string } = {}
+  extra: {
+    regionalEnabled?: boolean;
+    softFallbackMessage?: string;
+    belowFipeLanding?: boolean;
+  } = {}
 ) {
   return render(
     <CatalogPageHeader
@@ -37,6 +41,7 @@ function renderHeader(
       totalResults={42}
       onPatch={vi.fn()}
       variant="cidade"
+      belowFipeLanding={extra.belowFipeLanding}
       stateUf="SP"
       regionalEnabled={extra.regionalEnabled ?? false}
       softFallbackMessage={extra.softFallbackMessage}
@@ -138,6 +143,25 @@ describe("CatalogPageHeader — vitrine enxuta (briefing 2026-05-22)", () => {
     );
     // O link direto "Ver carros na Região" foi removido.
     expect(screen.queryByTestId("catalog-city-to-region-link")).toBeNull();
+  });
+});
+
+describe("CatalogPageHeader — carros baratos com padrão do catálogo da cidade", () => {
+  it("preserva um H1 específico e o mesmo visual da cidade", () => {
+    renderHeader({ below_fipe: true, raio: 0 }, { belowFipeLanding: true });
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.textContent).toContain("Carros baratos em Atibaia - SP");
+    expect(h1.querySelector("span.text-primary")?.textContent).toBe("Atibaia - SP");
+    expect(screen.getByText("Veículos abaixo da FIPE em Atibaia")).toBeTruthy();
+    expect(screen.getByRole("searchbox").getAttribute("placeholder")).toMatch(/FIPE/);
+  });
+
+  it("breadcrumb mantém acesso à cidade e identifica o recorte", () => {
+    renderHeader({ below_fipe: true, raio: 0 }, { belowFipeLanding: true });
+    expect(screen.getByRole("link", { name: "Atibaia" }).getAttribute("href")).toBe(
+      "/carros-em/atibaia-sp"
+    );
+    expect(screen.getByText("Abaixo da FIPE")).toBeTruthy();
   });
 });
 
