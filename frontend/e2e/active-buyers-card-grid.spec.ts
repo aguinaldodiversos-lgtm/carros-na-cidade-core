@@ -322,6 +322,63 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
     ).toEqual([]);
   });
 
+  test("homologação visual: referências e fallback em desktop e mobile", async ({ page }) => {
+    const fixture = buildFixture(3);
+    fixture.purchase_intents[0].brand = "Volkswagen";
+    fixture.purchase_intents[0].model = "Virtus";
+    fixture.purchase_intents[1].intent_type = "specific_model";
+    fixture.purchase_intents[1].brand = "Fiat";
+    fixture.purchase_intents[1].model = "Pulse";
+    fixture.purchase_intents[1].body_type = null;
+    fixture.purchase_intents[2].intent_type = "open_category";
+    fixture.purchase_intents[2].brand = null;
+    fixture.purchase_intents[2].model = null;
+    fixture.purchase_intents[2].body_type = "suv";
+
+    for (const viewport of [
+      { width: 1440, height: 900, label: "desktop-1440" },
+      { width: 390, height: 844, label: "mobile-390" },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await prepare(page, fixture);
+      await page.goto(PAGE_PATH);
+      const cards = page.getByTestId("active-buyer-card");
+      await expect(cards).toHaveCount(3);
+      await expectNoHorizontalOverflow(page);
+      await expect(cards.nth(0).getByTestId("active-buyer-media")).toHaveAttribute(
+        "data-media-kind",
+        "model"
+      );
+      await expect(cards.nth(1).getByTestId("active-buyer-media")).toHaveAttribute(
+        "data-media-kind",
+        "model"
+      );
+      await expect(cards.nth(2).getByTestId("active-buyer-media")).toHaveAttribute(
+        "data-media-kind",
+        "category"
+      );
+
+      // Aguarda carregamento inclusive abaixo da dobra no mobile.
+      for (const index of [0, 1]) {
+        const media = cards.nth(index).getByTestId("active-buyer-model-image");
+        await media.scrollIntoViewIfNeeded();
+        await expect.poll(async () =>
+          media.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)
+        ).toBe(true);
+      }
+
+      // Capturas legíveis e auditáveis: grade, modelos e fallback.
+      await page.screenshot({
+        path: `${SHOTS}/11-buyers-models-${viewport.label}.png`,
+        fullPage: true,
+      });
+      await cards.nth(0).screenshot({ path: `${SHOTS}/12-virtus-${viewport.label}.png` });
+      await cards.nth(1).screenshot({ path: `${SHOTS}/13-pulse-${viewport.label}.png` });
+      await cards.nth(2).screenshot({ path: `${SHOTS}/14-suv-fallback-${viewport.label}.png` });
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
   test("procura sem referência cadastrada permanece em SVG, sem foto de anúncio", async ({
     page,
   }) => {
