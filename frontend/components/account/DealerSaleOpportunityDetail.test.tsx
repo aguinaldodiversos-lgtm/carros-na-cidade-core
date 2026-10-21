@@ -19,7 +19,6 @@ import {
  * suíte que só verificasse o que a tela mostra.
  */
 
-
 /**
  * `next/navigation` mockado com um leitor de query REAL.
  *
@@ -129,7 +128,7 @@ describe("cabeçalho e ficha", () => {
     // 4.11A — "pelo vendedor" entrou no subtítulo. A frase continua descrevendo
     // LEITURA e OFERTA, e continua sem prometer contato: é o portal que conduz.
     expect(
-      screen.getByText("Analise as informações declaradas pelo vendedor e envie sua oferta.")
+      screen.getByText("Analise as informações declaradas pelo vendedor e faça seu lance.")
     ).toBeTruthy();
   });
 
@@ -209,9 +208,7 @@ describe("cabeçalho e ficha", () => {
     //
     // Mês em UTC: o snapshot de 01/08 não pode aparecer como julho.
     expect(screen.getByText("Referência FIPE (ago de 2026)")).toBeTruthy();
-    expect(screen.getByTestId("dealer-detail-fipe-value").textContent).toMatch(
-      /92\.000,00/
-    );
+    expect(screen.getByTestId("dealer-detail-fipe-value").textContent).toMatch(/92\.000,00/);
   });
 
   it("FIPE não resolvida mostra 'Não informado', nunca um número inventado", async () => {
@@ -221,9 +218,7 @@ describe("cabeçalho e ficha", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-sale-opportunity-detail");
 
-    expect(screen.getByTestId("dealer-detail-fipe-missing").textContent).toContain(
-      "Não informado"
-    );
+    expect(screen.getByTestId("dealer-detail-fipe-missing").textContent).toContain("Não informado");
     // E nenhum número aparece no lugar — nem o piso, que está logo ao lado e
     // seria o candidato natural a ser confundido com a tabela.
     expect(screen.queryByTestId("dealer-detail-fipe-value")).toBeNull();
@@ -257,287 +252,208 @@ describe("galeria", () => {
 });
 
 // ============================================================================
-describe("painel de proposta", () => {
-  /**
-   * 4.11A (§22) — a ausência virou FRASE.
-   *
-   * O travessão dizia a verdade, mas obrigava o leitor a interpretá-lo: "—" em
-   * "Sua proposta" tanto podia ser "você não ofertou" quanto "não conseguimos
-   * carregar". As frases dizem qual dos dois é.
-   *
-   * O que a asserção protege é o mesmo de antes, e é o que importa: ausência
-   * NUNCA vira R$ 0,00, porque zero seria uma proposta de nada.
-   */
-  it("sem proposta nenhuma diz o que falta em palavras, e nunca R$ 0,00", async () => {
+describe("painel de lances com incremento fixo", () => {
+  it("sem propostas exibe o piso da rodada como lance inicial, nunca zero fictício", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const panel = await screen.findByTestId("dealer-offer-panel");
-
-    expect(panel.textContent).toContain("Nenhuma oferta recebida ainda.");
-    expect(panel.textContent).toContain("Você ainda não fez uma oferta.");
-    expect(within(panel).queryByText("R$ 0,00")).toBeNull();
+    expect(within(panel).getByTestId("dealer-offer-current").textContent).toContain("62.500,00");
+    expect(panel.textContent).toContain("Lance inicial · mínimo do vendedor");
+    expect(screen.getByTestId("dealer-offer-count").textContent).toContain("Nenhuma proposta");
     expect(panel.textContent).not.toMatch(/R\$\s?0,00/);
-    expect(within(panel).getByTestId("dealer-offer-count").textContent).toContain(
-      "Nenhuma proposta recebida"
+  });
+
+  it("outra loja muda o lance: refresh em foco atualiza valor e exige nova escolha", async () => {
+    fetchSaleOpportunity
+      .mockResolvedValueOnce(makeDetail({ current_highest_offer: "63000.00", offers_count: 1 }))
+      .mockResolvedValue(makeDetail({ current_highest_offer: "63400.00", offers_count: 2 }));
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-300"));
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("63.300,00");
+
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => {
+      expect(screen.getByTestId("dealer-offer-current").textContent).toContain("63.400,00");
+    });
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain(
+      "Selecione um incremento"
     );
+    expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
+    expect(submitSaleOffer).not.toHaveBeenCalled();
   });
 
-  it("enviar uma proposta chama a API com o valor em reais", async () => {
+  it("quatro incrementos fixos e nenhum campo manual com uma referência válida", async () => {
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+    for (const increment of [100, 300, 500, 1000]) {
+      expect(screen.getByTestId(`dealer-offer-bump-${increment}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId("dealer-offer-bump-2000")).toBeNull();
+    expect(screen.queryByTestId("dealer-offer-amount")).toBeNull();
+    expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("selecionar incremento prepara lance, sem disparar requisição", async () => {
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({ current_highest_offer: "63000.00", offers_count: 1 })
+    );
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-panel");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-300"));
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("63.300,00");
+    expect(screen.getByTestId("dealer-offer-submit").textContent).toContain("63.300,00");
+    expect(submitSaleOffer).not.toHaveBeenCalled();
+    expect(screen.getByTestId("dealer-offer-bump-300").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("envia exatamente o valor da referência acrescido de R$ 100 e atualiza o lance líder", async () => {
     submitSaleOffer.mockResolvedValue({
-      offer: { id: 1, amount: "50000.00", note: null, created_at: new Date().toISOString() },
-      current_highest_offer: "50000.00",
-      my_offer: "50000.00",
+      offer: { id: 1, amount: "62600.00", note: null, created_at: new Date().toISOString() },
+      current_highest_offer: "62600.00",
+      my_offer: "62600.00",
       is_leading: true,
       offers_count: 1,
     });
-
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
-
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6500000");
-    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
-
-    await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
-    expect(submitSaleOffer.mock.calls[0][1].amount).toBe("65000.00");
-  });
-
-  it("depois de enviar, o painel mostra a liderança sem nova request", async () => {
-    submitSaleOffer.mockResolvedValue({
-      offer: { id: 1, amount: "50000.00", note: null, created_at: new Date().toISOString() },
-      current_highest_offer: "50000.00",
-      my_offer: "50000.00",
-      is_leading: true,
-      offers_count: 1,
-    });
-
-    render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
-
     fetchSaleOpportunity.mockClear();
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6500000");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-100"));
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
-
-    // A igualdade EXATA quebrou quando o badge ganhou um glifo de estado ao lado
-    // do texto. O glifo existe para a posição não depender só de cor; a asserção
-    // passa a ser sobre a MENSAGEM, que é o que o lojista lê.
+    await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
+    expect(submitSaleOffer.mock.calls[0][1]).toMatchObject({ amount: "62600.00", note: null });
     expect((await screen.findByTestId("dealer-offer-standing")).textContent).toContain(
       "Você está liderando"
     );
+    expect(screen.getByTestId("dealer-offer-current").textContent).toContain("62.600,00");
     expect(fetchSaleOpportunity).not.toHaveBeenCalled();
+    expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("quando outra loja lidera, o aviso não tem nome", async () => {
-    fetchSaleOpportunity.mockResolvedValue(
-      makeDetail({
-        current_highest_offer: "60000.00",
-        my_offer: "50000.00",
-        is_leading: false,
-        offers_count: 2,
-      })
-    );
-
+  it("após envio, próximos incrementos partem do novo maior lance", async () => {
+    submitSaleOffer.mockResolvedValue({
+      offer: { id: 1, amount: "62600.00", note: null, created_at: new Date().toISOString() },
+      current_highest_offer: "62600.00",
+      my_offer: "62600.00",
+      is_leading: true,
+      offers_count: 1,
+    });
     render(<DealerSaleOpportunityDetail id="1" />);
-    const standing = await screen.findByTestId("dealer-offer-standing");
-
-    expect(standing.textContent).toContain("Existe uma proposta maior");
-    expect(standing.textContent).not.toMatch(/loja|dealer|concorrente/i);
+    await screen.findByTestId("dealer-offer-panel");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-100"));
+    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
+    await screen.findByTestId("dealer-offer-success");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-500"));
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("63.100,00");
   });
 
-  it("a recusa por não superar atualiza o líder na tela", async () => {
-    // O erro REAL do módulo, e não um sósia com a mesma propriedade.
-    // `readRejectedHighest` só reconhece `DealerSaleOpportunityError` — e essa
-    // é a checagem certa: um objeto qualquer com um campo `currentHighest`
-    // poderia vir de qualquer lugar, inclusive de uma resposta malformada.
+  it("rejeição 409 de outra loja atualiza a base, mas nunca envia um lance novo sem confirmação", async () => {
     submitSaleOffer.mockRejectedValue(
       new DealerSaleOpportunityError(
         "A sua proposta precisa ser maior que a maior proposta atual.",
         409,
         "SALE_OPPORTUNITY_OFFER_NOT_LEADING",
-        "61000.00"
+        "64500.00"
       )
     );
-
     fetchSaleOpportunity.mockResolvedValue(
-      makeDetail({ current_highest_offer: "60000.00", my_offer: "50000.00", offers_count: 2 })
+      makeDetail({
+        current_highest_offer: "64000.00",
+        my_offer: "63000.00",
+        offers_count: 2,
+      })
     );
-
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
-
-    // 62.000 SUPERA o líder que a tela conhece (60.000) — a checagem local
-    // deixa passar, e é o servidor que recusa, porque enquanto isso outra loja
-    // subiu para 61.000. É o cenário real de tela defasada, e é o que este teste
-    // existe para provar.
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6200000");
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-100"));
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("64.100,00");
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
-
-    expect(await screen.findByTestId("dealer-offer-error")).toBeTruthy();
-    // O painel passa a mostrar 61.000 — o lojista não precisa recarregar para
-    // descobrir quanto falta.
-    await waitFor(() => expect(screen.getByText(/R\$\s?61\.000,00/)).toBeTruthy());
+    await screen.findByTestId("dealer-offer-error");
+    expect(screen.getByTestId("dealer-offer-current").textContent).toContain("64.500,00");
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain(
+      "Selecione um incremento"
+    );
+    expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
+    expect(submitSaleOffer).toHaveBeenCalledTimes(1);
   });
 
-  it("valor vazio não chama a API", async () => {
+  it("liderança e valor pessoal aparecem sem identidade da loja concorrente", async () => {
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({
+        current_highest_offer: "65000.00",
+        my_offer: "64000.00",
+        offers_count: 2,
+        is_leading: false,
+      })
+    );
     render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
+    const standing = await screen.findByTestId("dealer-offer-standing");
+    expect(standing.textContent).toContain("Existe uma proposta maior");
+    expect(standing.textContent).not.toMatch(/loja|dealer|concorrente/i);
+    expect(screen.getByTestId("dealer-offer-current").textContent).toContain("65.000,00");
+    expect(screen.getByTestId("dealer-offer-panel").textContent).toContain("64.000,00");
+  });
 
+  it("sem mínimo e sem líder preserva entrada manual para veículos legados", async () => {
+    fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
+    submitSaleOffer.mockResolvedValue({
+      offer: { id: 1, amount: "50000.00", note: null, created_at: new Date().toISOString() },
+      current_highest_offer: "50000.00",
+      my_offer: "50000.00",
+      is_leading: true,
+      offers_count: 1,
+    });
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-legacy-entry");
+    expect(screen.getByTestId("dealer-offer-current").textContent).toContain("Não informado");
+    expect(screen.getByTestId("dealer-offer-panel").textContent).not.toMatch(/R\$\s?0,00/);
+    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "5000000");
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
+    await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
+    expect(submitSaleOffer.mock.calls[0][1].amount).toBe("50000.00");
+  });
 
+  it("sem valor manual em legado, não envia requisição", async () => {
+    fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
+    render(<DealerSaleOpportunityDetail id="1" />);
+    await screen.findByTestId("dealer-offer-legacy-entry");
+    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
     expect(submitSaleOffer).not.toHaveBeenCalled();
     expect(screen.getByTestId("dealer-offer-error").textContent).toContain("Informe o valor");
   });
 
-  /*
-    ────────────────────────────────────────────────────────────────────────
-    AS DUAS BARREIRAS NA TELA (§24 da Fase 4.3.3)
-    ────────────────────────────────────────────────────────────────────────
-    A checagem local NÃO substitui o servidor — lá ela acontece dentro da
-    transação que trava a solicitação, e é a única confiável. Aqui ela existe
-    para transformar um 409 previsível em resposta imediata, com o alvo na tela.
-
-    O que estes testes prendem é a ORDEM das barreiras: sem proposta, o piso e
-    `>=`; com proposta, a maior atual e `>`. Invertê-las faria a tela recusar um
-    valor que a API aceita — o pior tipo de divergência, porque o lojista não
-    tem como saber quem está certo.
-  */
-  it("abaixo do piso: não chama a API e diz qual é o piso", async () => {
+  it("observação opcional só aparece depois do clique", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
-
-    // Piso da fixture: 62.500. Um centavo abaixo.
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6249999");
-    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
-
-    expect(submitSaleOffer).not.toHaveBeenCalled();
-    const error = screen.getByTestId("dealer-offer-error").textContent ?? "";
-    expect(error).toContain("valor mínimo");
-    expect(error).toMatch(/62\.500,00/);
+    expect(screen.queryByTestId("dealer-offer-note")).toBeNull();
+    await userEvent.click(screen.getByTestId("dealer-offer-note-toggle"));
+    expect(screen.getByLabelText(/Observações para avaliação/)).toBeTruthy();
   });
 
-  it("EXATAMENTE o piso é aceito enquanto não existe proposta", async () => {
-    submitSaleOffer.mockResolvedValue({
-      offer: { id: 1, amount: "62500.00", note: null, created_at: new Date().toISOString() },
-      current_highest_offer: "62500.00",
-      my_offer: "62500.00",
-      is_leading: true,
-      offers_count: 1,
-    });
-
-    render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
-
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6250000");
-    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
-
-    await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
-    expect(submitSaleOffer.mock.calls[0][1].amount).toBe("62500.00");
-  });
-
-  it("com proposta na mesa, alcançar o piso já não basta: precisa superar o líder", async () => {
-    fetchSaleOpportunity.mockResolvedValue(
-      makeDetail({ current_highest_offer: "64000.00", my_offer: null, offers_count: 1 })
-    );
-
-    render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
-
-    // Acima do piso (62.500) e abaixo do líder (64.000).
-    await userEvent.type(screen.getByTestId("dealer-offer-amount"), "6300000");
-    await userEvent.click(screen.getByTestId("dealer-offer-submit"));
-
-    expect(submitSaleOffer).not.toHaveBeenCalled();
-    expect(screen.getByTestId("dealer-offer-error").textContent).toContain(
-      "superar a maior proposta atual"
-    );
-  });
-
-  it("o detalhe mostra os QUATRO valores — é o card que mostra só o piso", async () => {
+  it("comparação com FIPE não se apresenta como lucro ou margem", async () => {
     fetchSaleOpportunity.mockResolvedValue(
       makeDetail({
-        minimum_accepted_price: "62500.00",
-        fipe_reference_value: "72000.00",
-        current_highest_offer: "65000.00",
-        my_offer: "64000.00",
-        offers_count: 2,
+        current_highest_offer: "70000.00",
+        my_offer: "70000.00",
+        is_leading: true,
+        offers_count: 1,
       })
     );
-
-    render(<DealerSaleOpportunityDetail id="1" />);
-    const panel = await screen.findByTestId("dealer-offer-panel");
-
-    // A tela de decisão tem largura para os quatro, e é onde eles servem: o
-    // formulário de proposta está logo abaixo.
-    expect(screen.getByTestId("dealer-offer-minimum").textContent).toMatch(/62\.500,00/);
-    expect(screen.getByTestId("dealer-detail-minimum").textContent).toMatch(/62\.500,00/);
-    expect(panel.textContent).toMatch(/65\.000,00/);
-    expect(panel.textContent).toMatch(/64\.000,00/);
-    expect(document.body.textContent).toMatch(/72\.000,00/);
-  });
-
-  it("legado sem piso: o painel não mostra linha de valor mínimo, e nada de R$ 0,00", async () => {
-    fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
-
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
-
-    expect(screen.queryByTestId("dealer-offer-minimum")).toBeNull();
-    // No resumo a linha existe, mas diz "não informado" — nunca zero.
-    expect(screen.getByTestId("dealer-detail-minimum").textContent).not.toContain("R$ 0");
+    const difference = screen.getByTestId("dealer-offer-fipe-distance").textContent ?? "";
+    expect(difference).toContain("22.000,00");
+    expect(difference).toContain("abaixo");
+    expect(difference.toLowerCase()).not.toMatch(/lucro|margem/);
   });
 
-  it("os atalhos partem da maior proposta atual e apenas PREENCHEM o campo", async () => {
-    fetchSaleOpportunity.mockResolvedValue(
-      makeDetail({ current_highest_offer: "50000.00", my_offer: null, offers_count: 1 })
-    );
-
+  it("as condições permanecem disponíveis, com o compromisso visível", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
-
-    await userEvent.click(screen.getByTestId("dealer-offer-bump-1000"));
-
-    expect((screen.getByTestId("dealer-offer-amount") as HTMLInputElement).value).toContain(
-      "51.000,00"
-    );
-    // Preencher não envia.
-    expect(submitSaleOffer).not.toHaveBeenCalled();
-  });
-
-  it("sem disputa nenhuma não há atalho de incremento — não há de onde partir", async () => {
-    render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
-
-    expect(screen.queryByTestId("dealer-offer-bump-1000")).toBeNull();
-  });
-
-  it("a distância para a FIPE é rotulada como distância, nunca como margem", async () => {
-    fetchSaleOpportunity.mockResolvedValue(
-      makeDetail({ my_offer: "70000.00", current_highest_offer: "70000.00", is_leading: true })
-    );
-
-    render(<DealerSaleOpportunityDetail id="1" />);
-    const distance = await screen.findByTestId("dealer-offer-fipe-distance");
-
-    // "da sua oferta" desambigua (4.11A): o cartão de referência de mercado
-    // mostra a diferença entre FIPE e PISO na mesma tela, e as duas distâncias
-    // sem dono seriam lidas como a mesma conta.
-    expect(distance.textContent).toContain("Distância da sua oferta para a FIPE");
-    expect(distance.textContent).toContain("22.000,00");
-    expect(distance.textContent).toContain("abaixo");
-  });
-
-  it("sem proposta não há distância — exibir a FIPE sozinha seria enganoso", async () => {
-    render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
-
-    expect(screen.queryByTestId("dealer-offer-fipe-distance")).toBeNull();
-  });
-
-  it("o campo de observação NÃO se parece com mensagem", async () => {
-    render(<DealerSaleOpportunityDetail id="1" />);
-    await screen.findByTestId("dealer-offer-panel");
-
-    expect(screen.getByLabelText(/Observações para avaliação/)).toBeTruthy();
-    expect(screen.queryByLabelText(/mensagem/i)).toBeNull();
-    expect(screen.queryByPlaceholderText(/mensagem/i)).toBeNull();
+    expect(screen.getByTestId("dealer-offer-commitment").textContent?.length).toBeGreaterThan(20);
+    await userEvent.click(screen.getByTestId("dealer-offer-terms-toggle"));
+    expect(
+      screen.getByTestId("dealer-offer-inspection-notice").textContent?.length
+    ).toBeGreaterThan(20);
   });
 });
 

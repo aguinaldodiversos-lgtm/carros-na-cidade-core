@@ -247,6 +247,56 @@ jobs:
           path: reports/screenshots/fase-4-11c/
           retention-days: 7
 
+      - name: Run E2E dealer bid screen (desktop + mobile)
+        run: npx playwright test e2e/dealer-opportunity-detail-premium.spec.ts --project=chromium
+        env:
+          CI: "true"
+          AUTH_SESSION_SECRET: cnc-dev-session-secret
+
+      - name: Upload dealer bid screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dealer-bid-pr81-screenshots
+          path: reports/screenshots/fase-4-11a/
+          retention-days: 7
+
+      # Prova de negociação real contra o banco de testes já migrado e semeado.
+      # O servidor Express roda apenas durante esta etapa e é encerrado ao sair.
+      - name: Run E2E dealer bids (two shops + real PostgreSQL)
+        run: |
+          set -euo pipefail
+          node src/index.js > /tmp/cnc-pr81-api.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 45); do
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              echo "API de testes encerrou antes de ficar pronta."
+              tail -100 /tmp/cnc-pr81-api.log
+              exit 1
+            fi
+            if curl -sf http://127.0.0.1:4000/health > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != 1 ]; then
+            echo "API de testes não ficou pronta."
+            tail -100 /tmp/cnc-pr81-api.log
+            exit 1
+          fi
+          cd frontend
+          npx playwright test e2e/dealer-sale-offers.spec.ts --project=chromium
+        working-directory: ${{ github.workspace }}
+        env:
+          CI: "true"
+          PORT: "4000"
+          HOST: "127.0.0.1"
+          RUN_MIGRATIONS: "false"
+          RUN_WORKERS: "false"
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

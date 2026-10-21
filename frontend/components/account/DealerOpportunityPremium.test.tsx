@@ -151,13 +151,19 @@ describe("§4 — a sidebar sai NO DETALHE, e continua no resto do painel", () =
 
   it("o predicado distingue o DETALHE da listagem e das demais telas", () => {
     // Detalhe → foco.
-    expect(isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42", "/dashboard-loja")).toBe(true);
+    expect(
+      isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42", "/dashboard-loja")
+    ).toBe(true);
     // Barra final não muda a rota.
-    expect(isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42/", "/dashboard-loja")).toBe(true);
+    expect(
+      isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42/", "/dashboard-loja")
+    ).toBe(true);
 
     // A LISTAGEM não entra em foco: ela não foi redesenhada nesta fase, e sem
     // menu o lojista ficaria sem saída de uma tela de navegação.
-    expect(isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos", "/dashboard-loja")).toBe(false);
+    expect(
+      isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos", "/dashboard-loja")
+    ).toBe(false);
 
     for (const path of [
       "/dashboard-loja",
@@ -222,7 +228,7 @@ describe("§8/§9 — cabeçalho da página e identidade do veículo", () => {
     expect(screen.getByText("BYD Dolphin 2024")).toBeTruthy();
     expect(screen.getByText("Dolphin Plus (Elétrico)")).toBeTruthy();
     expect(screen.getByText("Particular")).toBeTruthy();
-    expect(screen.getByText("Recebendo propostas")).toBeTruthy();
+    expect(screen.getAllByText("Recebendo propostas").length).toBeGreaterThan(0);
   });
 });
 
@@ -354,47 +360,33 @@ describe("§13/§14 — informações do veículo, e o que NÃO entra nelas", ()
 
 // ============================================================================
 describe("§22/§23/§55 — o valor mínimo é o número principal da negociação", () => {
-  it("§53 — o piso aparece com destaque, e nunca como travessão", async () => {
+  it("§53 — antes da primeira oferta, o piso é a referência do lance inicial", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const block = await screen.findByTestId("dealer-detail-minimum");
-
-    expect(block.textContent).toContain("Valor mínimo do vendedor");
+    expect(block.textContent).toContain("Lance inicial");
     expect(within(block).getByTestId("dealer-offer-minimum").textContent).toMatch(/62\.500,00/);
-
-    // §64 — sem traço no lugar do mínimo, e sem zero.
-    expect(block.textContent).not.toContain("—");
+    expect(screen.getByTestId("dealer-offer-current").textContent).toMatch(/62\.500,00/);
     expect(block.textContent).not.toMatch(/R\$\s?0,00/);
-
-    // §23 — e nunca com um rótulo que sugira outra coisa.
-    const text = document.body.textContent ?? "";
-    expect(text).not.toContain("Última avaliação");
-    expect(text).not.toContain("Preço estimado");
   });
-
-  it("§55 — legado sem piso diz 'Não informado', nunca zero nem travessão", async () => {
+  it("§55 — sem nenhum valor de referência, legado diz Não informado e permite lance manual", async () => {
     fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
     render(<DealerSaleOpportunityDetail id="1" />);
-
     const block = await screen.findByTestId("dealer-detail-minimum");
     expect(block.textContent).toContain("Não informado");
-    expect(block.textContent).not.toMatch(/R\$\s?0,00/);
-    // O VALOR não existe; o bloco, sim. Sumir com ele faria a pergunta mais
-    // importante da coluna desaparecer sem explicação.
+    expect(screen.getByTestId("dealer-offer-legacy-entry")).toBeTruthy();
     expect(screen.queryByTestId("dealer-offer-minimum")).toBeNull();
   });
 });
 
 // ============================================================================
 describe("§26/§27 — a disputa, sem identidade e sem zero", () => {
-  it("sem ofertas, as duas ausências são frases distintas", async () => {
+  it("sem ofertas o piso aparece como lance inicial, e nenhuma proposta vira zero", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const panel = await screen.findByTestId("dealer-offer-panel");
-
-    expect(panel.textContent).toContain("Nenhuma oferta recebida ainda.");
-    expect(panel.textContent).toContain("Você ainda não fez uma oferta.");
+    expect(panel.textContent).toContain("Lance inicial");
+    expect(panel.textContent).toContain("Nenhuma proposta recebida ainda.");
     expect(panel.textContent).not.toMatch(/R\$\s?0,00/);
   });
-
   it("liderando: o aviso é discreto e não nomeia ninguém", async () => {
     fetchSaleOpportunity.mockResolvedValue(
       makeDetail({
@@ -433,41 +425,34 @@ describe("§26/§27 — a disputa, sem identidade e sem zero", () => {
 
 // ============================================================================
 describe("§28/§29/§36 — o formulário de oferta", () => {
-  it("§29 — o CTA é 'Fazer oferta', o mesmo nome do card do feed", async () => {
+  it("o CTA só é habilitado depois de selecionar incremento e mostra o lance exato", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     const submit = await screen.findByTestId("dealer-offer-submit");
-
-    expect(submit.textContent).toContain("Fazer oferta");
-    // Um único nome para a ação em toda a experiência (§29).
-    expect(document.body.textContent).not.toContain("Enviar oferta");
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-500"));
+    expect((submit.textContent || "").replace(/\u00a0/g, " ")).toContain(
+      "Fazer lance de R$ 63.000,00"
+    );
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
   });
-
-  it("§28 — prefixo R$ fora do campo e placeholder de exemplo", async () => {
+  it("os lances normais não têm campo livre: seleção explícita de quatro valores", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
-    const input = (await screen.findByTestId("dealer-offer-amount")) as HTMLInputElement;
-
-    expect(input.getAttribute("placeholder")).toBe("Ex.: 62.500,00");
-    // O símbolo é do invólucro, não do valor: digitar não deve produzir
-    // "R$ R$ 62.500,00".
-    await userEvent.type(input, "6250000");
-    expect(input.value).toBe("62.500,00");
+    await screen.findByTestId("dealer-offer-panel");
+    expect(screen.queryByTestId("dealer-offer-amount")).toBeNull();
+    for (const increment of [100, 300, 500, 1000]) {
+      expect(screen.getByTestId(`dealer-offer-bump-${increment}`)).toBeTruthy();
+    }
   });
-
-  it("§28 — os atalhos continuam apenas PREENCHENDO, sem enviar", async () => {
+  it("escolher incremento apenas altera a prévia e não faz POST", async () => {
     fetchSaleOpportunity.mockResolvedValue(
       makeDetail({ current_highest_offer: "60000.00", offers_count: 1 })
     );
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
-
-    await userEvent.click(screen.getByTestId("dealer-offer-bump-2000"));
-
-    expect((screen.getByTestId("dealer-offer-amount") as HTMLInputElement).value).toBe(
-      "62.000,00"
-    );
+    await userEvent.click(screen.getByTestId("dealer-offer-bump-1000"));
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("61.000,00");
     expect(submitSaleOffer).not.toHaveBeenCalled();
   });
-
   it("§36 — a regra do compromisso fica VISÍVEL; o detalhamento, a um clique", async () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
@@ -479,9 +464,9 @@ describe("§28/§29/§36 — o formulário de oferta", () => {
     // O resto continua ACESSÍVEL — resumir não é remover (§36).
     expect(screen.queryByTestId("dealer-offer-inspection-notice")).toBeNull();
     await userEvent.click(screen.getByTestId("dealer-offer-terms-toggle"));
-    expect(screen.getByTestId("dealer-offer-inspection-notice").textContent?.length).toBeGreaterThan(
-      20
-    );
+    expect(
+      screen.getByTestId("dealer-offer-inspection-notice").textContent?.length
+    ).toBeGreaterThan(20);
   });
 
   it("§30 — não existe 'Salvar oportunidade': o backend não tem favorito", async () => {
@@ -631,7 +616,10 @@ describe("§19/§20 — pontos para avaliar: fatos, nunca julgamento", () => {
         ...base,
         evaluation: { ...EVALUATION, caution_report_status: value },
       });
-      expect(points.map((p) => p.label), String(value)).toContain("Sem laudo cautelar informado");
+      expect(
+        points.map((p) => p.label),
+        String(value)
+      ).toContain("Sem laudo cautelar informado");
     }
 
     // Laudo COM resultado não vira alerta: ele está na ficha, com o resultado.
@@ -667,7 +655,9 @@ describe("§19/§20 — pontos para avaliar: fatos, nunca julgamento", () => {
       "engine",
     ]);
     // Cada frase diz DE ONDE vem a afirmação.
-    expect(points.find((p) => p.id === "collision")?.label).toContain("declarado pelo proprietário");
+    expect(points.find((p) => p.id === "collision")?.label).toContain(
+      "declarado pelo proprietário"
+    );
   });
 
   it("nenhum ponto é elogio — a lista só cresce com o que merece um segundo olhar", () => {
