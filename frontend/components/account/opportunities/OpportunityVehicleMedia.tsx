@@ -43,9 +43,7 @@ export function resolveOpportunityModelIllustration(
   const brand = normalizeModelPart(opportunity.brand);
   const model = normalizeModelPart(opportunity.model);
   const match = MODEL_ILLUSTRATIONS.find(
-    (item) =>
-      brand === item.brand &&
-      (model === item.model || model.startsWith(`${item.model} `))
+    (item) => brand === item.brand && (model === item.model || model.startsWith(`${item.model} `))
   );
 
   return match?.src ?? null;
@@ -88,7 +86,13 @@ export default function OpportunityVehicleMedia({
             aria-hidden="true"
             className="pointer-events-none absolute right-2 top-2 z-[2] flex h-9 w-9 items-center justify-center rounded-full border border-[#e0eaff] bg-white/95 text-[#0e62d8] shadow-sm"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.1">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.1"
+            >
               <circle cx="10.8" cy="10.8" r="6.5" />
               <path d="m16 16 5 5" />
             </svg>
