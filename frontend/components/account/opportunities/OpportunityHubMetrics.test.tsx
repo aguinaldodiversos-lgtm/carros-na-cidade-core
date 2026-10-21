@@ -37,7 +37,9 @@ vi.mock("@/lib/account/opportunities-summary", async (importOriginal) => {
   };
 });
 
-function makeSummary(overrides: Partial<DealerOpportunitiesSummary> = {}): DealerOpportunitiesSummary {
+function makeSummary(
+  overrides: Partial<DealerOpportunitiesSummary> = {}
+): DealerOpportunitiesSummary {
   return {
     active_buyers: { total: 128, trend: { percent: 18, direction: "up" } },
     sale_requests: { total: 76, trend: { percent: 12, direction: "up" } },
@@ -124,9 +126,9 @@ describe("os quatro números", () => {
     );
 
     // A redação antiga não pode voltar por nenhum caminho.
-    expect(
-      screen.getByTestId("dealer-hub-metrics").textContent
-    ).not.toContain("nos últimos 7 dias");
+    expect(screen.getByTestId("dealer-hub-metrics").textContent).not.toContain(
+      "nos últimos 7 dias"
+    );
   });
 
   /**
@@ -145,9 +147,7 @@ describe("os quatro números", () => {
       "+9% novas entradas em 7 dias"
     );
     // E NÃO promete uma comparação com ontem, que o backend não faz.
-    expect(screen.getByTestId("dealer-hub-metric-new-today").textContent).not.toContain(
-      "ontem"
-    );
+    expect(screen.getByTestId("dealer-hub-metric-new-today").textContent).not.toContain("ontem");
   });
 
   /** §9 — o que entra em "Compras em andamento" são COMPRAS, não entradas. */
@@ -280,9 +280,9 @@ describe("describeTrend", () => {
     expect(describeTrend({ percent: 5, direction: "up" }, "novas compras").label).toBe(
       "+5% novas compras"
     );
-    expect(
-      describeTrend({ percent: 9, direction: "up" }, "novas entradas em 7 dias").label
-    ).toBe("+9% novas entradas em 7 dias");
+    expect(describeTrend({ percent: 9, direction: "up" }, "novas entradas em 7 dias").label).toBe(
+      "+9% novas entradas em 7 dias"
+    );
   });
 
   it("queda usa o sinal de MENOS tipográfico, não o hífen", () => {
