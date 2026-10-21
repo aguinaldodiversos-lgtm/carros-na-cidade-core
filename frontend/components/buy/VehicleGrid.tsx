@@ -154,12 +154,12 @@ function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
     ctx.belowFipeLanding && ctx.citySlug
       ? `/carros-baratos-em/${ctx.citySlug}`
       : ctx.variant === "cidade" && ctx.citySlug
-      ? `/carros-em/${ctx.citySlug}`
-      : ctx.variant === "regional" && ctx.citySlug
-        ? `/carros-usados/regiao/${ctx.citySlug}`
-        : ctx.variant === "estadual" && ctx.stateUf
-          ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
-          : "/comprar";
+        ? `/carros-em/${ctx.citySlug}`
+        : ctx.variant === "regional" && ctx.citySlug
+          ? `/carros-usados/regiao/${ctx.citySlug}`
+          : ctx.variant === "estadual" && ctx.stateUf
+            ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
+            : "/comprar";
 
   // Ação secundária: ampliar escopo. Cidade → região (ou estado),
   // regional → estado, estado → Brasil, nacional → não tem.
