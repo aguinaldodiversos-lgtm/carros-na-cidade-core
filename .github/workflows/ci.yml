@@ -231,6 +231,22 @@ jobs:
         env:
           CI: "true"
 
+      # Suíte de layout/privacidade do feed. A sessão de teste é assinada
+      # com segredo de desenvolvimento, sem qualquer credencial de produção.
+      - name: Run E2E buyer opportunity cards (desktop + mobile)
+        run: npx playwright test e2e/active-buyers-card-grid.spec.ts --project=chromium
+        env:
+          CI: "true"
+          AUTH_SESSION_SECRET: cnc-dev-session-secret
+
+      - name: Upload buyer card screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buyer-cards-pr80-screenshots
+          path: reports/screenshots/fase-4-11c/
+          retention-days: 7
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4

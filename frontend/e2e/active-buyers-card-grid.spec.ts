@@ -270,7 +270,126 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
     expect(report.duplicated).toEqual([]);
   });
 
-  test("nenhuma fotografia: zero <img> e zero requisição de imagem", async ({ page }) => {
+  test("Virtus e Pulse carregam assets próprios, sem consultar fotos de anúncios", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const fixture = buildFixture(2);
+    fixture.purchase_intents[0].brand = "Volkswagen";
+    fixture.purchase_intents[0].model = "Virtus";
+    fixture.purchase_intents[1].intent_type = "specific_model";
+    fixture.purchase_intents[1].brand = "Fiat";
+    fixture.purchase_intents[1].model = "Pulse";
+    fixture.purchase_intents[1].body_type = null;
+    await prepare(page, fixture);
+
+    const requested: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "image") requested.push(request.url());
+    });
+
+    await page.goto(PAGE_PATH);
+    const images = page.getByTestId("active-buyer-model-image");
+    await expect(images).toHaveCount(2);
+    await expect(images.nth(0)).toHaveAttribute(
+      "src",
+      "/images/oportunidades/modelos/volkswagen-virtus.webp"
+    );
+    await expect(images.nth(1)).toHaveAttribute(
+      "src",
+      "/images/oportunidades/modelos/fiat-pulse.webp"
+    );
+    await expect
+      .poll(async () =>
+        images.evaluateAll((nodes) =>
+          nodes.every(
+            (node) =>
+              (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0
+          )
+        )
+      )
+      .toBe(true);
+
+    const modelRequests = requested.filter((url) => url.includes("/images/oportunidades/modelos/"));
+    expect(modelRequests.length).toBe(2);
+    expect(
+      requested.filter(
+        (url) =>
+          url.includes("/api/vehicle-images") ||
+          url.includes("r2.dev") ||
+          url.includes("/uploads/ads/")
+      )
+    ).toEqual([]);
+  });
+
+  test("homologação visual: referências e fallback em desktop e mobile", async ({ page }) => {
+    const fixture = buildFixture(3);
+    fixture.purchase_intents[0].brand = "Volkswagen";
+    fixture.purchase_intents[0].model = "Virtus";
+    fixture.purchase_intents[1].intent_type = "specific_model";
+    fixture.purchase_intents[1].brand = "Fiat";
+    fixture.purchase_intents[1].model = "Pulse";
+    fixture.purchase_intents[1].body_type = null;
+    fixture.purchase_intents[2].intent_type = "open_category";
+    fixture.purchase_intents[2].brand = null;
+    fixture.purchase_intents[2].model = null;
+    fixture.purchase_intents[2].body_type = "suv";
+
+    for (const viewport of [
+      { width: 1440, height: 900, label: "desktop-1440" },
+      { width: 390, height: 844, label: "mobile-390" },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await prepare(page, fixture);
+      await page.goto(PAGE_PATH);
+      const cards = page.getByTestId("active-buyer-card");
+      await expect(cards).toHaveCount(3);
+      await expectNoHorizontalOverflow(page);
+      await expect(cards.nth(0).getByTestId("active-buyer-media")).toHaveAttribute(
+        "data-media-kind",
+        "model"
+      );
+      await expect(cards.nth(1).getByTestId("active-buyer-media")).toHaveAttribute(
+        "data-media-kind",
+        "model"
+      );
+      await expect(cards.nth(2).getByTestId("active-buyer-media")).toHaveAttribute(
+        "data-media-kind",
+        "category"
+      );
+
+      // Aguarda carregamento inclusive abaixo da dobra no mobile.
+      for (const index of [0, 1]) {
+        const media = cards.nth(index).getByTestId("active-buyer-model-image");
+        await media.scrollIntoViewIfNeeded();
+        await expect
+          .poll(async () =>
+            media.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)
+          )
+          .toBe(true);
+      }
+
+      // Volta ao topo antes da captura fullPage: no mobile, o scroll para
+      // carregar a imagem do segundo card posicionava a BottomNav sobre o
+      // primeiro card na imagem final, embora a navegação funcionasse.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+      // Capturas legíveis e auditáveis: grade, modelos e fallback.
+      await page.screenshot({
+        path: `${SHOTS}/11-buyers-models-${viewport.label}.png`,
+        fullPage: true,
+      });
+      await cards.nth(0).screenshot({ path: `${SHOTS}/12-virtus-${viewport.label}.png` });
+      await cards.nth(1).screenshot({ path: `${SHOTS}/13-pulse-${viewport.label}.png` });
+      await cards.nth(2).screenshot({ path: `${SHOTS}/14-suv-fallback-${viewport.label}.png` });
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+
+  test("procura sem referência cadastrada permanece em SVG, sem foto de anúncio", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await prepare(page);
 
@@ -393,9 +512,11 @@ test.describe("@active-buyers filtros, contagem e estados", () => {
 
   test("erro NÃO vira '0 resultados'", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.context().addCookies([
-      { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-    ]);
+    await page
+      .context()
+      .addCookies([
+        { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
+      ]);
     await page.route(FEED_URL, async (route) => {
       await route.fulfill({
         status: 503,
