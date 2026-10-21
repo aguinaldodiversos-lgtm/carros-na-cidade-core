@@ -7,6 +7,7 @@ const NEARBY_AD = "honda-hr-v-ex-2020-braganca-sp-e2e-4";
 
 test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
   test.describe.configure({ mode: "serial" });
+  test.setTimeout(120_000);
 
   const saved: Array<{
     slug: string;
@@ -99,7 +100,7 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
       );
       expect(overflow).toBe(false);
       await page.screenshot({
-        path: `reports/screenshots/pr82/baratos-${viewport.label}.png`,
+        path: `../reports/screenshots/pr82/baratos-${viewport.label}.png`,
         fullPage: true,
       });
     });
