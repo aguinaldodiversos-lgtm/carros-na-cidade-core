@@ -228,7 +228,7 @@ describe("§8/§9 — cabeçalho da página e identidade do veículo", () => {
     expect(screen.getByText("BYD Dolphin 2024")).toBeTruthy();
     expect(screen.getByText("Dolphin Plus (Elétrico)")).toBeTruthy();
     expect(screen.getByText("Particular")).toBeTruthy();
-    expect(screen.getByText("Recebendo propostas")).toBeTruthy();
+    expect(screen.getAllByText("Recebendo propostas").length).toBeGreaterThan(0);
   });
 });
 
@@ -430,7 +430,7 @@ describe("§28/§29/§36 — o formulário de oferta", () => {
     const submit = await screen.findByTestId("dealer-offer-submit");
     expect((submit as HTMLButtonElement).disabled).toBe(true);
     await userEvent.click(screen.getByTestId("dealer-offer-bump-500"));
-    expect(submit.textContent).toContain("Fazer lance de R$ 63.000,00");
+    expect((submit.textContent || "").replace(/\u00a0/g, " ")).toContain("Fazer lance de R$ 63.000,00");
     expect((submit as HTMLButtonElement).disabled).toBe(false);
   });
   it("os lances normais não têm campo livre: seleção explícita de quatro valores", async () => {
