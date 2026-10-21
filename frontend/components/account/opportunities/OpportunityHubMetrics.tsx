@@ -38,38 +38,60 @@ const TONE: Record<MetricTone, { card: string; icon: string; link: string }> = {
 
 const ICON = {
   buyers: (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <circle cx="9" cy="8" r="3.4" />
       <path d="M3 19c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3.3 3.3 0 0 1 0 6.5M17.5 13c2 .7 3.5 2.7 3.5 5" />
     </svg>
   ),
   car: (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <path d="M4 16v2.2M20 16v2.2M3 15.5c0-1.6.9-2.6 2.4-3l1.9-4c.4-.9 1.2-1.4 2.2-1.4h5c1 0 1.8.5 2.2 1.4l1.9 4c1.5.4 2.4 1.4 2.4 3v.5H3v-.5Z" />
       <circle cx="7.4" cy="15.8" r="1.1" />
       <circle cx="16.6" cy="15.8" r="1.1" />
     </svg>
   ),
   clock: (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M12 6v6l4 2" strokeLinecap="round" />
     </svg>
   ),
   deal: (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 10.5 6.5 7l3.2 3.2a2 2 0 0 0 2.8 0L15 7.5M21 10.5 17.5 7l-2 1.6M6.5 14.5 9 17l1.6-1.6L12.4 17l1.6-1.6L15.6 17l2.2-2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path
+        d="M3 10.5 6.5 7l3.2 3.2a2 2 0 0 0 2.8 0L15 7.5M21 10.5 17.5 7l-2 1.6M6.5 14.5 9 17l1.6-1.6L12.4 17l1.6-1.6L15.6 17l2.2-2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   ),
 } as const;
 
-function TrendLine({
-  metric,
-  entriesLabel,
-}: {
-  metric: OpportunityMetric;
-  entriesLabel: string;
-}) {
+function TrendLine({ metric, entriesLabel }: { metric: OpportunityMetric; entriesLabel: string }) {
   const trend = describeTrend(metric.trend, entriesLabel);
   const tone =
     trend.tone === "positive"
@@ -130,12 +152,18 @@ function MetricCard({
         <p className="text-[27px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-[#101B3D]">
           {metric.total.toLocaleString("pt-BR")}
         </p>
-        <p className="mt-1 min-h-[31px] text-[12px] font-semibold leading-snug text-[#576986] xl:min-h-[35px]" title={hint}>
+        <p
+          className="mt-1 min-h-[31px] text-[12px] font-semibold leading-snug text-[#576986] xl:min-h-[35px]"
+          title={hint}
+        >
           {label}
         </p>
         <TrendLine metric={metric} entriesLabel={entriesLabel} />
         {href && linkLabel ? (
-          <Link href={href} className={`mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-bold underline-offset-2 hover:underline ${colors.link}`}>
+          <Link
+            href={href}
+            className={`mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-bold underline-offset-2 hover:underline ${colors.link}`}
+          >
             {linkLabel} <span aria-hidden="true">→</span>
           </Link>
         ) : (
@@ -192,7 +220,10 @@ export default function OpportunityHubMetrics() {
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="dealer-hub-metrics-heading" className="text-[18px] font-extrabold tracking-[-0.025em] text-[#101B3D] sm:text-[20px]">
+          <h2
+            id="dealer-hub-metrics-heading"
+            className="text-[18px] font-extrabold tracking-[-0.025em] text-[#101B3D] sm:text-[20px]"
+          >
             Resumo de oportunidades
           </h2>
           <p className="mt-1 text-[12.5px] text-[#667793]">
@@ -200,8 +231,19 @@ export default function OpportunityHubMetrics() {
           </p>
         </div>
         <span className="flex items-center gap-2 text-[11px] text-[#6D7C98]">
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <path d="M20 11a8 8 0 1 0-2.2 5.6M20 4v7h-7" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
+          >
+            <path
+              d="M20 11a8 8 0 1 0-2.2 5.6M20 4v7h-7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           Dados consultados ao abrir a página
         </span>
@@ -209,12 +251,21 @@ export default function OpportunityHubMetrics() {
 
       {loading ? (
         <ul className={metricGrid} data-testid="dealer-hub-metrics-loading">
-          {[0, 1, 2, 3].map((key) => <MetricSkeleton key={key} />)}
+          {[0, 1, 2, 3].map((key) => (
+            <MetricSkeleton key={key} />
+          ))}
         </ul>
       ) : failed || !summary ? (
-        <p className="rounded-xl border border-[#E8ECF4] bg-[#F9FAFC] px-4 py-3 text-[12.5px] text-[#667085]" data-testid="dealer-hub-metrics-error">
+        <p
+          className="rounded-xl border border-[#E8ECF4] bg-[#F9FAFC] px-4 py-3 text-[12.5px] text-[#667085]"
+          data-testid="dealer-hub-metrics-error"
+        >
           Não foi possível carregar o resumo agora.{" "}
-          <button type="button" onClick={() => void load()} className="font-bold text-[#0e62d8] hover:underline">
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="font-bold text-[#0e62d8] hover:underline"
+          >
             Tentar novamente
           </button>
         </p>
