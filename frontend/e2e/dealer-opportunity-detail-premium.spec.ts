@@ -404,7 +404,7 @@ test.describe("@dealer-detail-premium §60 — desktop", () => {
 
     const panel = page.getByTestId("dealer-offer-panel");
     await expect(panel).toContainText("Nenhuma proposta recebida ainda.");
-    await expect(panel).toContainText("Você ainda não fez uma oferta.");
+    await expect(page.getByTestId("dealer-offer-submit")).toBeDisabled();
     await expect(panel).not.toContainText("R$ 0,00");
     // O piso continua lá — é o único número da coluna antes da primeira oferta.
     await expect(page.getByTestId("dealer-offer-minimum")).toContainText("62.500,00");
