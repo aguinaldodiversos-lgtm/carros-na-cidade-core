@@ -295,9 +295,11 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
       nodes.every((node) => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0)
     )).toBe(true);
 
-    const modelRequests = requested.filter((url) => /\\/images\\/oportunidades\\/modelos\\//.test(url));
+    const modelRequests = requested.filter((url) => url.includes("/images/oportunidades/modelos/"));
     expect(modelRequests.length).toBe(2);
-    expect(requested.filter((url) => /\\/api\\/vehicle-images|r2\\.dev|\\/uploads\\/ads\\//i.test(url))).toEqual([]);
+    expect(requested.filter((url) =>
+      url.includes("/api/vehicle-images") || url.includes("r2.dev") || url.includes("/uploads/ads/")
+    )).toEqual([]);
   });
 
   test("procura sem referência cadastrada permanece em SVG, sem foto de anúncio", async ({ page }) => {
