@@ -1289,7 +1289,10 @@ export async function handleWebhookNotification({
     (reference && reference !== String(intent.id)) ||
     (metadataIntentId && metadataIntentId !== String(intent.id))
   ) {
-    logger.warn({ intentId: intent.id, resourceId }, "[payments] divergência da referência do pagamento");
+    logger.warn(
+      { intentId: intent.id, resourceId },
+      "[payments] divergência da referência do pagamento"
+    );
     return { ok: true, ignored: true, reason: "payment_reference_mismatch" };
   }
 
@@ -1307,7 +1310,10 @@ export async function handleWebhookNotification({
       !Number.isSafeInteger(paidCents) ||
       paidCents !== expectedCents
     ) {
-      logger.warn({ intentId: intent.id, resourceId }, "[payments] divergência do valor pago — benefício bloqueado");
+      logger.warn(
+        { intentId: intent.id, resourceId },
+        "[payments] divergência do valor pago — benefício bloqueado"
+      );
       return { ok: true, ignored: true, reason: "payment_amount_mismatch" };
     }
   }
