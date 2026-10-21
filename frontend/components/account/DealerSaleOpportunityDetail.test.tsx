@@ -349,7 +349,8 @@ describe("painel de lances com incremento fixo", () => {
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
     await screen.findByTestId("dealer-offer-error");
     expect(screen.getByTestId("dealer-offer-current").textContent).toContain("64.500,00");
-    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("64.600,00");
+    expect(screen.getByTestId("dealer-offer-preview").textContent).toContain("Selecione um incremento");
+    expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
     expect(submitSaleOffer).toHaveBeenCalledTimes(1);
   });
 
