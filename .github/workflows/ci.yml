@@ -289,6 +289,7 @@ jobs:
           fi
           cd frontend
           npx playwright test e2e/dealer-sale-offers.spec.ts --project=chromium
+          npx playwright test e2e/baratos-catalogo-padrao.spec.ts --project=chromium
         working-directory: ${{ github.workspace }}
         env:
           CI: "true"
@@ -296,6 +297,14 @@ jobs:
           HOST: "127.0.0.1"
           RUN_MIGRATIONS: "false"
           RUN_WORKERS: "false"
+
+      - name: Upload cheap-cars catalog screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baratos-catalogo-pr82-screenshots
+          path: reports/screenshots/pr82/
+          retention-days: 7
 
       - name: Upload Playwright report
         if: always()
