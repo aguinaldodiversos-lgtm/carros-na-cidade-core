@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 330" role="img" aria-label="Representação ilustrativa de um SUV Fiat Pulse">
+<defs>
+<linearGradient id="body" x1="0" x2=".35" y1="0" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#f0f4f9"/><stop offset=".8" stop-color="#b1c6dd"/><stop offset="1" stop-color="#e1eaf5"/></linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#bad6ee"/><stop offset=".36" stop-color="#537fa8"/><stop offset="1" stop-color="#223957"/></linearGradient>
+<radialGradient id="rim"><stop stop-color="#fff"/><stop offset=".72" stop-color="#bdcfe1"/><stop offset="1" stop-color="#637a94"/></radialGradient>
+<filter id="shadow"><feGaussianBlur stdDeviation="13"/></filter>
+</defs>
+<ellipse cx="405" cy="273" rx="306" ry="17" fill="#7192bc" opacity=".22" filter="url(#shadow)"/>
+<path d="M87 222Q80 187 105 171L180 155 224 141 279 85Q299 65 337 64H513Q543 64 558 83L612 148 698 158Q738 165 746 197L748 227 730 255H99Q81 249 87 222Z" fill="url(#body)" stroke="#819fbe" stroke-width="3"/>
+<path d="M239 144 289 91Q299 81 333 81H420V144Z" fill="url(#glass)" stroke="#7297bb" stroke-width="3"/>
+<path d="M434 81H508Q527 81 540 99L577 144H434Z" fill="url(#glass)" stroke="#7297bb" stroke-width="3"/>
+<path d="M432 80V144M430 148V239M600 157 616 239" stroke="#94a9c1" stroke-width="3" fill="none"/>
+<path d="M178 156 217 89Q235 74 275 72" fill="none" stroke="#d7e4f2" stroke-width="7"/>
+<path d="M99 189Q390 165 734 189" fill="none" stroke="#fff" stroke-width="7" opacity=".72"/>
+<path d="M105 226Q407 242 731 229" fill="none" stroke="#819bb6" stroke-width="4" opacity=".56"/>
+<path d="M237 167H261M494 167H516" stroke="#667c98" stroke-width="6" stroke-linecap="round"/>
+<path d="M90 196 130 185 143 191 134 208 90 212Z" fill="#f2faff" stroke="#809fba" stroke-width="2"/>
+<path d="M724 184 744 198 744 213 728 212Z" fill="#d34c5b"/>
+<path d="M110 250H729" stroke="#324960" stroke-width="12" opacity=".65"/>
+<path d="M142 257a61 61 0 0 1 122 0M547 257a61 61 0 0 1 122 0" fill="none" stroke="#637b94" stroke-width="6"/>
+<g transform="translate(203 256)"><circle r="53" fill="#263241"/><circle r="37" fill="url(#rim)" stroke="#dce5ef" stroke-width="2"/><circle r="27" fill="#587493"/><path d="M0 -27V27M-27 0H27M-19 -19 19 19M-19 19 19 -19" stroke="#edf6ff" stroke-width="7"/><circle r="9" fill="#cad9e9"/></g>
+<g transform="translate(608 256)"><circle r="53" fill="#263241"/><circle r="37" fill="url(#rim)" stroke="#dce5ef" stroke-width="2"/><circle r="27" fill="#587493"/><path d="M0 -27V27M-27 0H27M-19 -19 19 19M-19 19 19 -19" stroke="#edf6ff" stroke-width="7"/><circle r="9" fill="#cad9e9"/></g>
+<path d="M290 103 345 88H414" stroke="#effaff" stroke-width="5" stroke-linecap="round" opacity=".65"/>
+</svg>
