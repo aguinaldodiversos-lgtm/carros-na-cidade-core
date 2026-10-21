@@ -398,7 +398,7 @@ test.describe("@dealer-detail-premium §60 — desktop", () => {
     await expect(page.getByTestId("dealer-offer-panel")).toBeVisible();
 
     const panel = page.getByTestId("dealer-offer-panel");
-    await expect(panel).toContainText("Nenhuma oferta recebida ainda.");
+    await expect(panel).toContainText("Nenhuma proposta recebida ainda.");
     await expect(panel).toContainText("Você ainda não fez uma oferta.");
     await expect(panel).not.toContainText("R$ 0,00");
     // O piso continua lá — é o único número da coluna antes da primeira oferta.
@@ -428,11 +428,11 @@ test.describe("@dealer-detail-premium §60 — desktop", () => {
         contentType: "application/json",
         body: JSON.stringify({
           success: true,
-          current_highest_offer: "62000.00",
-          my_offer: "62000.00",
+          current_highest_offer: "61000.00",
+          my_offer: "61000.00",
           is_leading: true,
           offers_count: 4,
-          offer: { id: 9, amount: "62000.00", note: null, created_at: new Date().toISOString() },
+          offer: { id: 9, amount: "61000.00", note: null, created_at: new Date().toISOString() },
         }),
       });
     });
@@ -441,13 +441,13 @@ test.describe("@dealer-detail-premium §60 — desktop", () => {
     await expect(page.getByTestId("dealer-offer-panel")).toBeVisible();
 
     // Os atalhos partem da maior oferta (60.000) e apenas PREENCHEM.
-    await page.getByTestId("dealer-offer-bump-2000").click();
-    await expect(page.getByTestId("dealer-offer-amount")).toHaveValue("62.000,00");
+    await page.getByTestId("dealer-offer-bump-1000").click();
+    await expect(page.getByTestId("dealer-offer-preview")).toContainText("61.000,00");
 
     await page.getByTestId("dealer-offer-submit").click();
     await expect(page.getByTestId("dealer-offer-success")).toBeVisible();
 
-    expect(posted).toMatchObject({ amount: "62000.00" });
+    expect(posted).toMatchObject({ amount: "61000.00" });
     // O estado novo veio do POST, sem segunda ida ao servidor.
     await expect(page.getByTestId("dealer-offer-standing")).toContainText("Você está liderando");
   });
@@ -506,7 +506,7 @@ test.describe("@dealer-detail-premium §61 — mobile e tablet", () => {
       expect(cta!.x + cta!.width).toBeLessThanOrEqual(viewport.width + 1);
 
       // O campo monetário idem: é o que mais estoura em 360px.
-      const field = await boxOf(page, "dealer-offer-amount");
+      const field = await boxOf(page, "dealer-offer-preview");
       expect(field!.x + field!.width).toBeLessThanOrEqual(viewport.width + 1);
     });
   }
