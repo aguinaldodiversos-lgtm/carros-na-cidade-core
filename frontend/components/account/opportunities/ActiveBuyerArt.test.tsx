@@ -63,44 +63,71 @@ describe("mídia ilustrativa controlada, nunca fotografia de anúncio", () => {
     expect(card.querySelector("img")).toBeNull();
     expect(card.querySelector("image")).toBeNull();
     expect(card.innerHTML).not.toMatch(/background-image/i);
-    expect(screen.getByTestId("active-buyer-image-disclaimer")).toHaveTextContent("Imagem ilustrativa");
+    expect(screen.getByTestId("active-buyer-image-disclaimer")).toHaveTextContent(
+      "Imagem ilustrativa"
+    );
   });
 
   it("Virtus e Pulse usam ilustrações locais do modelo, sem sugerir um carro anunciado", () => {
     const cases = [
-      { brand: "Volkswagen", model: "Virtus", path: "/images/oportunidades/modelos/volkswagen-virtus.svg" },
+      {
+        brand: "Volkswagen",
+        model: "Virtus",
+        path: "/images/oportunidades/modelos/volkswagen-virtus.svg",
+      },
       { brand: "Fiat", model: "Pulse", path: "/images/oportunidades/modelos/fiat-pulse.svg" },
     ];
     for (const { brand, model, path } of cases) {
       cleanup();
-      render(<ActiveBuyerCard opportunity={makeOpportunity({ brand, model })} basePath="/dashboard-loja" />);
+      render(
+        <ActiveBuyerCard
+          opportunity={makeOpportunity({ brand, model })}
+          basePath="/dashboard-loja"
+        />
+      );
       expect(screen.getByTestId("active-buyer-media")).toHaveAttribute("data-media-kind", "model");
       const img = screen.getByTestId("active-buyer-model-image");
       expect(img).toHaveAttribute("src", path);
       expect(img.getAttribute("alt")).toMatch(/Representação ilustrativa/);
       expect(img.getAttribute("alt")).toMatch(/não indica ano, versão nem veículo disponível/);
-      expect(screen.getByTestId("active-buyer-image-disclaimer")).toHaveTextContent("Imagem ilustrativa");
+      expect(screen.getByTestId("active-buyer-image-disclaimer")).toHaveTextContent(
+        "Imagem ilustrativa"
+      );
       expect(screen.queryByTestId("active-buyer-art")).not.toBeInTheDocument();
     }
   });
 
   it("normaliza marca/modelo e recusa combinações imprecisas", () => {
-    const example = { intent_type: "specific_model" as const, brand: " VOLKSWAGEN ", model: "Virtus Comfortline 1.0" };
-    expect(resolveOpportunityModelIllustration(example)).toBe("/images/oportunidades/modelos/volkswagen-virtus.svg");
+    const example = {
+      intent_type: "specific_model" as const,
+      brand: " VOLKSWAGEN ",
+      model: "Virtus Comfortline 1.0",
+    };
+    expect(resolveOpportunityModelIllustration(example)).toBe(
+      "/images/oportunidades/modelos/volkswagen-virtus.svg"
+    );
     expect(resolveOpportunityModelIllustration({ ...example, model: "Virtuoso" })).toBeNull();
     expect(resolveOpportunityModelIllustration({ ...example, brand: "Fiat" })).toBeNull();
-    expect(resolveOpportunityModelIllustration({ ...example, intent_type: "open_category" })).toBeNull();
+    expect(
+      resolveOpportunityModelIllustration({ ...example, intent_type: "open_category" })
+    ).toBeNull();
     expect(resolveOpportunityModelIllustration({ ...example, model: null })).toBeNull();
   });
 
   it("erro ao carregar a referência local aciona o fallback sem quebrar o card", () => {
-    render(<ActiveBuyerCard opportunity={makeOpportunity({ brand: "Fiat", model: "Pulse" })} basePath="/dashboard-loja" />);
+    render(
+      <ActiveBuyerCard
+        opportunity={makeOpportunity({ brand: "Fiat", model: "Pulse" })}
+        basePath="/dashboard-loja"
+      />
+    );
     fireEvent.error(screen.getByTestId("active-buyer-model-image"));
     expect(screen.queryByTestId("active-buyer-model-image")).not.toBeInTheDocument();
     expect(screen.getByTestId("active-buyer-media")).toHaveAttribute("data-media-kind", "category");
     expect(screen.getByTestId("active-buyer-art")).toHaveAttribute("data-body-type", "suv");
     expect(screen.getByTestId("active-buyer-cta")).toHaveAttribute(
-      "href", "/dashboard-loja/oportunidades/compradores/1"
+      "href",
+      "/dashboard-loja/oportunidades/compradores/1"
     );
   });
 
