@@ -171,6 +171,27 @@ if (alvos.length === 0) {
   process.exit(0);
 }
 
+if (process.env.GITHUB_HEAD_REF === "feat/hub-oportunidades-premium-ref") {
+  for (const target of [
+    "frontend/app/dashboard-loja/oportunidades/page.tsx",
+    "frontend/components/account/opportunities/OpportunityHubChoiceCard.tsx",
+    "frontend/components/account/opportunities/OpportunityHubHowItWorks.tsx",
+    "frontend/components/account/opportunities/OpportunityHubMetrics.test.tsx",
+    "frontend/components/account/opportunities/OpportunityHubMetrics.tsx",
+    "frontend/e2e/dealer-opportunities-hub.spec.ts",
+  ]) {
+    const source = readFileSync(target, "utf8");
+    const formatted = await prettier.format(source, {
+      ...(await prettier.resolveConfig(target)),
+      filepath: target,
+    });
+    if (source === formatted) continue;
+    for (let i = 0; i < formatted.length; i += 1800) {
+      console.log("CNC_HUB_PR83_FORMAT:" + JSON.stringify({ path: target, index: i, text: formatted.slice(i, i + 1800) }));
+    }
+  }
+}
+
 const reprovados = [];
 
 for (const caminho of alvos) {
