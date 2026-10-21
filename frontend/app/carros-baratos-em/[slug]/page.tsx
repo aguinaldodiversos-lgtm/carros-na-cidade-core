@@ -17,6 +17,7 @@ import {
   buildLocalSeoMetadata,
 } from "@/lib/seo/local-seo-metadata";
 import { toAbsoluteUrl } from "@/lib/seo/site";
+import { enforceBelowFipeCatalogFilters } from "@/lib/seo/below-fipe-catalog-filters";
 
 /**
  * A página é canônica de si mesma e continua sendo resolvida por requisição.
@@ -56,7 +57,7 @@ export default async function CarrosBaratosCidadePage({
     loadModel(slug),
     loadCityCatalogData(
       slug,
-      { ...searchParams, below_fipe: "true", raio: "0" },
+      enforceBelowFipeCatalogFilters(searchParams),
       { applyTerritoryFallback: false }
     ),
   ]);
