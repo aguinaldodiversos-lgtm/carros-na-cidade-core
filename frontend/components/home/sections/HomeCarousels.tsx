@@ -93,7 +93,7 @@ export async function HomeCarousels({ stateUf, stateName, detectedCityName }: Ho
         <VehicleCarouselSection
           icon={<IconPriceTag className="h-6 w-6" />}
           title="Oportunidades abaixo da FIPE"
-          subtitle="Seu carro pelo melhor preço aguardando seu próximo veículo."
+          subtitle="Condições especiais para você encontrar seu próximo carro."
           link={{ label: "Ver todos", href: "/comprar?below_fipe=true" }}
           items={opportunityItems}
           variant="opportunity"
