@@ -30,7 +30,7 @@ export function HomeProfileSearch({ profiles }: { profiles: HomeProfileChip[] })
       <DSSectionHeader
         as="h2"
         title="Busca por perfil"
-        description="Atalhos para encontrar o carro certo para o seu momento."
+        description="Encontre o carro certo para o seu momento."
         variant="with-icon"
         icon={<IconStar className="h-5 w-5" />}
         className="mb-4 sm:mb-5"
