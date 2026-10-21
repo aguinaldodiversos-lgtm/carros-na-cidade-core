@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import DealerOfferPanel from "@/components/account/DealerOfferPanel";
@@ -84,6 +84,7 @@ export default function DealerSaleOpportunityDetail({
   const [opportunity, setOpportunity] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const submissionEpoch = useRef(0);
 
   // A loja escolhida no feed chega pela URL e acompanha o detalhe inteiro —
   // leitura e proposta. Sem ela, um lojista com duas lojas veria o 409 de novo
@@ -119,8 +120,43 @@ export default function DealerSaleOpportunityDetail({
    * solicitação.
    */
   const applyOfferState = (next: DealerOfferState) => {
+    // Um GET iniciado antes de um POST não pode sobrescrever a oferta confirmada.
+    submissionEpoch.current += 1;
     setOpportunity((current) => (current ? { ...current, ...next } : current));
   };
+
+  // Outras lojas podem ofertar enquanto a página está aberta. Atualizar o valor
+  // de referência sem recarregar a ficha, sem piscar a galeria e sem fazer POST.
+  // O servidor continua sendo a autoridade sobre a disputa (inclusive no 409).
+  useEffect(() => {
+    let mounted = true;
+    let inFlight = false;
+    const refreshBid = async () => {
+      if (!mounted || inFlight || document.visibilityState === "hidden") return;
+      inFlight = true;
+      const epochAtRequest = submissionEpoch.current;
+      try {
+        const latest = await fetchSaleOpportunity(id, advertiserId);
+        if (!mounted || epochAtRequest !== submissionEpoch.current) return;
+        setOpportunity((current) =>
+          current && String(current.id) === String(latest.id) ? latest : current
+        );
+      } catch {
+        // Falha transitória na atualização silenciosa não apaga os dados exibidos.
+        // A validação de um lance continuará ocorrendo na transação do backend.
+      } finally {
+        inFlight = false;
+      }
+    };
+    const interval = window.setInterval(() => void refreshBid(), 30_000);
+    const onFocus = () => void refreshBid();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [id, advertiserId]);
 
   if (loading) {
     return (
@@ -222,7 +258,7 @@ export default function DealerSaleOpportunityDetail({
               : "O proprietário não aceitou a proposta final. Esta avaliação está encerrada."
             : opportunity.is_selected
               ? "O proprietário aceitou a oferta da sua loja e recebeu os dados de contato."
-              : "Analise as informações declaradas pelo vendedor e envie sua oferta."}
+              : "Analise as informações declaradas pelo vendedor e faça seu lance."}
         </p>
       </header>
 
@@ -239,7 +275,7 @@ export default function DealerSaleOpportunityDetail({
         {/* ══ COLUNA ESQUERDA — VEÍCULO E ANÁLISE ══════════════════════════ */}
         <div className="contents lg:block lg:space-y-4">
           {/* 1 — IDENTIDADE DO VEÍCULO + GALERIA, no mesmo cartão (§9/§10) */}
-          <section className="order-1 rounded-2xl border border-[#E5E9F2] bg-white p-3.5 sm:p-5">
+          <section className="order-1 rounded-[20px] border border-[#DFE8F5] bg-white p-3.5 shadow-[0_6px_24px_-19px_rgba(20,54,112,0.22)] sm:p-5">
             <div className="mb-3">
               {/*
                 "Particular" é um FATO deste produto, não um rótulo decorativo:
@@ -250,7 +286,7 @@ export default function DealerSaleOpportunityDetail({
                 Particular
               </span>
 
-              <h2 className="mt-2 text-[21px] font-bold leading-tight text-[#161f34] sm:text-[26px]">
+              <h2 className="mt-2 text-[21px] font-extrabold leading-tight tracking-[-0.02em] text-[#161f34] sm:text-[26px]">
                 {vehicleLabel}
               </h2>
 
