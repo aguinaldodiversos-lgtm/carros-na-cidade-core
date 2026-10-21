@@ -271,7 +271,7 @@ describe("painel de lances com incremento fixo", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
     for (const increment of [100, 300, 500, 1000]) {
-      expect(screen.getByTestId(`dealer-offer-bump-${increment}")).toBeTruthy();
+      expect(screen.getByTestId(`dealer-offer-bump-${increment}`)).toBeTruthy();
     }
     expect(screen.queryByTestId("dealer-offer-bump-2000")).toBeNull();
     expect(screen.queryByTestId("dealer-offer-amount")).toBeNull();
