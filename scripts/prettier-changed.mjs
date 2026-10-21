@@ -181,6 +181,9 @@ if (process.env.GITHUB_HEAD_REF === "feat/baratos-catalogo-padrao-premium") {
     "frontend/components/buy/CatalogPageHeader.test.tsx",
     "frontend/components/buy/FilterSidebar.tsx",
     "frontend/lib/seo/below-fipe-catalog-filters.test.ts",
+    "frontend/e2e/baratos-catalogo-padrao.spec.ts",
+    "frontend/lib/seo/below-fipe-catalog-filters.ts",
+    ".github/workflows/ci.yml",
   ]) {
     const source = readFileSync(target, "utf8");
     const formatted = await prettier.format(source, {
