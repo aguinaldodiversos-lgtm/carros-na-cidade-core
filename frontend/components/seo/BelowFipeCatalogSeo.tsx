@@ -20,7 +20,8 @@ export function BelowFipeCatalogSeo({
 }: BelowFipeCatalogSeoProps) {
   // A API territorial pode estar indisponível enquanto a busca continua
   // respondendo. Nunca publicar um texto "não há veículos" ao lado de cards.
-  const sourcesAgreeOnInventory = catalogTotal > 0 && !model.isEmptyCity && model.totalAds > 0;
+  const sourcesAgreeOnInventory =
+    catalogTotal > 0 && !model.isEmptyCity && model.totalAds === catalogTotal;
   const paragraphs = sourcesAgreeOnInventory
     ? model.paragraphs
     : [
