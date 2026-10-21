@@ -75,8 +75,12 @@ export async function sendResetPasswordEmail(to, token) {
       console.warn("[email] RESEND_API_KEY ausente — e-mail de reset não enviado");
       return false;
     }
-    const baseUrl = frontendBaseUrl() || String(process.env.SITE_URL || "").replace(/\/+$/, "");
-    if (!baseUrl || (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))) {
+    const baseUrl =
+      frontendBaseUrl() || String(process.env.SITE_URL || "").replace(/\/+$/, "");
+    if (
+      !baseUrl ||
+      (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))
+    ) {
       console.error("[email] URL pública do frontend inválida para recuperação de senha");
       return false;
     }
