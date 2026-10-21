@@ -8,9 +8,9 @@ type ApiResponse = {
   message?: string;
 };
 
-export default function RecoverPasswordPanel() {
+export default function RecoverPasswordPanel({ initialToken = "" }: { initialToken?: string }) {
   const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState(initialToken);
   const [newPassword, setNewPassword] = useState("");
   const [loadingRecovery, setLoadingRecovery] = useState(false);
   const [loadingReset, setLoadingReset] = useState(false);
@@ -122,10 +122,10 @@ export default function RecoverPasswordPanel() {
         />
         <input
           type="password"
-          minLength={6}
+          minLength={8}
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
-          placeholder="Nova senha"
+          placeholder="Nova senha (mínimo 8 caracteres)"
           className="cnc-input"
           required
         />
