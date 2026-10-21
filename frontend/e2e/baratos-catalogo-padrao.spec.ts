@@ -95,7 +95,7 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
         const locked = modal.getByRole("button", { name: /Abaixo da FIPE/i });
         await expect(locked).toBeDisabled();
         await expect(locked).toHaveAttribute("aria-pressed", "true");
-        await modal.getByRole("button", { name: "Fechar" }).click();
+        await modal.getByRole("button", { name: "Fechar", exact: true }).click();
       }
 
       const overflow = await page.evaluate(
