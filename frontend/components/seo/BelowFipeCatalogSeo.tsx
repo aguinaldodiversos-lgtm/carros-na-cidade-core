@@ -22,7 +22,10 @@ export function BelowFipeCatalogSeo({ model }: { model: LocalSeoLandingModel }) 
           <p key={index}>{paragraph}</p>
         ))}
       </div>
-      <nav aria-label="Outras opções de veículos na cidade" className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+      <nav
+        aria-label="Outras opções de veículos na cidade"
+        className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm"
+      >
         <Link href={model.paths.em} className="font-semibold text-primary hover:underline">
           Carros em {model.cityName}
         </Link>
