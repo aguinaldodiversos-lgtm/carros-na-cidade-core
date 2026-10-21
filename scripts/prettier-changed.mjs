@@ -171,6 +171,28 @@ if (alvos.length === 0) {
   process.exit(0);
 }
 
+if (process.env.GITHUB_HEAD_REF === "feat/baratos-catalogo-padrao-premium") {
+  for (const target of [
+    "frontend/app/carros-baratos-em/[slug]/page.tsx",
+    "frontend/components/buy/CatalogPageHeader.tsx",
+    "frontend/components/buy/VehicleGrid.tsx",
+    "frontend/components/seo/BelowFipeCatalogSeo.tsx",
+    "frontend/components/buy/BuyMarketplacePageClient.tsx",
+    "frontend/components/buy/CatalogPageHeader.test.tsx",
+    "frontend/components/buy/FilterSidebar.tsx",
+    "frontend/lib/seo/below-fipe-catalog-filters.test.ts",
+  ]) {
+    const source = readFileSync(target, "utf8");
+    const formatted = await prettier.format(source, {
+      ...(await prettier.resolveConfig(target)), filepath: target,
+    });
+    if (source === formatted) continue;
+    for (let i = 0; i < formatted.length; i += 1800) {
+      console.log("CNC_PR82_FORMAT:" + JSON.stringify({ path: target, index: i, text: formatted.slice(i, i + 1800) }));
+    }
+  }
+}
+
 const reprovados = [];
 
 for (const caminho of alvos) {
