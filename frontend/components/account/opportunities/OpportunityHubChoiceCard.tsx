@@ -81,7 +81,9 @@ export default function OpportunityHubChoiceCard({
 
       <div className="relative z-10 flex flex-1 flex-col">
         <div className="max-w-full">
-          <span className={`inline-flex rounded-lg px-3 py-1 text-[11px] font-extrabold tracking-[0.04em] ${style.pill}`}>
+          <span
+            className={`inline-flex rounded-lg px-3 py-1 text-[11px] font-extrabold tracking-[0.04em] ${style.pill}`}
+          >
             {label}
           </span>
           <h2 className="mt-3 max-w-[430px] text-[22px] font-extrabold leading-[1.12] tracking-[-0.035em] text-[#101B3D] sm:text-[25px] lg:text-[23px] xl:text-[27px]">
@@ -94,8 +96,17 @@ export default function OpportunityHubChoiceCard({
           <ul className="mt-4 max-w-[410px] space-y-2.5 lg:max-w-[75%] xl:max-w-[72%]">
             {benefits.map((benefit) => (
               <li key={benefit} className="flex items-start gap-2.5">
-                <span className={`mt-[3px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-white ${style.check}`} aria-hidden="true">
-                  <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <span
+                  className={`mt-[3px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-white ${style.check}`}
+                  aria-hidden="true"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    className="h-3 w-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
                     <path d="m3.5 8 3 3 6-6" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
