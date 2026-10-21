@@ -46,20 +46,15 @@ export async function generateMetadata({
  * portanto ?below_fipe=false ou ?raio=25 não podem ampliar este recorte.
  * Metadata, canonical, H1 e FAQ continuam específicos de "carros baratos".
  */
-export default async function CarrosBaratosCidadePage({
-  params,
-  searchParams = {},
-}: PageProps) {
+export default async function CarrosBaratosCidadePage({ params, searchParams = {} }: PageProps) {
   const slug = String(params.slug || "").trim();
   if (!isValidBrazilianCitySlug(slug)) notFound();
 
   const [model, catalog] = await Promise.all([
     loadModel(slug),
-    loadCityCatalogData(
-      slug,
-      enforceBelowFipeCatalogFilters(searchParams),
-      { applyTerritoryFallback: false }
-    ),
+    loadCityCatalogData(slug, enforceBelowFipeCatalogFilters(searchParams), {
+      applyTerritoryFallback: false,
+    }),
   ]);
 
   const { ctx, filters, initialResults: rawResults, initialFacets } = catalog;
@@ -95,7 +90,10 @@ export default async function CarrosBaratosCidadePage({
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {breadcrumbJsonLd ? (
         <script
           type="application/ld+json"
