@@ -19,7 +19,6 @@ import {
  * suíte que só verificasse o que a tela mostra.
  */
 
-
 /**
  * `next/navigation` mockado com um leitor de query REAL.
  *
@@ -209,9 +208,7 @@ describe("cabeçalho e ficha", () => {
     //
     // Mês em UTC: o snapshot de 01/08 não pode aparecer como julho.
     expect(screen.getByText("Referência FIPE (ago de 2026)")).toBeTruthy();
-    expect(screen.getByTestId("dealer-detail-fipe-value").textContent).toMatch(
-      /92\.000,00/
-    );
+    expect(screen.getByTestId("dealer-detail-fipe-value").textContent).toMatch(/92\.000,00/);
   });
 
   it("FIPE não resolvida mostra 'Não informado', nunca um número inventado", async () => {
@@ -221,9 +218,7 @@ describe("cabeçalho e ficha", () => {
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-sale-opportunity-detail");
 
-    expect(screen.getByTestId("dealer-detail-fipe-missing").textContent).toContain(
-      "Não informado"
-    );
+    expect(screen.getByTestId("dealer-detail-fipe-missing").textContent).toContain("Não informado");
     // E nenhum número aparece no lugar — nem o piso, que está logo ao lado e
     // seria o candidato natural a ser confundido com a tabela.
     expect(screen.queryByTestId("dealer-detail-fipe-value")).toBeNull();
@@ -279,7 +274,9 @@ describe("painel de lances com incremento fixo", () => {
   });
 
   it("selecionar incremento prepara lance, sem disparar requisição", async () => {
-    fetchSaleOpportunity.mockResolvedValue(makeDetail({ current_highest_offer: "63000.00", offers_count: 1 }));
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({ current_highest_offer: "63000.00", offers_count: 1 })
+    );
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
     await userEvent.click(screen.getByTestId("dealer-offer-bump-300"));
@@ -304,7 +301,9 @@ describe("painel de lances com incremento fixo", () => {
     await userEvent.click(screen.getByTestId("dealer-offer-submit"));
     await waitFor(() => expect(submitSaleOffer).toHaveBeenCalled());
     expect(submitSaleOffer.mock.calls[0][1]).toMatchObject({ amount: "62600.00", note: null });
-    expect((await screen.findByTestId("dealer-offer-standing")).textContent).toContain("Você está liderando");
+    expect((await screen.findByTestId("dealer-offer-standing")).textContent).toContain(
+      "Você está liderando"
+    );
     expect(screen.getByTestId("dealer-offer-current").textContent).toContain("62.600,00");
     expect(fetchSaleOpportunity).not.toHaveBeenCalled();
     expect((screen.getByTestId("dealer-offer-submit") as HTMLButtonElement).disabled).toBe(true);
@@ -313,7 +312,10 @@ describe("painel de lances com incremento fixo", () => {
   it("após envio, próximos incrementos partem do novo maior lance", async () => {
     submitSaleOffer.mockResolvedValue({
       offer: { id: 1, amount: "62600.00", note: null, created_at: new Date().toISOString() },
-      current_highest_offer: "62600.00", my_offer: "62600.00", is_leading: true, offers_count: 1,
+      current_highest_offer: "62600.00",
+      my_offer: "62600.00",
+      is_leading: true,
+      offers_count: 1,
     });
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
@@ -333,9 +335,13 @@ describe("painel de lances com incremento fixo", () => {
         "64500.00"
       )
     );
-    fetchSaleOpportunity.mockResolvedValue(makeDetail({
-      current_highest_offer: "64000.00", my_offer: "63000.00", offers_count: 2,
-    }));
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({
+        current_highest_offer: "64000.00",
+        my_offer: "63000.00",
+        offers_count: 2,
+      })
+    );
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
     await userEvent.click(screen.getByTestId("dealer-offer-bump-100"));
@@ -348,9 +354,14 @@ describe("painel de lances com incremento fixo", () => {
   });
 
   it("liderança e valor pessoal aparecem sem identidade da loja concorrente", async () => {
-    fetchSaleOpportunity.mockResolvedValue(makeDetail({
-      current_highest_offer: "65000.00", my_offer: "64000.00", offers_count: 2, is_leading: false,
-    }));
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({
+        current_highest_offer: "65000.00",
+        my_offer: "64000.00",
+        offers_count: 2,
+        is_leading: false,
+      })
+    );
     render(<DealerSaleOpportunityDetail id="1" />);
     const standing = await screen.findByTestId("dealer-offer-standing");
     expect(standing.textContent).toContain("Existe uma proposta maior");
@@ -363,7 +374,10 @@ describe("painel de lances com incremento fixo", () => {
     fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
     submitSaleOffer.mockResolvedValue({
       offer: { id: 1, amount: "50000.00", note: null, created_at: new Date().toISOString() },
-      current_highest_offer: "50000.00", my_offer: "50000.00", is_leading: true, offers_count: 1,
+      current_highest_offer: "50000.00",
+      my_offer: "50000.00",
+      is_leading: true,
+      offers_count: 1,
     });
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-legacy-entry");
@@ -393,9 +407,14 @@ describe("painel de lances com incremento fixo", () => {
   });
 
   it("comparação com FIPE não se apresenta como lucro ou margem", async () => {
-    fetchSaleOpportunity.mockResolvedValue(makeDetail({
-      current_highest_offer: "70000.00", my_offer: "70000.00", is_leading: true, offers_count: 1,
-    }));
+    fetchSaleOpportunity.mockResolvedValue(
+      makeDetail({
+        current_highest_offer: "70000.00",
+        my_offer: "70000.00",
+        is_leading: true,
+        offers_count: 1,
+      })
+    );
     render(<DealerSaleOpportunityDetail id="1" />);
     await screen.findByTestId("dealer-offer-panel");
     const difference = screen.getByTestId("dealer-offer-fipe-distance").textContent ?? "";
@@ -409,7 +428,9 @@ describe("painel de lances com incremento fixo", () => {
     await screen.findByTestId("dealer-offer-panel");
     expect(screen.getByTestId("dealer-offer-commitment").textContent?.length).toBeGreaterThan(20);
     await userEvent.click(screen.getByTestId("dealer-offer-terms-toggle"));
-    expect(screen.getByTestId("dealer-offer-inspection-notice").textContent?.length).toBeGreaterThan(20);
+    expect(
+      screen.getByTestId("dealer-offer-inspection-notice").textContent?.length
+    ).toBeGreaterThan(20);
   });
 });
 
