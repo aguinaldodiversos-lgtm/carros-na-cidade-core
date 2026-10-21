@@ -109,6 +109,34 @@ test.describe("@dealer-hub desktop", () => {
     await expect(page.locator("header").first()).toBeVisible();
   });
 
+  test("novo layout: escolhas acima do resumo, nomenclatura e fotos decorativas", async ({ page }) => {
+    await prepare(page);
+    await page.goto(HUB_PATH);
+    const choices = page.getByTestId("dealer-hub-choices");
+    const summary = page.getByTestId("dealer-hub-summary-section");
+    await expect(choices).toBeVisible();
+    await expect(summary).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Compradores Procurando" })).toBeVisible();
+    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
+      "Compradores Procurando"
+    );
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
+      "Compras em andamento"
+    );
+    await expect(summary).toContainText("Dados consultados ao abrir a página");
+    const choiceBox = await choices.boundingBox();
+    const summaryBox = await summary.boundingBox();
+    expect(choiceBox && summaryBox).toBeTruthy();
+    expect(summaryBox!.y).toBeGreaterThan(choiceBox!.y + choiceBox!.height - 1);
+    // As fotos são ornamentais. Carregam dos ativos locais, sem virar anúncios.
+    for (const card of ["dealer-hub-card-buyers", "dealer-hub-card-vehicles"]) {
+      const img = page.getByTestId(card).locator("img");
+      await expect(img).toHaveCount(1);
+      await expect.poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      await expect(img).toHaveAttribute("alt", "");
+    }
+  });
+
   test("os quatro números do resumo aparecem com a variação de 7 dias", async ({ page }) => {
     await prepare(page);
     await page.goto(HUB_PATH);
