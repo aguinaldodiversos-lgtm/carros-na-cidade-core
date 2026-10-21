@@ -151,13 +151,19 @@ describe("§4 — a sidebar sai NO DETALHE, e continua no resto do painel", () =
 
   it("o predicado distingue o DETALHE da listagem e das demais telas", () => {
     // Detalhe → foco.
-    expect(isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42", "/dashboard-loja")).toBe(true);
+    expect(
+      isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42", "/dashboard-loja")
+    ).toBe(true);
     // Barra final não muda a rota.
-    expect(isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42/", "/dashboard-loja")).toBe(true);
+    expect(
+      isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos/42/", "/dashboard-loja")
+    ).toBe(true);
 
     // A LISTAGEM não entra em foco: ela não foi redesenhada nesta fase, e sem
     // menu o lojista ficaria sem saída de uma tela de navegação.
-    expect(isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos", "/dashboard-loja")).toBe(false);
+    expect(
+      isOpportunityDetailPath("/dashboard-loja/oportunidades/veiculos", "/dashboard-loja")
+    ).toBe(false);
 
     for (const path of [
       "/dashboard-loja",
@@ -369,7 +375,8 @@ describe("§22/§23/§55 — o valor mínimo é o número principal da negociaç
     expect(block.textContent).toContain("Não informado");
     expect(screen.getByTestId("dealer-offer-legacy-entry")).toBeTruthy();
     expect(screen.queryByTestId("dealer-offer-minimum")).toBeNull();
-  });});
+  });
+});
 
 // ============================================================================
 describe("§26/§27 — a disputa, sem identidade e sem zero", () => {
@@ -455,9 +462,9 @@ describe("§28/§29/§36 — o formulário de oferta", () => {
     // O resto continua ACESSÍVEL — resumir não é remover (§36).
     expect(screen.queryByTestId("dealer-offer-inspection-notice")).toBeNull();
     await userEvent.click(screen.getByTestId("dealer-offer-terms-toggle"));
-    expect(screen.getByTestId("dealer-offer-inspection-notice").textContent?.length).toBeGreaterThan(
-      20
-    );
+    expect(
+      screen.getByTestId("dealer-offer-inspection-notice").textContent?.length
+    ).toBeGreaterThan(20);
   });
 
   it("§30 — não existe 'Salvar oportunidade': o backend não tem favorito", async () => {
@@ -607,7 +614,10 @@ describe("§19/§20 — pontos para avaliar: fatos, nunca julgamento", () => {
         ...base,
         evaluation: { ...EVALUATION, caution_report_status: value },
       });
-      expect(points.map((p) => p.label), String(value)).toContain("Sem laudo cautelar informado");
+      expect(
+        points.map((p) => p.label),
+        String(value)
+      ).toContain("Sem laudo cautelar informado");
     }
 
     // Laudo COM resultado não vira alerta: ele está na ficha, com o resultado.
@@ -643,7 +653,9 @@ describe("§19/§20 — pontos para avaliar: fatos, nunca julgamento", () => {
       "engine",
     ]);
     // Cada frase diz DE ONDE vem a afirmação.
-    expect(points.find((p) => p.id === "collision")?.label).toContain("declarado pelo proprietário");
+    expect(points.find((p) => p.id === "collision")?.label).toContain(
+      "declarado pelo proprietário"
+    );
   });
 
   it("nenhum ponto é elogio — a lista só cresce com o que merece um segundo olhar", () => {
