@@ -48,7 +48,8 @@ describe("hub de oportunidades — copy fiel ao escopo real", () => {
   });
 
   it("os dois caminhos continuam nomeados como o produto os chama", () => {
-    expect(rendered).toContain("Compradores ativos");
+    expect(rendered).toContain("Compradores Procurando");
+    expect(rendered).not.toContain("Compradores ativos");
     expect(rendered).toContain("Veículos para avaliação");
   });
 
