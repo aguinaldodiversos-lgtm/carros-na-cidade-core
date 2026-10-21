@@ -138,3 +138,53 @@ describe("getBackendPublicUrl — precedência sem APP_BASE_URL", () => {
     expect(() => getMercadoPagoBackendPublicUrl()).toThrow(/URL pública do backend/i);
   });
 });
+
+
+// Etapa P0: webhook nunca concede benefício por um pagamento de valor ou
+// referência diferentes do checkout persistido. Sem transação de escrita.
+describe("webhook anti-fraude — divergência com intent", () => {
+  async function simulatePayment({ amount, externalReference }) {
+    const db = await import("../../src/infrastructure/database/db.js");
+    db.query.mockReset().mockResolvedValue({
+      rows: [{
+        id: "intent-safe-1",
+        amount: 39.9,
+        context: "boost",
+        checkout_resource_type: "preference",
+        metadata: { boost_days: "7" },
+      }],
+    });
+    db.withTransaction.mockClear();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "mp-payment-1",
+        status: "approved",
+        transaction_amount: amount,
+        external_reference: externalReference,
+        metadata: { intent_id: "intent-safe-1" },
+      }),
+    }));
+
+    const result = await handleWebhookNotification({
+      rawBody: JSON.stringify({ type: "payment", data: { id: "mp-payment-1" } }),
+      signature: null,
+      requestId: null,
+      dataId: "mp-payment-1",
+      traceRequestId: "trace-security",
+    });
+    expect(db.withTransaction).not.toHaveBeenCalled();
+    return result;
+  }
+
+  it("não credita destaque se valor do MP for menor que o contratado", async () => {
+    const result = await simulatePayment({ amount: 1, externalReference: "intent-safe-1" });
+    expect(result).toMatchObject({ ignored: true, reason: "payment_amount_mismatch" });
+  });
+
+  it("não credita destaque se referência do MP for de outro checkout", async () => {
+    const result = await simulatePayment({ amount: 39.9, externalReference: "intent-other" });
+    expect(result).toMatchObject({ ignored: true, reason: "payment_reference_mismatch" });
+  });
+});
