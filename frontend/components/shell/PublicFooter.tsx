@@ -265,8 +265,7 @@ export function PublicFooter({
             </Link>
 
             <p className="mt-5 max-w-md text-sm leading-relaxed text-white/80">
-              Marketplace automotivo regional: catálogo por cidade, referência FIPE local e
-              negociação com contexto — sem estoque genérico nacional.
+              Encontre o carro ideal para você. Compare ofertas, descubra oportunidades e negocie diretamente com anunciantes de forma simples.
             </p>
 
             {socials.length > 0 ? (
