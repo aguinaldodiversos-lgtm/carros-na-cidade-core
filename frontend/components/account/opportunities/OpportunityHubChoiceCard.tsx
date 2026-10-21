@@ -65,7 +65,7 @@ export default function OpportunityHubChoiceCard({
       {/* Ilustrações são decorativas, não correspondem a um anúncio real. */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <span className="absolute -right-9 -top-14 h-60 w-60 rounded-full border-[28px] border-white/30 blur-[1px]" />
-        <div className="absolute right-[-7%] top-[9%] w-[35%] max-w-[190px] opacity-55 sm:right-[3%] sm:top-[8%] lg:right-[-2%]">
+        <div className="absolute right-[-7%] top-[9%] hidden w-[35%] max-w-[190px] opacity-55 sm:right-[3%] sm:top-[8%] sm:block lg:right-[-2%]">
           {art}
         </div>
         <div className="absolute bottom-0 right-[-12%] hidden h-[70%] w-[62%] [mask-image:linear-gradient(to_right,transparent_0%,black_30%)] sm:block lg:right-[-18%] lg:w-[69%] xl:right-[-12%]">
