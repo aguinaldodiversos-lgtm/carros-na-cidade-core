@@ -44,6 +44,8 @@ type FilterSidebarProps = {
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
   onClear: () => void;
   showApplyCta?: boolean;
+  /** Nesta landing o recorte abaixo da FIPE é fixo e não pode ser desmarcado. */
+  belowFipeLocked?: boolean;
   onApply?: () => void;
   regionalEnabled?: boolean;
   /**
@@ -515,6 +517,7 @@ export function FilterSidebar({
   onPatch,
   onClear,
   showApplyCta = false,
+  belowFipeLocked = false,
   onApply,
   regionalEnabled = false,
   controlTotals,
@@ -765,10 +768,12 @@ export function FilterSidebar({
               <button
                 type="button"
                 aria-pressed={filters.below_fipe === true}
+                disabled={belowFipeLocked}
+                title={belowFipeLocked ? "Filtro obrigatório desta página" : undefined}
                 onClick={() =>
                   onPatch({ below_fipe: filters.below_fipe === true ? undefined : true, page: 1 })
                 }
-                className={chipCls(filters.below_fipe === true)}
+                className={`${chipCls(filters.below_fipe === true)} disabled:cursor-default disabled:opacity-100`}
               >
                 <ShieldIcon /> Abaixo da FIPE <Count total={controlTotals?.offers?.below_fipe} />
               </button>
