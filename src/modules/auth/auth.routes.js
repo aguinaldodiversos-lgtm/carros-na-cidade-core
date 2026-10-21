@@ -6,6 +6,8 @@ import {
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { pool } from "../../infrastructure/database/db.js";
+import { sendResetPasswordEmail } from "../../services/email.service.js";
+import { logger } from "../../shared/logger.js";
 
 import * as AuthServiceNS from "./auth.service.js";
 import * as PasswordServiceNS from "./password.service.js";
@@ -284,9 +286,17 @@ async function handleForgotPassword(req, res) {
   );
 
   try {
-    await fn(email);
-  } catch {
-    // não enumerar usuários
+    const result = await fn(email);
+    // O serviço retorna o token somente para usuários existentes; nunca ao navegador.
+    if (result?.token) {
+      const delivered = await sendResetPasswordEmail(email, result.token);
+      if (!delivered) {
+        logger.warn("[auth] recuperação de senha: e-mail não entregue");
+      }
+    }
+  } catch (err) {
+    // Mantém a mesma resposta para e-mails existentes ou inexistentes.
+    logger.error({ err }, "[auth] falha interna na solicitação de recuperação de senha");
   }
 
   return res.status(200).json({
