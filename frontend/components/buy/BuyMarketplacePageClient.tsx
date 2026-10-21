@@ -207,7 +207,7 @@ export default function BuyMarketplacePageClient({
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
     },
-    [initialFilters, buildUrl, router]
+    [belowFipeLanding, city.slug, initialFilters, buildUrl, router]
   );
 
   /**
