@@ -171,16 +171,6 @@ if (alvos.length === 0) {
   process.exit(0);
 }
 
-if (process.env.GITHUB_HEAD_REF === "feat/compradores-cards-imagens-premium") {
-  const target = "frontend/e2e/active-buyers-card-grid.spec.ts";
-  const formatted = await prettier.format(readFileSync(target, "utf8"), {
-    ...(await prettier.resolveConfig(target)),
-    filepath: target,
-  });
-  for (let i = 0; i < formatted.length; i += 1800) {
-    console.log("CNC_FORMAT_PAYLOAD:" + JSON.stringify({ path: target, index: i, text: formatted.slice(i, i + 1800) }));
-  }
-}
 const reprovados = [];
 
 for (const caminho of alvos) {
