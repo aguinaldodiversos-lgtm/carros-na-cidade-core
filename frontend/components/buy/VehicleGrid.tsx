@@ -40,6 +40,7 @@ type EmptyStateContext = {
   stateUf?: string;
   /** Houve filtros aplicados (q/brand/price/year/etc.) — muda a copy. */
   hasFilters?: boolean;
+  belowFipeLanding?: boolean;
 };
 
 /**
@@ -133,20 +134,32 @@ function resolveEmptyLabel(ctx: EmptyStateContext): string | null {
 
 function EmptyState({ ctx }: { ctx: EmptyStateContext }) {
   // Copy unificada via lib/public-contracts (briefing P2-B 2026-05-25).
-  const { title, body: description } = buildEmptyStateCopy(resolveEmptyVariant(ctx), {
+  const genericCopy = buildEmptyStateCopy(resolveEmptyVariant(ctx), {
     label: resolveEmptyLabel(ctx),
   });
+  const title = ctx.belowFipeLanding
+    ? ctx.hasFilters
+      ? "Nenhum carro abaixo da FIPE combina com estes filtros"
+      : `Nenhum carro abaixo da FIPE em ${ctx.cityName || "esta cidade"} no momento`
+    : genericCopy.title;
+  const description = ctx.belowFipeLanding
+    ? ctx.hasFilters
+      ? "Remova algum filtro para ampliar as opções sem sair desta seleção abaixo da FIPE."
+      : "As ofertas mudam conforme os anúncios ativos. Confira outras opções no catálogo da cidade."
+    : genericCopy.body;
 
   // Ação primária: limpar filtros (cidade/regional/estado mantém pathname
   // para preservar canonical; nacional sempre vai para /comprar limpo).
   const clearFiltersHref =
-    ctx.variant === "cidade" && ctx.citySlug
-      ? `/carros-em/${ctx.citySlug}`
-      : ctx.variant === "regional" && ctx.citySlug
-        ? `/carros-usados/regiao/${ctx.citySlug}`
-        : ctx.variant === "estadual" && ctx.stateUf
-          ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
-          : "/comprar";
+    ctx.belowFipeLanding && ctx.citySlug
+      ? `/carros-baratos-em/${ctx.citySlug}`
+      : ctx.variant === "cidade" && ctx.citySlug
+        ? `/carros-em/${ctx.citySlug}`
+        : ctx.variant === "regional" && ctx.citySlug
+          ? `/carros-usados/regiao/${ctx.citySlug}`
+          : ctx.variant === "estadual" && ctx.stateUf
+            ? `/comprar/estado/${ctx.stateUf.toLowerCase()}`
+            : "/comprar";
 
   // Ação secundária: ampliar escopo. Cidade → região (ou estado),
   // regional → estado, estado → Brasil, nacional → não tem.

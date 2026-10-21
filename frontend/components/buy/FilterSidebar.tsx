@@ -44,6 +44,10 @@ type FilterSidebarProps = {
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
   onClear: () => void;
   showApplyCta?: boolean;
+  /** Nesta landing o recorte abaixo da FIPE é fixo e não pode ser desmarcado. */
+  belowFipeLocked?: boolean;
+  /** Impede ampliar a cidade por atalho quando o território é fixo na rota. */
+  cityScopeLocked?: boolean;
   onApply?: () => void;
   regionalEnabled?: boolean;
   /**
@@ -515,6 +519,8 @@ export function FilterSidebar({
   onPatch,
   onClear,
   showApplyCta = false,
+  belowFipeLocked = false,
+  cityScopeLocked = false,
   onApply,
   regionalEnabled = false,
   controlTotals,
@@ -765,10 +771,12 @@ export function FilterSidebar({
               <button
                 type="button"
                 aria-pressed={filters.below_fipe === true}
+                disabled={belowFipeLocked}
+                title={belowFipeLocked ? "Filtro obrigatório desta página" : undefined}
                 onClick={() =>
                   onPatch({ below_fipe: filters.below_fipe === true ? undefined : true, page: 1 })
                 }
-                className={chipCls(filters.below_fipe === true)}
+                className={`${chipCls(filters.below_fipe === true)} disabled:cursor-default disabled:opacity-100`}
               >
                 <ShieldIcon /> Abaixo da FIPE <Count total={controlTotals?.offers?.below_fipe} />
               </button>
@@ -848,16 +856,26 @@ export function FilterSidebar({
                   <p className="block text-[12px] font-semibold uppercase tracking-[0.07em] text-cnc-muted">
                     Cidade
                   </p>
-                  <Link
-                    href={cityOnlyHref}
-                    data-testid="sidebar-city-link"
-                    aria-pressed={cityOnly}
-                    title={cityOnlyTitulo}
-                    className="flex h-[52px] w-full items-center justify-between rounded-xl border border-cnc-line-strong bg-cnc-surface px-4 text-[15px] font-semibold text-primary transition hover:border-primary motion-reduce:transition-none lg:min-w-0"
-                  >
-                    <span className="lg:min-w-0 lg:truncate">{cityOnlyRotulo}</span>
-                    <ChevronDownIcon className="h-[18px] w-[18px] -rotate-90 text-cnc-muted lg:shrink-0" />
-                  </Link>
+                  {cityScopeLocked ? (
+                    <span
+                      data-testid="sidebar-city-fixed"
+                      title={`Somente ${currentCityName || currentCitySlug}`}
+                      className="flex h-[52px] w-full items-center rounded-xl border border-cnc-line-strong bg-cnc-surface px-4 text-[15px] font-semibold text-primary lg:min-w-0"
+                    >
+                      <span className="truncate">{currentCityName || currentCitySlug}</span>
+                    </span>
+                  ) : (
+                    <Link
+                      href={cityOnlyHref}
+                      data-testid="sidebar-city-link"
+                      aria-pressed={cityOnly}
+                      title={cityOnlyTitulo}
+                      className="flex h-[52px] w-full items-center justify-between rounded-xl border border-cnc-line-strong bg-cnc-surface px-4 text-[15px] font-semibold text-primary transition hover:border-primary motion-reduce:transition-none lg:min-w-0"
+                    >
+                      <span className="lg:min-w-0 lg:truncate">{cityOnlyRotulo}</span>
+                      <ChevronDownIcon className="h-[18px] w-[18px] -rotate-90 text-cnc-muted lg:shrink-0" />
+                    </Link>
+                  )}
                 </div>
               ) : null}
             </div>
