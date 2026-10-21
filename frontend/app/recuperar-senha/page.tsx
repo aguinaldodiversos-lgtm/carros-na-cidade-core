@@ -9,10 +9,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RecuperarSenhaPage() {
+export default function RecuperarSenhaPage({
+  searchParams,
+}: {
+  searchParams?: { token?: string | string[] };
+}) {
+  const initialToken = typeof searchParams?.token === "string" ? searchParams.token : "";
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-      <RecoverPasswordPanel />
+      <RecoverPasswordPanel initialToken={initialToken} />
     </main>
   );
 }
