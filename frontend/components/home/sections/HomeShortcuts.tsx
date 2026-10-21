@@ -1,19 +1,20 @@
 // frontend/components/home/sections/HomeShortcuts.tsx
 
 import Link from "next/link";
+import { IconCalculator } from "@/components/home/icons";
 
 /**
- * Quick actions — 5 atalhos circulares azuis conforme contrato visual
+ * Quick actions — 6 atalhos circulares azuis conforme contrato visual
  * `atualização-home.png` (revisão 2026-05-19).
  *
- * Items: Comprar, Vender, FIPE, Ofertas, Planos.
+ * Items: Comprar, Vender, FIPE, Ofertas, Planos, Simulador.
  * Ícones brancos sobre círculo azul sólido (#2563EB).
  *
  * Layout responsivo:
- *   • Mobile (< sm): cada item `flex-1` para distribuir uniformemente
- *     em qualquer largura de viewport (360–639px). Círculos h-14 w-14
- *     (56px) para caber confortavelmente em 360px.
- *   • Desktop (sm+): círculos h-16 w-16 (64px), gaps maiores.
+ *   • Mobile (< sm): rolagem horizontal dos 6 itens, sem quebrar linha
+ *     nem comprimir os círculos de 56px em telas de 360px.
+ *   • Desktop (sm+): 6 itens distribuídos igualmente, com círculos
+ *     h-16 w-16 (64px) e gaps maiores.
  *
  * Server Component — apenas composição estática.
  */
@@ -120,6 +121,11 @@ const ACTIONS = [
   { href: "/tabela-fipe", label: "FIPE", icon: <FileIcon /> },
   { href: "/comprar?below_fipe=true", label: "Ofertas", icon: <PercentTagIcon /> },
   { href: "/planos", label: "Planos", icon: <StarFilledIcon /> },
+  {
+    href: "/simulador-financiamento",
+    label: "Simulador",
+    icon: <IconCalculator className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden="true" />,
+  },
 ];
 
 export function HomeShortcuts() {
@@ -128,15 +134,15 @@ export function HomeShortcuts() {
       aria-label="Atalhos rápidos"
       className="mx-auto w-full max-w-8xl px-4 pt-4 sm:px-6 sm:pt-7 lg:px-8"
     >
-      <ul className="flex items-start gap-1 sm:gap-3">
+      <ul className="-mx-4 flex items-start gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0">
         {ACTIONS.map(({ href, label, icon }) => (
-          <li key={href} className="flex min-w-0 flex-1 justify-center">
+          <li key={href} className="flex shrink-0 justify-center sm:min-w-0 sm:flex-1">
             <Link
               href={href}
               aria-label={label}
               className="flex flex-col items-center gap-1.5 outline-none focus-visible:opacity-90 sm:gap-2"
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-[0_4px_12px_rgba(37,99,235,0.30)] transition hover:bg-blue-700 active:scale-95 sm:h-16 sm:w-16">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.30)] transition hover:bg-blue-700 active:scale-95 sm:h-16 sm:w-16">
                 {icon}
               </div>
               <span className="text-[12px] font-semibold text-slate-900 sm:text-[13px]">
