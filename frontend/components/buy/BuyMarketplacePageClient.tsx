@@ -315,6 +315,7 @@ export default function BuyMarketplacePageClient({
     filters: initialFilters,
     city,
     belowFipeLocked: belowFipeLanding,
+    cityScopeLocked: belowFipeLanding,
     brandOptions,
     modelOptions,
     popularBrands,
