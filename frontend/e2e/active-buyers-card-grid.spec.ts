@@ -270,7 +270,9 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
     expect(report.duplicated).toEqual([]);
   });
 
-  test("Virtus e Pulse carregam assets próprios, sem consultar fotos de anúncios", async ({ page }) => {
+  test("Virtus e Pulse carregam assets próprios, sem consultar fotos de anúncios", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const fixture = buildFixture(2);
     fixture.purchase_intents[0].brand = "Volkswagen";
@@ -289,20 +291,40 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
     await page.goto(PAGE_PATH);
     const images = page.getByTestId("active-buyer-model-image");
     await expect(images).toHaveCount(2);
-    await expect(images.nth(0)).toHaveAttribute("src", "/images/oportunidades/modelos/volkswagen-virtus.svg");
-    await expect(images.nth(1)).toHaveAttribute("src", "/images/oportunidades/modelos/fiat-pulse.svg");
-    await expect.poll(async () => images.evaluateAll((nodes) =>
-      nodes.every((node) => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0)
-    )).toBe(true);
+    await expect(images.nth(0)).toHaveAttribute(
+      "src",
+      "/images/oportunidades/modelos/volkswagen-virtus.svg"
+    );
+    await expect(images.nth(1)).toHaveAttribute(
+      "src",
+      "/images/oportunidades/modelos/fiat-pulse.svg"
+    );
+    await expect
+      .poll(async () =>
+        images.evaluateAll((nodes) =>
+          nodes.every(
+            (node) =>
+              (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0
+          )
+        )
+      )
+      .toBe(true);
 
     const modelRequests = requested.filter((url) => url.includes("/images/oportunidades/modelos/"));
     expect(modelRequests.length).toBe(2);
-    expect(requested.filter((url) =>
-      url.includes("/api/vehicle-images") || url.includes("r2.dev") || url.includes("/uploads/ads/")
-    )).toEqual([]);
+    expect(
+      requested.filter(
+        (url) =>
+          url.includes("/api/vehicle-images") ||
+          url.includes("r2.dev") ||
+          url.includes("/uploads/ads/")
+      )
+    ).toEqual([]);
   });
 
-  test("procura sem referência cadastrada permanece em SVG, sem foto de anúncio", async ({ page }) => {
+  test("procura sem referência cadastrada permanece em SVG, sem foto de anúncio", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await prepare(page);
 
@@ -425,9 +447,11 @@ test.describe("@active-buyers filtros, contagem e estados", () => {
 
   test("erro NÃO vira '0 resultados'", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.context().addCookies([
-      { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-    ]);
+    await page
+      .context()
+      .addCookies([
+        { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
+      ]);
     await page.route(FEED_URL, async (route) => {
       await route.fulfill({
         status: 503,
