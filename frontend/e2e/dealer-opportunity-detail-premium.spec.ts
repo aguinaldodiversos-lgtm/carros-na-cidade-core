@@ -166,9 +166,11 @@ function buildFeed() {
 }
 
 async function prepare(page: Page, detailOverrides: Record<string, unknown> = {}) {
-  await page.context().addCookies([
-    { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-  ]);
+  await page
+    .context()
+    .addCookies([
+      { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
+    ]);
 
   // A rota do DETALHE é registrada por ÚLTIMO: o Playwright casa a última rota
   // compatível, e o padrão do feed (`...sale-requests*`) também casaria
@@ -322,7 +324,10 @@ test.describe("@dealer-detail-premium §60 — desktop", () => {
         .querySelector('[data-testid="dealer-offer-panel"]')!
         .closest("div")!.parentElement!;
       const grid = column.parentElement!;
-      return Math.max(0, grid.getBoundingClientRect().height - column.getBoundingClientRect().height);
+      return Math.max(
+        0,
+        grid.getBoundingClientRect().height - column.getBoundingClientRect().height
+      );
     });
 
     // Sem curso não há o que provar: seria um painel mais alto que a página.
@@ -471,7 +476,7 @@ test.describe("@dealer-detail-premium §60 — desktop", () => {
     }
 
     const wire = payloads.join(" ").toLowerCase();
-    for (const term of ["owner_user_id", "\"cpf\"", "\"email\"", "whatsapp", "\"phone\""]) {
+    for (const term of ["owner_user_id", '"cpf"', '"email"', "whatsapp", '"phone"']) {
       expect(wire, `PII no payload: ${term}`).not.toContain(term);
     }
   });
