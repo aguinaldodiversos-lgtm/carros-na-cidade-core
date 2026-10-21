@@ -189,8 +189,8 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     // grupos. O que a asserção protege é que todo grupo de dados declarados
     // chega ao lojista — não o nome que cada um tinha antes.
     for (const section of [
-      "Resumo do veículo",
-      "Situação declarada pelo proprietário",
+      "Informações do veículo",
+      "Condição declarada pelo vendedor",
       "Conservação",
       "Financeiro e documentação",
       "Histórico",
