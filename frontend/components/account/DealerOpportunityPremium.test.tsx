@@ -358,9 +358,9 @@ describe("§22/§23/§55 — o valor mínimo é o número principal da negociaç
     render(<DealerSaleOpportunityDetail id="1" />);
     const block = await screen.findByTestId("dealer-detail-minimum");
     expect(block.textContent).toContain("Lance inicial");
-    expect(within(block).getByTestId("dealer-offer-minimum").textContent).toMatch(/62\\.500,00/);
-    expect(screen.getByTestId("dealer-offer-current").textContent).toMatch(/62\\.500,00/);
-    expect(block.textContent).not.toMatch(/R\\$\\s?0,00/);
+    expect(within(block).getByTestId("dealer-offer-minimum").textContent).toMatch(/62\.500,00/);
+    expect(screen.getByTestId("dealer-offer-current").textContent).toMatch(/62\.500,00/);
+    expect(block.textContent).not.toMatch(/R\$\s?0,00/);
   });
   it("§55 — sem nenhum valor de referência, legado diz Não informado e permite lance manual", async () => {
     fetchSaleOpportunity.mockResolvedValue(makeDetail({ minimum_accepted_price: null }));
@@ -378,7 +378,7 @@ describe("§26/§27 — a disputa, sem identidade e sem zero", () => {
     const panel = await screen.findByTestId("dealer-offer-panel");
     expect(panel.textContent).toContain("Lance inicial");
     expect(panel.textContent).toContain("Nenhuma proposta recebida ainda.");
-    expect(panel.textContent).not.toMatch(/R\\$\\s?0,00/);
+    expect(panel.textContent).not.toMatch(/R\$\s?0,00/);
   });
   it("liderando: o aviso é discreto e não nomeia ninguém", async () => {
     fetchSaleOpportunity.mockResolvedValue(
