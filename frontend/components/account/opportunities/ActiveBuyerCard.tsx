@@ -85,7 +85,14 @@ export default function ActiveBuyerCard({
               "Categoria aberta") diz a mesma coisa. Quem não distingue azul de
               verde lê o modo do mesmo jeito.
             */}
-            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              className="h-3 w-3"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M12 8v4l2.5 2" />
             </svg>
@@ -111,7 +118,10 @@ export default function ActiveBuyerCard({
             aos vizinhos da mesma linha.
           */}
           {criteria ? (
-            <p className="mt-1 text-[13px] leading-relaxed text-[#667085]" data-testid="active-buyer-criteria">
+            <p
+              className="mt-1 text-[13px] leading-relaxed text-[#667085]"
+              data-testid="active-buyer-criteria"
+            >
               {criteria}
             </p>
           ) : null}
@@ -127,7 +137,14 @@ export default function ActiveBuyerCard({
               houvesse um veículo já avaliado do outro lado.
             */}
             <p className="flex items-baseline gap-1.5" data-testid="active-buyer-budget">
-              <svg viewBox="0 0 24 24" className="mr-0.5 h-4 w-4 shrink-0 self-center text-[#0e62d8]" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                className="mr-0.5 h-4 w-4 shrink-0 self-center text-[#0e62d8]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                aria-hidden="true"
+              >
                 <path d="M20.6 13.4 12 4.8H4.8V12l8.6 8.6a2 2 0 0 0 2.8 0l4.4-4.4a2 2 0 0 0 0-2.8Z" />
                 <circle cx="8.6" cy="8.6" r="1.4" />
               </svg>
@@ -144,8 +161,18 @@ export default function ActiveBuyerCard({
             </p>
 
             {city ? (
-              <p className="mt-2 flex items-center gap-2 text-[13px] text-[#667085]" data-testid="active-buyer-city">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-[#98a2b3]" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <p
+                className="mt-2 flex items-center gap-2 text-[13px] text-[#667085]"
+                data-testid="active-buyer-city"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4 shrink-0 text-[#98a2b3]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  aria-hidden="true"
+                >
                   <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z" />
                   <circle cx="12" cy="10" r="2.6" />
                 </svg>
@@ -154,8 +181,18 @@ export default function ActiveBuyerCard({
             ) : null}
 
             {published ? (
-              <p className="mt-1.5 flex items-center gap-2 text-[12.5px] text-[#98a2b3]" data-testid="active-buyer-published">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <p
+                className="mt-1.5 flex items-center gap-2 text-[12.5px] text-[#98a2b3]"
+                data-testid="active-buyer-published"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  aria-hidden="true"
+                >
                   <circle cx="12" cy="12" r="8.5" />
                   <path d="M12 7.5V12l3 2" />
                 </svg>
@@ -185,7 +222,14 @@ export default function ActiveBuyerCard({
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0e62d8] px-4 text-[14px] font-bold text-white shadow-[0_4px_10px_-7px_rgba(14,98,216,0.9)] transition hover:bg-[#0b52b8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8]"
               data-testid="active-buyer-cta"
             >
-              <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-[18px] w-[18px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                aria-hidden="true"
+              >
                 <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
                 <circle cx="12" cy="12" r="3.1" />
               </svg>
