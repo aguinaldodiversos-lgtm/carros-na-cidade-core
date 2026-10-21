@@ -87,7 +87,10 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
         await expect(locked).toBeDisabled();
         await expect(locked).toHaveAttribute("aria-pressed", "true");
       } else {
-        await page.getByRole("button", { name: /Filtrar/i }).first().click();
+        await page
+          .getByRole("button", { name: /Filtrar/i })
+          .first()
+          .click();
         const modal = page.getByRole("dialog", { name: "Filtros" });
         const locked = modal.getByRole("button", { name: /Abaixo da FIPE/i });
         await expect(locked).toBeDisabled();
@@ -95,8 +98,8 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
         await modal.getByRole("button", { name: "Fechar" }).click();
       }
 
-      const overflow = await page.evaluate(() =>
-        document.documentElement.scrollWidth > document.documentElement.clientWidth
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth
       );
       expect(overflow).toBe(false);
       await page.screenshot({
@@ -116,8 +119,6 @@ test.describe("@seo carros baratos no layout do catálogo da cidade", () => {
     await expect(locked).toBeDisabled();
     await expect(locked).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator('[data-variant="grid"]').first()).toBeVisible();
-    await expect(page.locator('[data-variant="grid"] a[href*="braganca-sp-e2e-4"]')).toHaveCount(
-      0
-    );
+    await expect(page.locator('[data-variant="grid"] a[href*="braganca-sp-e2e-4"]')).toHaveCount(0);
   });
 });
