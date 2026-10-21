@@ -63,7 +63,7 @@ export default function DealerOfferPanel({
   onSubmitted: (next: DealerOfferState) => void;
   advertiserId?: string | number | null;
 }) {
-  const [increment, setIncrement] = useState<number | null>(null);
+  const [selection, setSelection] = useState<{ value: number; baseCents: number } | null>(null);
   const [legacyDigits, setLegacyDigits] = useState("");
   const [note, setNote] = useState("");
   const [showNotes, setShowNotes] = useState(false);
@@ -77,6 +77,9 @@ export default function DealerOfferPanel({
   const floorCents = toCents(minimumAcceptedPrice);
   const currentCents = leaderCents ?? floorCents;
   const currentMoney = formattedCents(currentCents);
+  // Nunca reajustar silenciosamente o valor que a loja prestes a confirmar.
+  // Se outra oferta mudou a base, a seleção anterior fica inválida.
+  const increment = selection?.baseCents === currentCents ? selection.value : null;
   const previewCents =
     currentCents !== null && increment !== null ? currentCents + increment * 100 : null;
   const previewMoney = formattedCents(previewCents);
@@ -92,7 +95,8 @@ export default function DealerOfferPanel({
   const fipeMoney = formatMoneyValue(fipeReferenceValue);
 
   function selectIncrement(next: number) {
-    setIncrement(next);
+    if (currentCents === null) return;
+    setSelection({ value: next, baseCents: currentCents });
     setError(null);
     setSuccess(null);
   }
@@ -142,7 +146,7 @@ export default function DealerOfferPanel({
         { amount, note: note.trim() || null },
         advertiserId
       );
-      setIncrement(null);
+      setSelection(null);
       setLegacyDigits("");
       setNote("");
       setShowNotes(false);
