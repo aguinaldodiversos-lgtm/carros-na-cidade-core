@@ -140,7 +140,7 @@ async function submitOffer(page: Page, amount: number) {
   } else {
     const leader = page.getByTestId("dealer-offer-current");
     const currentText = (await leader.textContent()) || "";
-    const current = Number(currentText.replace(/[^0-9,]/g, "").replace(",", ".")) / 1000;
+    const current = Number(currentText.replace(/[^0-9,]/g, "").replace(",", "."));
     // Nunca permitir um lance manual fora dos incrementos escolhidos.
     const delta = amount - current;
     expect([100, 300, 500, 1000]).toContain(delta);
