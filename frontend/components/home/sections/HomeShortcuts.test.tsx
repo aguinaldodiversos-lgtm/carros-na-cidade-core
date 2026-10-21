@@ -21,9 +21,11 @@ describe("HomeShortcuts — seis atalhos rápidos", () => {
     const links = within(nav).getAllByRole("link");
 
     expect(links).toHaveLength(6);
-    expect(links.map((link) => [link.getAttribute("aria-label"), link.getAttribute("href")])).toEqual(
-      expectedActions.map(([label, href]) => [label, href])
-    );
+    const actualActions = links.map((link) => [
+      link.getAttribute("aria-label"),
+      link.getAttribute("href"),
+    ]);
+    expect(actualActions).toEqual(expectedActions.map(([label, href]) => [label, href]));
   });
 
   it("usa calculadora branca no círculo azul do Simulador, com tamanho igual aos demais", () => {
