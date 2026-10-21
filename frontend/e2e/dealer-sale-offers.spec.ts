@@ -130,11 +130,25 @@ async function openDetail(page: Page, saleRequestId: string) {
   await expect(page.getByTestId("dealer-offer-panel")).toBeVisible();
 }
 
-/** Preenche o campo e envia. `amount` em reais inteiros. */
+/** Em solicitações antigas sem referência o primeiro lance é manual;
+ * na disputa normal escolhe-se um incremento fixo a partir do líder. */
 async function submitOffer(page: Page, amount: number) {
-  const field = page.getByTestId("dealer-offer-amount");
-  await field.fill("");
-  await field.type(String(amount * 100));
+  if (await page.getByTestId("dealer-offer-legacy-entry").isVisible().catch(() => false)) {
+    const field = page.getByTestId("dealer-offer-amount");
+    await field.fill("");
+    await field.type(String(amount * 100));
+  } else {
+    const leader = page.getByTestId("dealer-offer-current");
+    const currentText = (await leader.textContent()) || "";
+    const current = Number(currentText.replace(/[^0-9,]/g, "").replace(",", ".")) / 1000;
+    // Nunca permitir um lance manual fora dos incrementos escolhidos.
+    const delta = amount - current;
+    expect([100, 300, 500, 1000]).toContain(delta);
+    await page.getByTestId(`dealer-offer-bump-${delta}`).click();
+    await expect(page.getByTestId("dealer-offer-preview")).toContainText(
+      amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+    );
+  }
   await page.getByTestId("dealer-offer-submit").click();
 }
 
@@ -204,13 +218,11 @@ test.describe("@dealer-sale-offers disputa entre dois lojistas", () => {
     // B ainda não propôs: não há badge de posição.
     await expect(page.getByTestId("dealer-offer-standing")).toHaveCount(0);
 
-    // ── 6. B tenta 49.000 e é RECUSADO ──────────────────────────────────────
-    await submitOffer(page, 49000);
-    await expect(page.getByTestId("dealer-offer-error")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("dealer-offer-error")).toContainText("maior");
-    await expect(page.getByTestId("dealer-offer-success")).toHaveCount(0);
+    // ── 6. B não pode ofertar abaixo do líder: o CTA começa desabilitado ───
+    await expect(page.getByTestId("dealer-offer-submit")).toBeDisabled();
+    await expect(page.getByTestId("dealer-offer-current")).toContainText("50.000,00");
 
-    // ── 7. B propõe 51.000 e assume a liderança ─────────────────────────────
+    // ── 7. B adiciona R$ 1.000 e assume a liderança ─────────────────────────
     await submitOffer(page, 51000);
     await expect(page.getByTestId("dealer-offer-success")).toBeVisible({ timeout: 30_000 });
     // `toContainText`: o badge carrega um glifo de estado (✓/⚠) ao lado da
