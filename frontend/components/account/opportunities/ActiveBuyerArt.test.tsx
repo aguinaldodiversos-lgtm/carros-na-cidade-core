@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import ActiveBuyerArt, { ART_BODY_TYPES, resolveArtBodyType } from "./ActiveBuyerArt";
 import ActiveBuyerCard from "./ActiveBuyerCard";
+import { resolveOpportunityModelIllustration } from "./OpportunityVehicleMedia";
 import {
   artBodyTypeFor,
   describeOpportunityCriteria,
@@ -53,33 +54,54 @@ const plain = (value: string) => value.replace(/[\u00A0\u202F]/g, " ");
 
 afterEach(cleanup);
 
-describe("a figura é ILUSTRAÇÃO, nunca fotografia", () => {
-  it("não existe <img>, nem background-image, nem URL de foto no card", () => {
+describe("mídia ilustrativa controlada, nunca fotografia de anúncio", () => {
+  it("modelo não cadastrado usa o SVG por carroceria e não requisita foto", () => {
     render(<ActiveBuyerCard opportunity={makeOpportunity()} basePath="/dashboard-loja" />);
     const card = screen.getByTestId("active-buyer-card");
-
-    /*
-      Uma foto de um Gol 2020 vermelho no card de quem procura "Volkswagen Gol"
-      comunicaria quatro coisas falsas: que aquele carro existe, que aquela cor é
-      exigida, que aquela geração é exigida e que a configuração é a procurada.
-
-      A ausência é verificada de três formas porque há três maneiras de uma foto
-      entrar: `<img>`, `background-image` em style inline, e um `<image>` dentro
-      do próprio SVG.
-    */
+    expect(screen.getByTestId("active-buyer-media")).toHaveAttribute("data-media-kind", "category");
+    expect(screen.getByTestId("active-buyer-art")).toHaveAttribute("data-body-type", "hatch");
     expect(card.querySelector("img")).toBeNull();
     expect(card.querySelector("image")).toBeNull();
-    expect(card.querySelector("picture")).toBeNull();
     expect(card.innerHTML).not.toMatch(/background-image/i);
-    expect(card.innerHTML).not.toMatch(/\.(?:jpe?g|png|webp|avif)/i);
+    expect(screen.getByTestId("active-buyer-image-disclaimer")).toHaveTextContent("Imagem ilustrativa");
+  });
 
-    // A ÚNICA URL tolerada é o namespace do próprio SVG. Proibir `https?://`
-    // por inteiro reprovaria o `xmlns` e o teste seria afrouxado até não provar
-    // mais nada; nomear a exceção mantém a proibição afiada.
-    const urls = card.innerHTML.match(/https?:\/\/[^"'\s)]+/gi) ?? [];
-    for (const url of urls) {
-      expect(url).toBe("http://www.w3.org/2000/svg");
+  it("Virtus e Pulse usam ilustrações locais do modelo, sem sugerir um carro anunciado", () => {
+    const cases = [
+      { brand: "Volkswagen", model: "Virtus", path: "/images/oportunidades/modelos/volkswagen-virtus.svg" },
+      { brand: "Fiat", model: "Pulse", path: "/images/oportunidades/modelos/fiat-pulse.svg" },
+    ];
+    for (const { brand, model, path } of cases) {
+      cleanup();
+      render(<ActiveBuyerCard opportunity={makeOpportunity({ brand, model })} basePath="/dashboard-loja" />);
+      expect(screen.getByTestId("active-buyer-media")).toHaveAttribute("data-media-kind", "model");
+      const img = screen.getByTestId("active-buyer-model-image");
+      expect(img).toHaveAttribute("src", path);
+      expect(img.getAttribute("alt")).toMatch(/Representação ilustrativa/);
+      expect(img.getAttribute("alt")).toMatch(/não indica ano, versão nem veículo disponível/);
+      expect(screen.getByTestId("active-buyer-image-disclaimer")).toHaveTextContent("Imagem ilustrativa");
+      expect(screen.queryByTestId("active-buyer-art")).not.toBeInTheDocument();
     }
+  });
+
+  it("normaliza marca/modelo e recusa combinações imprecisas", () => {
+    const example = { intent_type: "specific_model" as const, brand: " VOLKSWAGEN ", model: "Virtus Comfortline 1.0" };
+    expect(resolveOpportunityModelIllustration(example)).toBe("/images/oportunidades/modelos/volkswagen-virtus.svg");
+    expect(resolveOpportunityModelIllustration({ ...example, model: "Virtuoso" })).toBeNull();
+    expect(resolveOpportunityModelIllustration({ ...example, brand: "Fiat" })).toBeNull();
+    expect(resolveOpportunityModelIllustration({ ...example, intent_type: "open_category" })).toBeNull();
+    expect(resolveOpportunityModelIllustration({ ...example, model: null })).toBeNull();
+  });
+
+  it("erro ao carregar a referência local aciona o fallback sem quebrar o card", () => {
+    render(<ActiveBuyerCard opportunity={makeOpportunity({ brand: "Fiat", model: "Pulse" })} basePath="/dashboard-loja" />);
+    fireEvent.error(screen.getByTestId("active-buyer-model-image"));
+    expect(screen.queryByTestId("active-buyer-model-image")).not.toBeInTheDocument();
+    expect(screen.getByTestId("active-buyer-media")).toHaveAttribute("data-media-kind", "category");
+    expect(screen.getByTestId("active-buyer-art")).toHaveAttribute("data-body-type", "suv");
+    expect(screen.getByTestId("active-buyer-cta")).toHaveAttribute(
+      "href", "/dashboard-loja/oportunidades/compradores/1"
+    );
   });
 
   it("a figura não consome nenhum campo de foto, mesmo se o payload trouxer um", () => {
