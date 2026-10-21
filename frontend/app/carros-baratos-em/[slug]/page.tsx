@@ -118,7 +118,11 @@ export default async function CarrosBaratosCidadePage({ params, searchParams = {
         regionalEnabled={isRegionalPageEnabled()}
       />
 
-      <BelowFipeCatalogSeo model={model} cityName={ctx.name} catalogTotal={initialResults.pagination.total} />
+      <BelowFipeCatalogSeo
+        model={model}
+        cityName={ctx.name}
+        catalogTotal={initialResults.pagination.total}
+      />
       {faqEntries.length ? (
         <FaqBlock
           title={`Perguntas frequentes sobre carros abaixo da FIPE em ${ctx.name}`}
