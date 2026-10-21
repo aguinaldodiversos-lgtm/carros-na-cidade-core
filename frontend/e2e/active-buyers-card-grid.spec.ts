@@ -369,6 +369,12 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
           .toBe(true);
       }
 
+      // Volta ao topo antes da captura fullPage: no mobile, o scroll para
+      // carregar a imagem do segundo card posicionava a BottomNav sobre o
+      // primeiro card na imagem final, embora a navegação funcionasse.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
       // Capturas legíveis e auditáveis: grade, modelos e fallback.
       await page.screenshot({
         path: `${SHOTS}/11-buyers-models-${viewport.label}.png`,
