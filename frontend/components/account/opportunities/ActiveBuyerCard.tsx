@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import ActiveBuyerArt from "./ActiveBuyerArt";
+import OpportunityVehicleMedia from "./OpportunityVehicleMedia";
 import {
   INTENT_MODE_BADGE,
-  artBodyTypeFor,
   describeOpportunityCriteria,
   describeOpportunityTitle,
   formatBudgetParts,
@@ -66,7 +65,7 @@ export default function ActiveBuyerCard({
 
   return (
     <li className="h-full" data-testid="active-buyer-card">
-      <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-[#e5eaf3] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_20px_-14px_rgba(16,24,40,0.18)] transition hover:border-[#cfe0fb] hover:shadow-[0_1px_2px_rgba(16,24,40,0.05),0_14px_30px_-16px_rgba(16,24,40,0.26)]">
+      <article className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#dfe8f5] bg-white shadow-[0_2px_8px_rgba(16,36,69,0.05),0_12px_30px_-18px_rgba(16,50,100,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bfd7fc] hover:shadow-[0_5px_14px_rgba(16,36,69,0.08),0_18px_35px_-18px_rgba(16,50,100,0.3)]">
         {/*
           A ILUSTRAÇÃO E A ETIQUETA DIVIDEM A MESMA CAIXA.
 
@@ -77,7 +76,7 @@ export default function ActiveBuyerCard({
         */}
         <div className="relative bg-[#f7faff] px-3 pt-3">
           <span
-            className={`absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none ${badge.className}`}
+            className={`absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none shadow-[0_1px_3px_rgba(19,65,124,0.08)] ${badge.className}`}
             data-testid="active-buyer-badge"
             data-intent-type={opportunity.intent_type}
           >
@@ -93,18 +92,13 @@ export default function ActiveBuyerCard({
             {badge.label}
           </span>
 
-          {/*
-            `w-full` sem altura fixa: a figura escala pela LARGURA e a altura
-            sai da proporção do `viewBox` (320×112). Fixar a altura faria o SVG
-            ser encaixado por ela, sobrando barras laterais vazias e encolhendo
-            o carro para metade da largura do card.
-          */}
-          <ActiveBuyerArt bodyType={artBodyTypeFor(opportunity)} className="block w-full" />
+          {/* Referência ilustrativa local quando disponível; SVG por carroceria como fallback. */}
+          <OpportunityVehicleMedia opportunity={opportunity} />
         </div>
 
         <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5 sm:px-5 sm:pb-5">
           <h3
-            className="text-[16px] font-bold leading-snug tracking-[-0.01em] text-[#161f34]"
+            className="text-[16px] font-extrabold leading-snug tracking-[-0.018em] text-[#11213a]"
             data-testid="active-buyer-title"
           >
             {title}
@@ -140,7 +134,7 @@ export default function ActiveBuyerCard({
               {budget.value ? (
                 <>
                   <span className="text-[13px] font-semibold text-[#475467]">{budget.prefix}</span>
-                  <span className="text-[19px] font-extrabold leading-none tracking-[-0.02em] text-[#0e62d8]">
+                  <span className="text-[20px] font-extrabold leading-none tracking-[-0.025em] text-[#0e62d8]">
                     {budget.value}
                   </span>
                 </>
@@ -188,7 +182,7 @@ export default function ActiveBuyerCard({
           <div className="mt-auto pt-4">
             <Link
               href={`${basePath}/oportunidades/compradores/${opportunity.id}`}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0e62d8] px-4 text-[14px] font-bold text-white transition hover:bg-[#0b52b8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8]"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0e62d8] px-4 text-[14px] font-bold text-white shadow-[0_4px_10px_-7px_rgba(14,98,216,0.9)] transition hover:bg-[#0b52b8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0e62d8]"
               data-testid="active-buyer-cta"
             >
               <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
