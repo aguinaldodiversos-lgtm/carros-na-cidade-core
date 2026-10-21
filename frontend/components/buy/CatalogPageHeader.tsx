@@ -211,10 +211,9 @@ export function CatalogPageHeader({
     return `Ofertas em cidades e regiões de ${activeStateUf || stateName}`;
   }, [belowFipeLanding, variant, city.name, activeStateUf, stateName]);
 
-  const placeholder =
-    belowFipeLanding
-      ? "Buscar marca, modelo ou versão entre os carros abaixo da FIPE"
-      : variant === "cidade"
+  const placeholder = belowFipeLanding
+    ? "Buscar marca, modelo ou versão entre os carros abaixo da FIPE"
+    : variant === "cidade"
       ? "Buscar marca, modelo ou versão nesta cidade"
       : variant === "regional"
         ? "Buscar marca, modelo ou versão nesta região"
