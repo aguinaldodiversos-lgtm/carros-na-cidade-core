@@ -57,9 +57,11 @@ function buildSummary(overrides: Record<string, unknown> = {}) {
 }
 
 async function prepare(page: Page, summaryOverrides: Record<string, unknown> = {}) {
-  await page.context().addCookies([
-    { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-  ]);
+  await page
+    .context()
+    .addCookies([
+      { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
+    ]);
 
   await page.route(SUMMARY_URL, (route) =>
     route.fulfill({
@@ -109,6 +111,36 @@ test.describe("@dealer-hub desktop", () => {
     await expect(page.locator("header").first()).toBeVisible();
   });
 
+  test("novo layout: escolhas acima do resumo, nomenclatura e fotos decorativas", async ({
+    page,
+  }) => {
+    await prepare(page);
+    await page.goto(HUB_PATH);
+    const choices = page.getByTestId("dealer-hub-choices");
+    const summary = page.getByTestId("dealer-hub-summary-section");
+    await expect(choices).toBeVisible();
+    await expect(summary).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Compradores Procurando" })).toBeVisible();
+    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
+      "Compradores Procurando"
+    );
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText("Compras em andamento");
+    await expect(summary).toContainText("Dados consultados ao abrir a página");
+    const choiceBox = await choices.boundingBox();
+    const summaryBox = await summary.boundingBox();
+    expect(choiceBox && summaryBox).toBeTruthy();
+    expect(summaryBox!.y).toBeGreaterThan(choiceBox!.y + choiceBox!.height - 1);
+    // As fotos são ornamentais. Carregam dos ativos locais, sem virar anúncios.
+    for (const card of ["dealer-hub-card-buyers", "dealer-hub-card-vehicles"]) {
+      const img = page.getByTestId(card).locator("img");
+      await expect(img).toHaveCount(1);
+      await expect
+        .poll(() => img.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
+      await expect(img).toHaveAttribute("alt", "");
+    }
+  });
+
   test("os quatro números do resumo aparecem com a variação de 7 dias", async ({ page }) => {
     await prepare(page);
     await page.goto(HUB_PATH);
@@ -128,9 +160,7 @@ test.describe("@dealer-hub desktop", () => {
       ativos do que há 7 dias". Falso: 128 é o ESTOQUE atual e os 18% comparam
       quantas procuras ENTRARAM na janela contra a janela anterior.
     */
-    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
-      "+18% novas entradas"
-    );
+    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText("+18% novas entradas");
     await expect(page.getByTestId("dealer-hub-metric-vehicles")).toContainText(
       "+12% novas entradas"
     );
@@ -139,9 +169,7 @@ test.describe("@dealer-hub desktop", () => {
       "+9% novas entradas em 7 dias"
     );
     // §9 — o que entra em compras são COMPRAS.
-    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
-      "+5% novas compras"
-    );
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText("+5% novas compras");
     await expect(strip).not.toContainText("nos últimos 7 dias");
 
     // Quatro cartões numa linha só em 1440 — é a faixa da referência.
@@ -195,9 +223,7 @@ test.describe("@dealer-hub desktop", () => {
     await page.goto(HUB_PATH);
     await expect(page.getByTestId("dealer-hub-metrics")).toBeVisible();
 
-    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
-      "Compras em andamento"
-    );
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText("Compras em andamento");
     await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText(
       "Receba demandas reais da sua cidade"
     );
@@ -340,9 +366,11 @@ test.describe("@dealer-hub desktop", () => {
   });
 
   test("resumo indisponível some com a faixa em vez de mostrar zero", async ({ page }) => {
-    await page.context().addCookies([
-      { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-    ]);
+    await page
+      .context()
+      .addCookies([
+        { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
+      ]);
     await page.route(SUMMARY_URL, (route) =>
       route.fulfill({
         status: 503,
@@ -414,12 +442,8 @@ test.describe("@dealer-hub responsivo", () => {
     // §15 — as mesmas garantias semânticas do desktop valem no celular. Os
     // rótulos são os que mais mudam de forma aqui (uma coluna, texto inteiro),
     // e é a largura em que uma quebra ruim passaria despercebida no desktop.
-    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
-      "Compras em andamento"
-    );
-    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText(
-      "+5% novas compras"
-    );
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText("Compras em andamento");
+    await expect(page.getByTestId("dealer-hub-metric-deals")).toContainText("+5% novas compras");
     const visible = await page.locator("main").innerText();
     expect(visible).not.toContain("Negócios em andamento");
     expect(visible).not.toContain("sua região");

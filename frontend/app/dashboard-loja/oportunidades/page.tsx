@@ -16,56 +16,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * Hub de oportunidades da loja.
- *
- * ════════════════════════════════════════════════════════════════════════════
- * A TELA RESPONDE UMA PERGUNTA, E ELA TEM DUAS RESPOSTAS
- * ════════════════════════════════════════════════════════════════════════════
- * "Como eu gero negócio hoje?"
- *
- *   VENDER  o que já tenho  → Compradores ativos
- *   COMPRAR para repor      → Veículos para avaliação
- *
- * Os dois caminhos existem desde a Fase 4.3, mas a tela anterior os apresentava
- * como dois retângulos brancos com um botão azul cada — visualmente idênticos,
- * o que obrigava a LER os dois para descobrir que faziam coisas opostas. Aqui a
- * distinção é dada antes da leitura: cor, ilustração e verbo diferentes de cada
- * lado.
- *
- * ════════════════════════════════════════════════════════════════════════════
- * A SIDEBAR CONTINUA
- * ════════════════════════════════════════════════════════════════════════════
- * Ao contrário do DETALHE de um veículo (Fase 4.11A), que entra em modo foco,
- * este hub é uma tela de NAVEGAÇÃO — tirar o menu dela deixaria o lojista sem
- * saída. `lib/account/focus-routes.ts` distingue as duas por caminho, e há teste
- * para essa fronteira exata.
- *
- * ════════════════════════════════════════════════════════════════════════════
- * OS NÚMEROS DO TOPO SÃO CONTADOS, NÃO ILUSTRATIVOS
- * ════════════════════════════════════════════════════════════════════════════
- * Os quatro cartões vêm de `/api/account/opportunities/summary`, que faz
- * `COUNT(*)` sobre as mesmas partições das listas que eles resumem. A variação
- * de 7 dias sai de `created_at`. Nenhum número é estimado, e quando não há base
- * de comparação a etiqueta verde dá lugar a uma frase neutra — ver
- * `dealer-opportunities-summary.service.js`.
- *
- * Continua valendo a regra do hub desde a Fase 2: um card por produto que
- * EXISTE, e nada de card desabilitado anunciando o que ainda não foi construído.
+ * Hub comercial: primeiro os dois caminhos de negócio, depois os indicadores
+ * reais e as instruções. Os fluxos e contagens já existentes são preservados.
+ * "Compradores Procurando" é o rótulo de UX; o escopo permanece a cidade da loja.
  */
-
-/*
-  "SUA CIDADE", E NÃO "SUA REGIÃO".
-
-  A consulta que alimenta este caminho é `pi.city_id = <cidade da loja>` — uma
-  igualdade, sem raio, sem `region_memberships`, sem vizinhança. "Região"
-  prometia uma abrangência que a query não entrega, e a promessa quebrada
-  apareceria do pior jeito possível: o lojista de Atibaia esperando ver procuras
-  de Bragança, não vendo nenhuma, e concluindo que não há compradores.
-
-  O conserto é a copy refletir o backend — não o contrário. Expandir o escopo
-  para região é decisão de produto, com custo de consulta e de precificação
-  territorial, e não cabe numa correção de texto.
-*/
 const BUYERS_BENEFITS = [
   "Receba demandas reais da sua cidade",
   "Ofereça veículos do seu estoque",
@@ -80,14 +34,26 @@ const VEHICLES_BENEFITS = [
 
 const FLOW_ICON = {
   buyers: (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[19px] w-[19px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <circle cx="9" cy="8" r="3.4" />
       <path d="M3 19c0-3.3 2.7-6 6-6s6 2.7 6 6" />
       <path d="M16 5.4a3.4 3.4 0 0 1 0 6.6M17.5 13.4c2 .8 3.5 2.8 3.5 5.1" />
     </svg>
   ),
   vehicles: (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[19px] w-[19px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
       <path d="M4 16v2.2M20 16v2.2M3 15.5c0-1.6.9-2.6 2.4-3l1.9-4c.4-.9 1.2-1.4 2.2-1.4h5c1 0 1.8.5 2.2 1.4l1.9 4c1.5.4 2.4 1.4 2.4 3v.5H3v-.5Z" />
       <circle cx="7.4" cy="15.8" r="1.1" />
       <circle cx="16.6" cy="15.8" r="1.1" />
@@ -97,7 +63,7 @@ const FLOW_ICON = {
 
 const FLOWS: readonly HowItWorksFlow[] = [
   {
-    label: "Compradores ativos",
+    label: "Compradores Procurando",
     tone: "blue",
     icon: FLOW_ICON.buyers,
     steps: [
@@ -140,38 +106,55 @@ export default async function OportunidadesHubPage() {
   await requireLojistaDashboardSession();
 
   return (
-    <section data-testid="dealer-opportunities-hub">
-      <header className="mb-5">
-        <h1 className="text-[24px] font-bold leading-tight tracking-[-0.01em] text-[#161f34] sm:text-[30px]">
-          Oportunidades
-        </h1>
-        <p className="mt-1.5 max-w-3xl text-[13.5px] leading-relaxed text-[#667085]">
-          Escolha como deseja gerar negócios: vender para compradores ativos ou comprar
-          veículos para repor seu estoque.
-        </p>
+    <section data-testid="dealer-opportunities-hub" className="space-y-5">
+      <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start sm:gap-5">
+        <div>
+          <h1 className="text-[29px] font-extrabold leading-tight tracking-[-0.035em] text-[#101B3D] sm:text-[34px]">
+            Oportunidades
+          </h1>
+          <p className="mt-1 max-w-3xl text-[13.5px] leading-relaxed text-[#5D6C88] sm:text-[14px]">
+            Escolha como gerar negócios: atender compradores procurando veículos ou comprar para
+            repor seu estoque.
+          </p>
+        </div>
+        <div className="flex max-w-[290px] shrink-0 items-start gap-2.5 rounded-xl border border-[#CFE1FC] bg-[#EEF5FF] px-3.5 py-2.5 text-[#184E9E]">
+          <svg
+            viewBox="0 0 24 24"
+            className="mt-0.5 h-5 w-5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 21h4M9 14c-1.5-1.1-2.5-2.9-2.5-5a5.5 5.5 0 0 1 11 0c0 2.1-1 3.9-2.5 5-.7.6-1 1.4-1 2H10c0-.6-.3-1.4-1-2Z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M12 1v2M2.5 9H4M20 9h1.5M5.5 3.7 7 5M17 5l1.5-1.3" strokeLinecap="round" />
+          </svg>
+          <p className="text-[11.5px] leading-snug">
+            <strong>Dica:</strong> mantenha seu estoque atualizado para receber mais oportunidades.
+          </p>
+        </div>
       </header>
 
-      <OpportunityHubMetrics />
-
-      {/*
-        Os dois caminhos, lado a lado a partir de `lg`. Abaixo disso empilham na
-        ordem do DOM — compradores primeiro, que é o produto mais antigo e o que
-        a maior parte das lojas usa.
-      */}
-      <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
+      <div
+        className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5"
+        data-testid="dealer-hub-choices"
+      >
         <OpportunityHubChoiceCard
           tone="blue"
           art={<BuyersArt className="w-full" />}
-          title="Compradores ativos"
-          description="Veja pessoas que procuram veículos e envie ofertas do seu estoque."
+          title="Compradores Procurando"
+          description="Veja pessoas que estão procurando veículos e envie ofertas do seu estoque."
           benefits={BUYERS_BENEFITS}
-          ctaLabel="Ver compradores ativos"
+          ctaLabel="Ver compradores procurando"
           ctaHref="/dashboard-loja/oportunidades/compradores"
           howItWorksHref="#como-funciona"
           testId="dealer-hub-card-buyers"
           ctaTestId="dealer-opportunities-buyers-link"
         />
-
         <OpportunityHubChoiceCard
           tone="teal"
           art={<VehiclesArt className="w-full" />}
@@ -186,6 +169,7 @@ export default async function OportunidadesHubPage() {
         />
       </div>
 
+      <OpportunityHubMetrics />
       <OpportunityHubHowItWorks flows={FLOWS} />
     </section>
   );
