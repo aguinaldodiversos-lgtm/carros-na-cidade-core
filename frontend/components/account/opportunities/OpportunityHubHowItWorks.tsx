@@ -37,12 +37,12 @@ export type HowItWorksFlow = {
 
 const TONE = {
   blue: {
-    row: "border-[#E4EDFB] bg-[#F8FBFF]",
+    row: "border-[#DCEAFD] bg-[linear-gradient(105deg,#F3F8FF,#FBFDFF)]",
     badge: "bg-[#EAF2FF] text-[#0e62d8]",
     step: "bg-[#EAF2FF] text-[#0e62d8]",
   },
   teal: {
-    row: "border-[#D8F0E9] bg-[#F6FCFA]",
+    row: "border-[#D4F0E5] bg-[linear-gradient(105deg,#F0FBF7,#FAFFFC)]",
     badge: "bg-[#E3F7F1] text-[#0E9384]",
     step: "bg-[#E3F7F1] text-[#0E9384]",
   },
@@ -67,22 +67,22 @@ function Flow({ flow }: { flow: HowItWorksFlow }) {
 
   return (
     <li
-      className={`rounded-2xl border p-4 sm:p-5 ${style.row}`}
+      className={`rounded-[17px] border px-4 py-4 sm:px-5 ${style.row}`}
       data-testid="dealer-hub-how-flow"
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
         {/* O rótulo do caminho: mesma cor e mesmo ícone do cartão lá de cima. */}
-        <div className="flex shrink-0 items-center gap-2.5 lg:w-[188px]">
+        <div className="flex shrink-0 items-center gap-2.5 lg:w-[190px]">
           <span
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${style.badge}`}
             aria-hidden="true"
           >
             {flow.icon}
           </span>
-          <p className="text-[13.5px] font-bold leading-tight text-[#161f34]">{flow.label}</p>
+          <p className="text-[13.5px] font-extrabold leading-tight text-[#101B3D]">{flow.label}</p>
         </div>
 
-        <ol className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
+        <ol className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
           {flow.steps.map((step, index) => (
             <li
               key={step.title}
@@ -101,7 +101,7 @@ function Flow({ flow }: { flow: HowItWorksFlow }) {
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[12.5px] font-bold leading-tight text-[#1D2440]">
+                  <p className="text-[12.5px] font-bold leading-tight text-[#172443]">
                     {step.title}
                   </p>
                   <p className="mt-0.5 text-[11.5px] leading-snug text-[#667085]">
@@ -126,17 +126,17 @@ export default function OpportunityHubHowItWorks({
   return (
     <section
       id="como-funciona"
-      className="scroll-mt-24 rounded-2xl border border-[#E8ECF4] bg-white p-4 sm:p-6"
+      className="scroll-mt-24 rounded-[21px] border border-[#E0E8F3] bg-white p-4 shadow-[0_8px_26px_-20px_rgba(20,45,90,0.16)] sm:p-6"
       data-testid="dealer-hub-how-it-works"
     >
-      <h2 className="text-[17px] font-bold leading-tight text-[#161f34] sm:text-[19px]">
+      <h2 className="text-[18px] font-extrabold leading-tight tracking-[-0.025em] text-[#101B3D] sm:text-[20px]">
         Como funciona
       </h2>
       <p className="mt-1 text-[13px] leading-relaxed text-[#667085]">
         Entenda os passos de cada oportunidade e gere mais negócios.
       </p>
 
-      <ul className="mt-4 space-y-3.5">
+      <ul className="mt-4 space-y-2.5">
         {flows.map((flow) => (
           <Flow key={flow.label} flow={flow} />
         ))}
