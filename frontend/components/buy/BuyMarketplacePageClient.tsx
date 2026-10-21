@@ -48,6 +48,8 @@ interface BuyMarketplacePageClientProps {
   initialFilters: AdsSearchFilters;
   city: BuyCityContext;
   variant?: ComprarVariant;
+  /** Mesmo catálogo da cidade, restringido aos carros abaixo da FIPE. */
+  belowFipeLanding?: boolean;
   stateUf?: string;
   /** Ativa GeoToCityRedirect apenas em páginas estaduais. */
   enableGeoRedirect?: boolean;
@@ -78,6 +80,7 @@ export default function BuyMarketplacePageClient({
   initialFilters,
   city,
   variant = "estadual",
+  belowFipeLanding = false,
   stateUf,
   enableGeoRedirect = false,
   fallbackTerritory,
@@ -156,12 +159,22 @@ export default function BuyMarketplacePageClient({
   const buildUrl = useCallback(
     (queryString: string): string => {
       const parts: string[] = [];
-      if (queryString) parts.push(queryString);
-      if (radiusKm && radiusKm !== DEFAULT_RADIUS_KM) parts.push(`raio=${radiusKm}`);
+      if (belowFipeLanding) {
+        const params = new URLSearchParams(queryString);
+        params.delete("city_slug");
+        params.delete("below_fipe");
+        params.delete("raio");
+        if (params.toString()) parts.push(params.toString());
+      } else if (queryString) {
+        parts.push(queryString);
+      }
+      if (!belowFipeLanding && radiusKm && radiusKm !== DEFAULT_RADIUS_KM) {
+        parts.push(`raio=${radiusKm}`);
+      }
       const qs = parts.join("&");
       return qs ? `${pathname}?${qs}` : pathname;
     },
-    [pathname, radiusKm]
+    [belowFipeLanding, pathname, radiusKm]
   );
 
   const pushFilters = useCallback(
@@ -170,16 +183,25 @@ export default function BuyMarketplacePageClient({
         ...patch,
         ...(resetPage ? { page: 1 } : {}),
       });
-
+      if (belowFipeLanding) {
+        merged.below_fipe = true;
+        merged.raio = 0;
+        merged.city_slug = city.slug;
+      }
       router.push(buildUrl(buildSearchQueryString(merged)));
       setMobileFiltersOpen(false);
     },
-    [initialFilters, buildUrl, router]
+    [belowFipeLanding, city.slug, initialFilters, buildUrl, router]
   );
 
   const pushPage = useCallback(
     (patch: Partial<AdsSearchFilters>) => {
       const merged = mergeSearchFilters(initialFilters, patch);
+      if (belowFipeLanding) {
+        merged.below_fipe = true;
+        merged.raio = 0;
+        merged.city_slug = city.slug;
+      }
       router.push(buildUrl(buildSearchQueryString(merged)));
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -204,13 +226,19 @@ export default function BuyMarketplacePageClient({
   const buildPageHref = useCallback(
     (target: number): string => {
       const params = new URLSearchParams(buildNonTerritoryQueryString(initialFilters));
+      if (belowFipeLanding) {
+        params.delete("below_fipe");
+        params.delete("raio");
+      }
       if (target >= 2) params.set("page", String(target));
-      if (radiusKm && radiusKm !== DEFAULT_RADIUS_KM) params.set("raio", String(radiusKm));
+      if (!belowFipeLanding && radiusKm && radiusKm !== DEFAULT_RADIUS_KM) {
+        params.set("raio", String(radiusKm));
+      }
 
       const { normalizedQuery } = decideSeoQueryPolicy(params);
       return normalizedQuery ? `${pathname}?${normalizedQuery}` : pathname;
     },
-    [initialFilters, pathname, radiusKm]
+    [belowFipeLanding, initialFilters, pathname, radiusKm]
   );
 
   // `changeRadius` foi removido na Fase 5.0B junto com o seletor de distância:
@@ -241,7 +269,7 @@ export default function BuyMarketplacePageClient({
       initialFilters.fuel_type ||
       initialFilters.transmission ||
       initialFilters.body_type ||
-      initialFilters.below_fipe === true ||
+      (!belowFipeLanding && initialFilters.below_fipe === true) ||
       initialFilters.highlight_only === true ||
       // Chips da sidebar que ficavam de fora: sem eles, filtrar
       // "Particulares" numa cidade com estoque só de loja caía no empty
@@ -276,6 +304,7 @@ export default function BuyMarketplacePageClient({
     cityName: variant === "cidade" || variant === "regional" ? city.name : undefined,
     stateUf: variant === "nacional" ? undefined : stateUf || city.state,
     hasFilters,
+    belowFipeLanding,
   };
 
   const softFallbackMessage = fallbackTerritory
@@ -285,6 +314,7 @@ export default function BuyMarketplacePageClient({
   const sidebarProps = {
     filters: initialFilters,
     city,
+    belowFipeLocked: belowFipeLanding,
     brandOptions,
     modelOptions,
     popularBrands,
@@ -292,7 +322,7 @@ export default function BuyMarketplacePageClient({
     onPatch: (patch: Partial<AdsSearchFilters>) => pushFilters(patch),
     onClear: clearFilters,
     regionalEnabled,
-    controlTotals,
+    controlTotals: belowFipeLanding ? undefined : controlTotals,
     // Seletor "Distância (km)" — a sidebar só o mostra quando recebe
     // `onRadiusChange` (ver `showDistance` em FilterSidebar).
     //
@@ -365,6 +395,7 @@ export default function BuyMarketplacePageClient({
         totalResults={totalAds}
         onPatch={(patch) => pushFilters(patch)}
         variant={variant}
+        belowFipeLanding={belowFipeLanding}
         stateUf={stateUf}
         regionalEnabled={regionalEnabled}
         softFallbackMessage={softFallbackMessage}
@@ -464,7 +495,11 @@ export default function BuyMarketplacePageClient({
                 filters={initialFilters}
                 onRemove={(patch) => pushFilters(patch)}
                 onClearAll={clearFilters}
-                lockedKeys={["city", "city_slug", "city_id", "state"]}
+                lockedKeys={
+                  belowFipeLanding
+                    ? ["city", "city_slug", "city_id", "state", "below_fipe"]
+                    : ["city", "city_slug", "city_id", "state"]
+                }
                 className="pb-1 pt-1"
               />
 
