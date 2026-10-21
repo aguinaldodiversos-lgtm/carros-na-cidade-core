@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { LocalSeoLandingModel } from "@/lib/seo/local-seo-data";
+import { CityInventoryStats } from "@/components/seo/CityInventoryStats";
 
 /**
  * Conteúdo territorial SSR depois do catálogo, sem hero/card duplicado.
@@ -22,6 +23,7 @@ export function BelowFipeCatalogSeo({ model }: { model: LocalSeoLandingModel }) 
           <p key={index}>{paragraph}</p>
         ))}
       </div>
+      <CityInventoryStats model={model} className="mt-4 max-w-4xl" />
       <nav
         aria-label="Outras opções de veículos na cidade"
         className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm"
