@@ -1,24 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 330" role="img" aria-label="Representação ilustrativa de um SUV Fiat Pulse">
-<defs>
-<linearGradient id="body" x1="0" x2=".35" y1="0" y2="1"><stop stop-color="#fff"/><stop offset=".38" stop-color="#f0f4f9"/><stop offset=".8" stop-color="#b1c6dd"/><stop offset="1" stop-color="#e1eaf5"/></linearGradient>
-<linearGradient id="glass" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#bad6ee"/><stop offset=".36" stop-color="#537fa8"/><stop offset="1" stop-color="#223957"/></linearGradient>
-<radialGradient id="rim"><stop stop-color="#fff"/><stop offset=".72" stop-color="#bdcfe1"/><stop offset="1" stop-color="#637a94"/></radialGradient>
-<filter id="shadow"><feGaussianBlur stdDeviation="13"/></filter>
-</defs>
-<ellipse cx="405" cy="273" rx="306" ry="17" fill="#7192bc" opacity=".22" filter="url(#shadow)"/>
-<path d="M87 222Q80 187 105 171L180 155 224 141 279 85Q299 65 337 64H513Q543 64 558 83L612 148 698 158Q738 165 746 197L748 227 730 255H99Q81 249 87 222Z" fill="url(#body)" stroke="#819fbe" stroke-width="3"/>
-<path d="M239 144 289 91Q299 81 333 81H420V144Z" fill="url(#glass)" stroke="#7297bb" stroke-width="3"/>
-<path d="M434 81H508Q527 81 540 99L577 144H434Z" fill="url(#glass)" stroke="#7297bb" stroke-width="3"/>
-<path d="M432 80V144M430 148V239M600 157 616 239" stroke="#94a9c1" stroke-width="3" fill="none"/>
-<path d="M178 156 217 89Q235 74 275 72" fill="none" stroke="#d7e4f2" stroke-width="7"/>
-<path d="M99 189Q390 165 734 189" fill="none" stroke="#fff" stroke-width="7" opacity=".72"/>
-<path d="M105 226Q407 242 731 229" fill="none" stroke="#819bb6" stroke-width="4" opacity=".56"/>
-<path d="M237 167H261M494 167H516" stroke="#667c98" stroke-width="6" stroke-linecap="round"/>
-<path d="M90 196 130 185 143 191 134 208 90 212Z" fill="#f2faff" stroke="#809fba" stroke-width="2"/>
-<path d="M724 184 744 198 744 213 728 212Z" fill="#d34c5b"/>
-<path d="M110 250H729" stroke="#324960" stroke-width="12" opacity=".65"/>
-<path d="M142 257a61 61 0 0 1 122 0M547 257a61 61 0 0 1 122 0" fill="none" stroke="#637b94" stroke-width="6"/>
-<g transform="translate(203 256)"><circle r="53" fill="#263241"/><circle r="37" fill="url(#rim)" stroke="#dce5ef" stroke-width="2"/><circle r="27" fill="#587493"/><path d="M0 -27V27M-27 0H27M-19 -19 19 19M-19 19 19 -19" stroke="#edf6ff" stroke-width="7"/><circle r="9" fill="#cad9e9"/></g>
-<g transform="translate(608 256)"><circle r="53" fill="#263241"/><circle r="37" fill="url(#rim)" stroke="#dce5ef" stroke-width="2"/><circle r="27" fill="#587493"/><path d="M0 -27V27M-27 0H27M-19 -19 19 19M-19 19 19 -19" stroke="#edf6ff" stroke-width="7"/><circle r="9" fill="#cad9e9"/></g>
-<path d="M290 103 345 88H414" stroke="#effaff" stroke-width="5" stroke-linecap="round" opacity=".65"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 330" role="img" aria-label="Representação ilustrativa de SUV compacto Fiat Pulse">
+  <defs>
+    <linearGradient id="pulseBody" x1="0" x2=".38" y1="0" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset=".4" stop-color="#eaf2fb"/>
+      <stop offset=".8" stop-color="#b2c8df"/>
+      <stop offset="1" stop-color="#dce8f6"/>
+    </linearGradient>
+    <linearGradient id="pulseGlass" x1="0" y1="0" x2=".7" y2="1">
+      <stop stop-color="#bed9ef"/>
+      <stop offset=".32" stop-color="#597fa3"/>
+      <stop offset="1" stop-color="#17314d"/>
+    </linearGradient>
+    <radialGradient id="pulseRim">
+      <stop stop-color="#fff"/>
+      <stop offset=".72" stop-color="#bccedf"/>
+      <stop offset="1" stop-color="#657c95"/>
+    </radialGradient>
+    <filter id="pulseShadow"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <ellipse cx="400" cy="279" rx="291" ry="14" fill="#6c8fb8" opacity=".26" filter="url(#pulseShadow)"/>
+  <!-- Taller greenhouse, upright tail, short overhang and lifted stance distinguish this SUV from the Virtus sedan. -->
+  <path d="M93 221Q88 188 112 177L201 152 260 142 300 69Q316 44 345 44H514Q550 44 572 65L626 138 686 157Q705 165 707 185L712 233Q710 250 687 251H111Q92 247 93 221Z" fill="url(#pulseBody)" stroke="#7d9cbd" stroke-width="3.5"/>
+  <!-- Roof rails and high-roof glass. -->
+  <path d="M319 45V36Q320 32 326 32H529Q535 32 536 37V45" fill="none" stroke="#7b92ad" stroke-width="5" stroke-linecap="round"/>
+  <path d="M270 139 311 73Q319 59 344 59H425V139Z" fill="url(#pulseGlass)" stroke="#809db9" stroke-width="3"/>
+  <path d="M440 59H510Q540 59 551 79L590 139H440Z" fill="url(#pulseGlass)" stroke="#809db9" stroke-width="3"/>
+  <path d="M435 60V142M432 145V235M610 144 610 235" fill="none" stroke="#92abc6" stroke-width="3"/>
+  <path d="M278 132 319 74Q324 67 347 67H419" stroke="#f8fcff" stroke-width="5" stroke-linecap="round" opacity=".72" fill="none"/>
+  <!-- Shoulder line and front/rear signatures. -->
+  <path d="M108 188Q380 166 690 184" stroke="#fff" stroke-width="7" fill="none" opacity=".75"/>
+  <path d="M112 218H700" stroke="#7491b0" stroke-width="4" opacity=".65"/>
+  <path d="M252 159H277M494 158H516" stroke="#607a97" stroke-width="5" stroke-linecap="round"/>
+  <path d="M98 196 142 181 156 187 146 204 99 211Z" fill="#f2faff" stroke="#7c9fbd" stroke-width="2"/>
+  <path d="M684 173 704 183 706 211 685 207Z" fill="#d44a5a"/>
+  <!-- Wide plastic cladding and raised rocker panel: SUV cue. -->
+  <path d="M105 229Q398 238 704 224L694 249H111Z" fill="#354b64" opacity=".76"/>
+  <path d="M120 244H684" stroke="#677e99" stroke-width="5" opacity=".8"/>
+  <path d="M162 255a58 58 0 0 1 116 0M521 255a58 58 0 0 1 116 0" fill="none" stroke="#506983" stroke-width="6"/>
+  <g transform="translate(220 255)">
+    <circle r="56" fill="#25313e"/>
+    <circle r="40" fill="url(#pulseRim)" stroke="#dfe8f0" stroke-width="2"/>
+    <circle r="27" fill="#536f8d"/>
+    <path d="M0 -27V27M-27 0H27M-19 -19 19 19M-19 19 19 -19" stroke="#eff7ff" stroke-width="7"/>
+    <circle r="9" fill="#d1e0ee"/>
+  </g>
+  <g transform="translate(579 255)">
+    <circle r="56" fill="#25313e"/>
+    <circle r="40" fill="url(#pulseRim)" stroke="#dfe8f0" stroke-width="2"/>
+    <circle r="27" fill="#536f8d"/>
+    <path d="M0 -27V27M-27 0H27M-19 -19 19 19M-19 19 19 -19" stroke="#eff7ff" stroke-width="7"/>
+    <circle r="9" fill="#d1e0ee"/>
+  </g>
 </svg>
