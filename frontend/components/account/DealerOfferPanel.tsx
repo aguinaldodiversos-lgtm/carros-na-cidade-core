@@ -101,10 +101,17 @@ export default function DealerOfferPanel({
     event.preventDefault();
     if (submitting) return;
 
-    const amount =
-      legacyMode ? offerDigitsToDecimal(legacyDigits) : formattedCents(previewCents) && previewCents !== null ? centsToDecimal(previewCents) : null;
+    const amount = legacyMode
+      ? offerDigitsToDecimal(legacyDigits)
+      : formattedCents(previewCents) && previewCents !== null
+        ? centsToDecimal(previewCents)
+        : null;
     if (!amount) {
-      setError(legacyMode ? "Informe o valor da proposta." : "Selecione um incremento para fazer seu lance.");
+      setError(
+        legacyMode
+          ? "Informe o valor da proposta."
+          : "Selecione um incremento para fazer seu lance."
+      );
       return;
     }
 
@@ -114,11 +121,15 @@ export default function DealerOfferPanel({
       return;
     }
     if (leaderCents === null && floorCents !== null && proposedCents < floorCents) {
-      setError(`A proposta precisa alcançar o valor mínimo do proprietário (${formatMoneyValue(minimumAcceptedPrice)}).`);
+      setError(
+        `A proposta precisa alcançar o valor mínimo do proprietário (${formatMoneyValue(minimumAcceptedPrice)}).`
+      );
       return;
     }
     if (leaderCents !== null && proposedCents <= leaderCents) {
-      setError(`A proposta precisa superar a maior proposta atual (${formatMoneyValue(state.current_highest_offer)}).`);
+      setError(
+        `A proposta precisa superar a maior proposta atual (${formatMoneyValue(state.current_highest_offer)}).`
+      );
       return;
     }
 
@@ -163,8 +174,17 @@ export default function DealerOfferPanel({
     >
       <header className="flex items-center justify-between gap-2 border-b border-[#EDF1F7] px-4 py-3.5 sm:px-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF4FF] text-[#0e62d8]" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF4FF] text-[#0e62d8]"
+            aria-hidden="true"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <path d="M3 21h8M6.5 14.5l6-6M4 11l5-5 3.5 3.5-5 5zM14 4l6 6M15.5 9.5l4.5 4.5-2 2-4.5-4.5z" />
             </svg>
           </span>
@@ -184,11 +204,17 @@ export default function DealerOfferPanel({
             {leaderCents === null ? "Lance inicial · mínimo do vendedor" : "Lance atual"}
           </p>
           {currentMoney ? (
-            <p className="mt-1 text-[clamp(27px,4vw,39px)] font-extrabold leading-tight tracking-[-0.035em] tabular-nums text-[#0E62D8]" data-testid="dealer-offer-current">
+            <p
+              className="mt-1 text-[clamp(27px,4vw,39px)] font-extrabold leading-tight tracking-[-0.035em] tabular-nums text-[#0E62D8]"
+              data-testid="dealer-offer-current"
+            >
               {currentMoney}
             </p>
           ) : (
-            <p className="mt-2 text-[15px] font-semibold text-[#667085]" data-testid="dealer-offer-current">
+            <p
+              className="mt-2 text-[15px] font-semibold text-[#667085]"
+              data-testid="dealer-offer-current"
+            >
               {NOT_INFORMED}
             </p>
           )}
@@ -218,8 +244,13 @@ export default function DealerOfferPanel({
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="min-w-0 rounded-xl border border-[#EBF0F8] bg-[#FAFCFF] px-3 py-2.5">
             <p className="text-[10px] text-[#64748B]">Propostas</p>
-            <p className="mt-0.5 text-[12px] font-bold text-[#1D2440]" data-testid="dealer-offer-count">
-              {count === 0 ? "Nenhuma proposta recebida ainda." : `${count} ${count === 1 ? "proposta recebida" : "propostas recebidas"}`}
+            <p
+              className="mt-0.5 text-[12px] font-bold text-[#1D2440]"
+              data-testid="dealer-offer-count"
+            >
+              {count === 0
+                ? "Nenhuma proposta recebida ainda."
+                : `${count} ${count === 1 ? "proposta recebida" : "propostas recebidas"}`}
             </p>
           </div>
           <div className="min-w-0 rounded-xl border border-[#EBF0F8] bg-[#FAFCFF] px-3 py-2.5">
@@ -228,7 +259,10 @@ export default function DealerOfferPanel({
               {fipeMoney || NOT_INFORMED}
             </p>
           </div>
-          <div className="col-span-2 min-w-0 rounded-xl border border-[#EBF0F8] bg-[#FAFCFF] px-3 py-2.5 sm:col-span-1" data-testid="dealer-offer-fipe-distance">
+          <div
+            className="col-span-2 min-w-0 rounded-xl border border-[#EBF0F8] bg-[#FAFCFF] px-3 py-2.5 sm:col-span-1"
+            data-testid="dealer-offer-fipe-distance"
+          >
             <p className="text-[10px] text-[#64748B]">Lance atual x FIPE</p>
             {distance ? (
               <p className="mt-0.5 text-[12px] font-bold text-[#1D2440]">
@@ -247,7 +281,11 @@ export default function DealerOfferPanel({
           </p>
           {!legacyMode ? (
             <>
-              <div className="mt-3 grid grid-cols-4 gap-1.5 sm:gap-2" role="group" aria-label="Incremento do lance">
+              <div
+                className="mt-3 grid grid-cols-4 gap-1.5 sm:gap-2"
+                role="group"
+                aria-label="Incremento do lance"
+              >
                 {BID_INCREMENTS.map((value) => (
                   <button
                     type="button"
@@ -268,7 +306,10 @@ export default function DealerOfferPanel({
               </div>
               <div className="mt-3 rounded-xl bg-[#EBF4FF] px-3.5 py-3" aria-live="polite">
                 <p className="text-[11px] font-semibold text-[#536580]">Próximo lance</p>
-                <p className="mt-0.5 text-[23px] font-extrabold leading-tight tabular-nums text-[#0E62D8] sm:text-[26px]" data-testid="dealer-offer-preview">
+                <p
+                  className="mt-0.5 text-[23px] font-extrabold leading-tight tabular-nums text-[#0E62D8] sm:text-[26px]"
+                  data-testid="dealer-offer-preview"
+                >
                   {previewMoney || "Selecione um incremento"}
                 </p>
               </div>
@@ -276,13 +317,22 @@ export default function DealerOfferPanel({
           ) : (
             <div className="mt-3" data-testid="dealer-offer-legacy-entry">
               <p className="mb-1.5 text-[12px] text-[#667085]">
-                Esta solicitação antiga não possui mínimo nem lance vigente. Informe seu primeiro valor.
+                Esta solicitação antiga não possui mínimo nem lance vigente. Informe seu primeiro
+                valor.
               </p>
-              <label htmlFor="dealer-offer-amount" className="block text-[12px] font-semibold text-[#1D2440]">
+              <label
+                htmlFor="dealer-offer-amount"
+                className="block text-[12px] font-semibold text-[#1D2440]"
+              >
                 Sua oferta em reais
               </label>
               <div className="mt-1 flex items-center overflow-hidden rounded-xl border border-[#D9E5F7] focus-within:ring-2 focus-within:ring-[#0e62d8]/20">
-                <span aria-hidden="true" className="border-r border-[#D9E5F7] bg-[#F7F9FC] px-3 py-3 font-bold text-[#667085]">R$</span>
+                <span
+                  aria-hidden="true"
+                  className="border-r border-[#D9E5F7] bg-[#F7F9FC] px-3 py-3 font-bold text-[#667085]"
+                >
+                  R$
+                </span>
                 <input
                   id="dealer-offer-amount"
                   inputMode="numeric"
@@ -313,7 +363,10 @@ export default function DealerOfferPanel({
           </button>
           {showNotes ? (
             <div className="mt-2" id="dealer-offer-note-wrapper">
-              <label htmlFor="dealer-offer-note" className="text-[12px] font-semibold text-[#667085]">
+              <label
+                htmlFor="dealer-offer-note"
+                className="text-[12px] font-semibold text-[#667085]"
+              >
                 Observações para avaliação (opcional)
               </label>
               <textarea
@@ -330,12 +383,20 @@ export default function DealerOfferPanel({
           ) : null}
 
           {error ? (
-            <p className="mt-3 rounded-lg border border-[#FECDCA] bg-[#FEF3F2] px-3 py-2 text-[12px] text-[#B42318]" role="alert" data-testid="dealer-offer-error">
+            <p
+              className="mt-3 rounded-lg border border-[#FECDCA] bg-[#FEF3F2] px-3 py-2 text-[12px] text-[#B42318]"
+              role="alert"
+              data-testid="dealer-offer-error"
+            >
               {error}
             </p>
           ) : null}
           {success ? (
-            <p className="mt-3 rounded-lg border border-[#ABEFC6] bg-[#ECFDF3] px-3 py-2 text-[12px] font-medium text-[#067647]" role="status" data-testid="dealer-offer-success">
+            <p
+              className="mt-3 rounded-lg border border-[#ABEFC6] bg-[#ECFDF3] px-3 py-2 text-[12px] font-medium text-[#067647]"
+              role="status"
+              data-testid="dealer-offer-success"
+            >
               {success}
             </p>
           ) : null}
@@ -352,7 +413,10 @@ export default function DealerOfferPanel({
                 ? `Fazer lance de ${previewMoney}`
                 : "Fazer lance"}
           </button>
-          <p className="mt-3 text-[11.5px] leading-relaxed text-[#667085]" data-testid="dealer-offer-commitment">
+          <p
+            className="mt-3 text-[11.5px] leading-relaxed text-[#667085]"
+            data-testid="dealer-offer-commitment"
+          >
             {DEALER_OFFER_COMMITMENT_NOTICE}
           </p>
           <button
@@ -368,11 +432,15 @@ export default function DealerOfferPanel({
           </button>
           {showTerms ? (
             <div id="dealer-offer-terms" className="mt-2 space-y-1.5">
-              <p className="text-[11.5px] leading-relaxed text-[#98A2B3]" data-testid="dealer-offer-inspection-notice">
+              <p
+                className="text-[11.5px] leading-relaxed text-[#98A2B3]"
+                data-testid="dealer-offer-inspection-notice"
+              >
                 {DEALER_OFFER_INSPECTION_NOTICE}
               </p>
               <p className="text-[11px] leading-relaxed text-[#98A2B3]">
-                A oferta precisa superar a maior proposta atual. Se outro lojista ofertar antes, a proposta pode ser recusada e o valor atualizado.
+                A oferta precisa superar a maior proposta atual. Se outro lojista ofertar antes, a
+                proposta pode ser recusada e o valor atualizado.
               </p>
             </div>
           ) : null}
