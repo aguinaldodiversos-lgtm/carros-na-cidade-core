@@ -362,9 +362,11 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
       for (const index of [0, 1]) {
         const media = cards.nth(index).getByTestId("active-buyer-model-image");
         await media.scrollIntoViewIfNeeded();
-        await expect.poll(async () =>
-          media.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)
-        ).toBe(true);
+        await expect
+          .poll(async () =>
+            media.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)
+          )
+          .toBe(true);
       }
 
       // Capturas legíveis e auditáveis: grade, modelos e fallback.
