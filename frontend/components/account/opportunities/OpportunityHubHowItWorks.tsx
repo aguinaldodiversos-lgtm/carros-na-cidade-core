@@ -55,7 +55,13 @@ function Arrow() {
       aria-hidden="true"
       data-testid="dealer-hub-step-arrow"
     >
-      <svg viewBox="0 0 32 12" className="h-3 w-8" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <svg
+        viewBox="0 0 32 12"
+        className="h-3 w-8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      >
         <path d="M0 6h28M24 2l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
@@ -84,10 +90,7 @@ function Flow({ flow }: { flow: HowItWorksFlow }) {
 
         <ol className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
           {flow.steps.map((step, index) => (
-            <li
-              key={step.title}
-              className="flex min-w-0 flex-1 items-start gap-2.5 lg:contents"
-            >
+            <li key={step.title} className="flex min-w-0 flex-1 items-start gap-2.5 lg:contents">
               {/*
                 `lg:contents` dissolve o `<li>` no desktop para que a seta possa
                 ficar ENTRE os passos como irmã deles — dentro do `<li>` ela
@@ -118,11 +121,7 @@ function Flow({ flow }: { flow: HowItWorksFlow }) {
   );
 }
 
-export default function OpportunityHubHowItWorks({
-  flows,
-}: {
-  flows: readonly HowItWorksFlow[];
-}) {
+export default function OpportunityHubHowItWorks({ flows }: { flows: readonly HowItWorksFlow[] }) {
   return (
     <section
       id="como-funciona"
