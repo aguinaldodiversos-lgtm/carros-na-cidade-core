@@ -64,6 +64,8 @@ type CatalogPageHeaderProps = {
   totalResults: number;
   onPatch: (patch: Partial<AdsSearchFilters>) => void;
   variant?: ComprarVariant;
+  /** Mesmo catálogo da cidade, mas com a intenção canônica abaixo da FIPE. */
+  belowFipeLanding?: boolean;
   stateUf?: string;
   /**
    * Quando o SSR não encontrou estoque na cidade pedida e está
@@ -84,6 +86,7 @@ export function CatalogPageHeader({
   totalResults: _totalResults,
   onPatch: _onPatch,
   variant = "estadual",
+  belowFipeLanding = false,
   stateUf,
   softFallbackMessage,
   regionalEnabled = false,
@@ -100,6 +103,14 @@ export function CatalogPageHeader({
   const stateName = activeStateUf ? stateNameFromUf(activeStateUf) : "";
 
   const breadcrumbItems = useMemo(() => {
+    if (belowFipeLanding) {
+      return [
+        { label: "Home", href: "/" },
+        { label: "Comprar", href: "/comprar" },
+        { label: city.name, href: `/carros-em/${city.slug}` },
+        { label: "Abaixo da FIPE" },
+      ];
+    }
     if (variant === "cidade") {
       return [
         { label: "Home", href: "/" },
@@ -125,7 +136,7 @@ export function CatalogPageHeader({
       { label: "Comprar", href: "/comprar" },
       { label: stateName || activeStateUf || "Estado" },
     ];
-  }, [variant, city.name, city.state, city.slug, stateName, activeStateUf]);
+  }, [belowFipeLanding, variant, city.name, city.state, city.slug, stateName, activeStateUf]);
 
   const submitSearch = useCallback(
     (value: string) => {
@@ -133,13 +144,31 @@ export function CatalogPageHeader({
         q: value.trim() || undefined,
         page: 1,
       });
-      const qs = buildSearchQueryString(merged);
+      const params = new URLSearchParams(buildSearchQueryString(merged));
+      if (belowFipeLanding) {
+        // O filtro obrigatório e a cidade pertencem à ROTA, não à query.
+        params.delete("below_fipe");
+        params.delete("city_slug");
+        params.delete("raio");
+      }
+      const qs = params.toString();
       router.push(qs ? `${pathname}?${qs}` : pathname);
     },
-    [filters, pathname, router]
+    [belowFipeLanding, filters, pathname, router]
   );
 
   const heading = useMemo(() => {
+    if (belowFipeLanding) {
+      return (
+        <>
+          Carros baratos em{" "}
+          <span className="text-primary">
+            {city.name}
+            {city.state ? ` - ${city.state}` : ""}
+          </span>
+        </>
+      );
+    }
     if (variant === "cidade") {
       // UF no H1 (alinha com o title "Carros ... em {Cidade} - {UF}"): sinal
       // territorial consistente e único por cidade+UF.
@@ -172,17 +201,20 @@ export function CatalogPageHeader({
         Carros usados em <span className="text-primary">{stateName || activeStateUf}</span>
       </>
     );
-  }, [variant, city.name, stateName, activeStateUf]);
+  }, [belowFipeLanding, variant, city.name, city.state, stateName, activeStateUf]);
 
   const subtitle = useMemo(() => {
+    if (belowFipeLanding) return `Veículos abaixo da FIPE em ${city.name}`;
     if (variant === "cidade") return `Ofertas em ${city.name} e região`;
     if (variant === "regional") return `Ofertas em ${city.name} e cidades próximas`;
     if (variant === "nacional") return "Refine por estado ou cidade";
     return `Ofertas em cidades e regiões de ${activeStateUf || stateName}`;
-  }, [variant, city.name, activeStateUf, stateName]);
+  }, [belowFipeLanding, variant, city.name, activeStateUf, stateName]);
 
   const placeholder =
-    variant === "cidade"
+    belowFipeLanding
+      ? "Buscar marca, modelo ou versão entre os carros abaixo da FIPE"
+      : variant === "cidade"
       ? "Buscar marca, modelo ou versão nesta cidade"
       : variant === "regional"
         ? "Buscar marca, modelo ou versão nesta região"
