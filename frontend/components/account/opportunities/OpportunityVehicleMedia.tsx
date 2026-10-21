@@ -12,12 +12,12 @@ const MODEL_ILLUSTRATIONS = [
   {
     brand: "volkswagen",
     model: "virtus",
-    src: "/images/oportunidades/modelos/volkswagen-virtus.svg",
+    src: "/images/oportunidades/modelos/volkswagen-virtus.webp",
   },
   {
     brand: "fiat",
     model: "pulse",
-    src: "/images/oportunidades/modelos/fiat-pulse.svg",
+    src: "/images/oportunidades/modelos/fiat-pulse.webp",
   },
 ] as const;
 

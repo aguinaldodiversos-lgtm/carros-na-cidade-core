@@ -293,11 +293,11 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
     await expect(images).toHaveCount(2);
     await expect(images.nth(0)).toHaveAttribute(
       "src",
-      "/images/oportunidades/modelos/volkswagen-virtus.svg"
+      "/images/oportunidades/modelos/volkswagen-virtus.webp"
     );
     await expect(images.nth(1)).toHaveAttribute(
       "src",
-      "/images/oportunidades/modelos/fiat-pulse.svg"
+      "/images/oportunidades/modelos/fiat-pulse.webp"
     );
     await expect
       .poll(async () =>

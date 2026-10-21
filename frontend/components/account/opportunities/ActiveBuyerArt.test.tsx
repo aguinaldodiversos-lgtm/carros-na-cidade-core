@@ -73,9 +73,9 @@ describe("mídia ilustrativa controlada, nunca fotografia de anúncio", () => {
       {
         brand: "Volkswagen",
         model: "Virtus",
-        path: "/images/oportunidades/modelos/volkswagen-virtus.svg",
+        path: "/images/oportunidades/modelos/volkswagen-virtus.webp",
       },
-      { brand: "Fiat", model: "Pulse", path: "/images/oportunidades/modelos/fiat-pulse.svg" },
+      { brand: "Fiat", model: "Pulse", path: "/images/oportunidades/modelos/fiat-pulse.webp" },
     ];
     for (const { brand, model, path } of cases) {
       cleanup();
@@ -104,7 +104,7 @@ describe("mídia ilustrativa controlada, nunca fotografia de anúncio", () => {
       model: "Virtus Comfortline 1.0",
     };
     expect(resolveOpportunityModelIllustration(example)).toBe(
-      "/images/oportunidades/modelos/volkswagen-virtus.svg"
+      "/images/oportunidades/modelos/volkswagen-virtus.webp"
     );
     expect(resolveOpportunityModelIllustration({ ...example, model: "Virtuoso" })).toBeNull();
     expect(resolveOpportunityModelIllustration({ ...example, brand: "Fiat" })).toBeNull();
