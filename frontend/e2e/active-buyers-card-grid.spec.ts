@@ -270,7 +270,37 @@ test.describe("@active-buyers a figura é ilustração, e não colide consigo me
     expect(report.duplicated).toEqual([]);
   });
 
-  test("nenhuma fotografia: zero <img> e zero requisição de imagem", async ({ page }) => {
+  test("Virtus e Pulse carregam assets próprios, sem consultar fotos de anúncios", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const fixture = buildFixture(2);
+    fixture.purchase_intents[0].brand = "Volkswagen";
+    fixture.purchase_intents[0].model = "Virtus";
+    fixture.purchase_intents[1].intent_type = "specific_model";
+    fixture.purchase_intents[1].brand = "Fiat";
+    fixture.purchase_intents[1].model = "Pulse";
+    fixture.purchase_intents[1].body_type = null;
+    await prepare(page, fixture);
+
+    const requested: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "image") requested.push(request.url());
+    });
+
+    await page.goto(PAGE_PATH);
+    const images = page.getByTestId("active-buyer-model-image");
+    await expect(images).toHaveCount(2);
+    await expect(images.nth(0)).toHaveAttribute("src", "/images/oportunidades/modelos/volkswagen-virtus.svg");
+    await expect(images.nth(1)).toHaveAttribute("src", "/images/oportunidades/modelos/fiat-pulse.svg");
+    await expect.poll(async () => images.evaluateAll((nodes) =>
+      nodes.every((node) => (node as HTMLImageElement).complete && (node as HTMLImageElement).naturalWidth > 0)
+    )).toBe(true);
+
+    const modelRequests = requested.filter((url) => /\\/images\\/oportunidades\\/modelos\\//.test(url));
+    expect(modelRequests.length).toBe(2);
+    expect(requested.filter((url) => /\\/api\\/vehicle-images|r2\\.dev|\\/uploads\\/ads\\//i.test(url))).toEqual([]);
+  });
+
+  test("procura sem referência cadastrada permanece em SVG, sem foto de anúncio", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await prepare(page);
 
