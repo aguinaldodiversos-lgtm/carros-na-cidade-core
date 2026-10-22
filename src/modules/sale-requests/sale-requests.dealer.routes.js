@@ -26,6 +26,10 @@ import express from "express";
 
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { requireDealerAccount } from "../../shared/middlewares/dealer.middleware.js";
+import {
+  OPPORTUNITY_FEATURE,
+  requireDealerOpportunity,
+} from "../../shared/middlewares/opportunities-entitlement.middleware.js";
 import * as controller from "./sale-requests.dealer.controller.js";
 
 const router = express.Router();
@@ -39,6 +43,7 @@ function asyncHandler(fn) {
 // mundo, inclusive lojista legítimo.
 router.use(authMiddleware);
 router.use(requireDealerAccount());
+router.use(requireDealerOpportunity(OPPORTUNITY_FEATURE.VEHICLE_EVALUATION));
 
 router.get("/", asyncHandler(controller.listSaleOpportunities));
 router.get("/:id", asyncHandler(controller.getSaleOpportunity));
