@@ -2,6 +2,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   clientRateLimitKey,
   sensitiveAuthRateLimitKey,
+  sensitiveAuthIdentityKey,
 } from "../../src/shared/middlewares/rateLimit.middleware.js";
 
 function mockReq(overrides = {}) {
@@ -124,5 +125,21 @@ describe("sensitiveAuthRateLimitKey — não aceita headers falsificados", () =>
     req.headers["x-internal-token"] = "unit-test-secret";
     req.headers["x-cnc-client-ip"] = "not-an-ip";
     expect(sensitiveAuthRateLimitKey(req)).toBe("192.0.2.10");
+  });
+});
+
+describe("limite por identidade mesmo com IP variável", () => {
+  it("gera a mesma chave para o mesmo e-mail com capitalização diferente", () => {
+    const a = mockReq({ headers: { "x-forwarded-for": "198.51.100.1" }, body: { email: " QA@EXAMPLE.COM " } });
+    const b = mockReq({ headers: { "x-forwarded-for": "198.51.100.2" }, body: { email: "qa@example.com" } });
+    expect(sensitiveAuthIdentityKey(a)).toBe(sensitiveAuthIdentityKey(b));
+    expect(sensitiveAuthIdentityKey(a)).not.toContain("@");
+    expect(sensitiveAuthIdentityKey(a)).toHaveLength(64);
+  });
+
+  it("não agrupa e-mails distintos na mesma identidade", () => {
+    const a = mockReq({ body: { email: "first@example.com" } });
+    const b = mockReq({ body: { email: "second@example.com" } });
+    expect(sensitiveAuthIdentityKey(a)).not.toBe(sensitiveAuthIdentityKey(b));
   });
 });
