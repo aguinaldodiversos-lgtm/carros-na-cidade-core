@@ -75,12 +75,8 @@ export async function sendResetPasswordEmail(to, token) {
       console.warn("[email] RESEND_API_KEY ausente — e-mail de reset não enviado");
       return false;
     }
-    const baseUrl =
-      frontendBaseUrl() || String(process.env.SITE_URL || "").replace(/\/+$/, "");
-    if (
-      !baseUrl ||
-      (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))
-    ) {
+    const baseUrl = frontendBaseUrl() || String(process.env.SITE_URL || "").replace(/\/+$/, "");
+    if (!baseUrl || (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))) {
       console.error("[email] URL pública do frontend inválida para recuperação de senha");
       return false;
     }
@@ -224,7 +220,9 @@ export async function sendTicketReply(userEmail, { ticket, message }) {
       console.warn("[email] RESEND_API_KEY ausente — aviso de resposta não enviado");
       return;
     }
-    const doc = String(ticket?.user_document_type || "").trim().toLowerCase();
+    const doc = String(ticket?.user_document_type || "")
+      .trim()
+      .toLowerCase();
     const basePath = doc === "cnpj" ? "/dashboard-loja/suporte" : "/dashboard/suporte";
     const panelUrl = `${frontendBaseUrl()}${basePath}?ticket=${ticket.id}`;
     const subject = escapeHtml(ticket.subject);
