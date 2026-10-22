@@ -62,7 +62,13 @@ export async function fetchOpportunitiesSummary(
 
   const response = await fetch(`${BASE}${suffix}`, { cache: "no-store" });
   const payload = (await response.json().catch(() => null)) as
-    | { success?: boolean; message?: string; code?: string; details?: { code?: string }; summary?: DealerOpportunitiesSummary }
+    | {
+        success?: boolean;
+        message?: string;
+        code?: string;
+        details?: { code?: string };
+        summary?: DealerOpportunitiesSummary;
+      }
     | null;
 
   if (!response.ok || payload?.success === false || !payload?.summary) {
