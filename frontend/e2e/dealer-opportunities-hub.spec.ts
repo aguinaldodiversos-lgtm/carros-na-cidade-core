@@ -120,6 +120,11 @@ test.describe("@dealer-hub desktop", () => {
     const summary = page.getByTestId("dealer-hub-summary-section");
     await expect(choices).toBeVisible();
     await expect(summary).toBeVisible();
+    const launch = page.getByTestId("dealer-launch-benefit-notice");
+    await expect(launch).toContainText("Benefício especial de lançamento");
+    await expect(launch).toContainText("disponíveis gratuitamente");
+    await expect(launch).toContainText("plano Pro");
+    await expect(launch).toContainText("planos Start e Pro");
     await expect(page.getByRole("heading", { name: "Compradores Procurando" })).toBeVisible();
     await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
       "Compradores Procurando"
