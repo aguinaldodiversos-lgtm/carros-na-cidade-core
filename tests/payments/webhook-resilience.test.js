@@ -31,14 +31,14 @@ const URL_ENV_KEYS = [
 
 let handleWebhookNotification;
 let getMercadoPagoBackendPublicUrl;
+let normalizeOneTimePaymentStatus;
 let savedEnv;
 
 beforeAll(async () => {
   process.env.MP_ACCESS_TOKEN = "TEST-token-resilience";
   delete process.env.MP_WEBHOOK_SECRET;
-  ({ handleWebhookNotification, getMercadoPagoBackendPublicUrl } = await import(
-    "../../src/modules/payments/payments.service.js"
-  ));
+  ({ handleWebhookNotification, getMercadoPagoBackendPublicUrl, normalizeOneTimePaymentStatus } =
+    await import("../../src/modules/payments/payments.service.js"));
 });
 
 beforeEach(() => {
@@ -213,5 +213,12 @@ describe("webhook anti-fraude — ID autenticado pelo manifesto", () => {
       })
     ).rejects.toMatchObject({ statusCode: 401 });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("pagamentos aguardando captura", () => {
+  it("authorized não equivale a approved", () => {
+    expect(normalizeOneTimePaymentStatus("authorized")).toBe("pending");
+    expect(normalizeOneTimePaymentStatus("approved")).toBe("approved");
   });
 });
