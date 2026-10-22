@@ -198,3 +198,20 @@ describe("webhook anti-fraude — divergência com intent", () => {
     expect(result).toMatchObject({ ignored: true, reason: "payment_reference_mismatch" });
   });
 });
+
+describe("webhook anti-fraude — ID autenticado pelo manifesto", () => {
+  it("rejeita corpo divergente do data.id assinado, antes de consultar o MP", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(
+      handleWebhookNotification({
+        rawBody: JSON.stringify({ type: "payment", data: { id: "id-do-corpo" } }),
+        signature: null,
+        requestId: null,
+        dataId: "id-do-manifesto",
+        traceRequestId: "trace-id-divergente",
+      })
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
