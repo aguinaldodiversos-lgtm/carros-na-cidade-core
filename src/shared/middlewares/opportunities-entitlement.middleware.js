@@ -93,7 +93,8 @@ export function requireDealerOpportunity(feature) {
         res.set("Cache-Control", "private, no-store");
         throw new AppError("Funcionalidade indisponível no seu plano.", 403, true, {
           code: "OPPORTUNITY_PLAN_REQUIRED",
-          required_plan: feature === OPPORTUNITY_FEATURE.BUYERS ? "cnpj-store-pro" : "cnpj-store-start",
+          required_plan:
+            feature === OPPORTUNITY_FEATURE.BUYERS ? "cnpj-store-pro" : "cnpj-store-start",
         });
       }
       req.dealerOpportunityRights = rights;
