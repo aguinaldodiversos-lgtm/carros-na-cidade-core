@@ -159,8 +159,8 @@ export default async function OportunidadesHubPage() {
           <p className="mt-1 text-[12.5px] leading-relaxed">
             Durante o lançamento, Compradores Procurando e Veículos para Avaliação estão
             disponíveis gratuitamente para lojistas cadastrados. Futuramente, Compradores
-            Procurando será exclusivo do plano Pro, e Veículos para Avaliação dos planos
-            Start e Pro.
+            Procurando será exclusivo do plano Pro, e Veículos para Avaliação dos planos Start e
+            Pro.
           </p>
         </div>
       </div>
