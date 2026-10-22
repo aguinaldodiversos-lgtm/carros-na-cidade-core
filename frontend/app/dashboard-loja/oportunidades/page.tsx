@@ -139,7 +139,7 @@ export default async function OportunidadesHubPage() {
         </div>
       </header>
 
-      <aside
+      <div
         className="flex items-start gap-3 rounded-2xl border border-[#CEE5FC] bg-[#F4F9FF] px-4 py-3.5 text-[#215080]"
         data-testid="dealer-launch-benefit-notice"
         aria-label="Benefício de lançamento"
@@ -163,7 +163,7 @@ export default async function OportunidadesHubPage() {
             Start e Pro.
           </p>
         </div>
-      </aside>
+      </div>
 
       <div
         className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5"
