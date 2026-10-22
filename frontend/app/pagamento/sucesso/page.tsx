@@ -125,9 +125,8 @@ export default function PagamentoSucessoPage() {
           <>
             <h1 className="text-3xl font-extrabold text-[#1d2538]">Plano ativo na sua conta</h1>
             <p className="mt-2 text-sm text-[#53607b]">
-              {planLabel
-                ? `Identificamos o plano ${planLabel} ativo. Isso não confirma, por si só, a aprovação desta compra. Consulte o comprovante da transação no Mercado Pago.`
-                : "Identificamos um plano ativo. Isso não confirma, por si só, a aprovação desta compra. Consulte o comprovante da transação no Mercado Pago."}
+              {planLabel ? `Plano ativo: ${planLabel}. ` : "Identificamos um plano ativo. "}
+              Isso não confirma a aprovação desta compra. Consulte o comprovante no Mercado Pago.
             </p>
             <div className="mt-5 flex justify-center gap-3">
               <Link
