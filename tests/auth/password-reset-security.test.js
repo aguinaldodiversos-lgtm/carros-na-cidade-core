@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../src/infrastructure/database/db.js", () => ({
-  query: vi.fn(),
-  pool: { query: vi.fn() },
-}));
+vi.mock("../../src/infrastructure/database/db.js", () => {
+  const query = vi.fn();
+  return {
+    query,
+    default: { query },
+    pool: { query },
+  };
+});
 vi.mock("../../src/modules/auth/sessions/refreshToken.repository.js", () => ({
   revokeAllUserRefreshTokens: vi.fn(),
 }));
