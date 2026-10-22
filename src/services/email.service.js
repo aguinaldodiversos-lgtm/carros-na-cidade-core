@@ -73,11 +73,17 @@ export async function sendResetPasswordEmail(to, token) {
     const resend = getResend();
     if (!resend) {
       console.warn("[email] RESEND_API_KEY ausente — e-mail de reset não enviado");
-      return;
+      return false;
     }
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const baseUrl = frontendBaseUrl() || String(process.env.SITE_URL || "").replace(/\/+$/, "");
+    if (!baseUrl || (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))) {
+      console.error("[email] URL pública do frontend inválida para recuperação de senha");
+      return false;
+    }
+    const resetUrl = new URL("/recuperar-senha", baseUrl);
+    resetUrl.searchParams.set("token", token);
 
-    await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: FROM,
       to,
       subject: "Redefinição de senha",
@@ -85,14 +91,20 @@ export async function sendResetPasswordEmail(to, token) {
         <h2>Redefinição de senha</h2>
         <p>Você solicitou a redefinição da sua senha.</p>
         <p>Clique no link abaixo para criar uma nova senha:</p>
-        <a href="${resetUrl}">${resetUrl}</a>
+        <a href="${escapeHtml(resetUrl.toString())}">Redefinir minha senha</a>
         <p>Este link expira em 1 hora.</p>
       `,
     });
 
-    console.log(`📧 Email de reset enviado para: ${to}`);
+    if (error) {
+      console.error("[email] Resend recusou o envio da recuperação de senha");
+      return false;
+    }
+    console.info("[email] instruções de recuperação de senha enviadas");
+    return true;
   } catch (err) {
-    console.error("Erro ao enviar email de reset:", err);
+    console.error("[email] erro ao enviar recuperação de senha", err);
+    return false;
   }
 }
 
@@ -208,7 +220,9 @@ export async function sendTicketReply(userEmail, { ticket, message }) {
       console.warn("[email] RESEND_API_KEY ausente — aviso de resposta não enviado");
       return;
     }
-    const doc = String(ticket?.user_document_type || "").trim().toLowerCase();
+    const doc = String(ticket?.user_document_type || "")
+      .trim()
+      .toLowerCase();
     const basePath = doc === "cnpj" ? "/dashboard-loja/suporte" : "/dashboard/suporte";
     const panelUrl = `${frontendBaseUrl()}${basePath}?ticket=${ticket.id}`;
     const subject = escapeHtml(ticket.subject);

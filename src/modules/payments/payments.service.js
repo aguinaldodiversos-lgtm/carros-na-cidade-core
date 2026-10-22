@@ -10,10 +10,7 @@ import {
 import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
-import {
-  assertNoLiveSubscriptionFor,
-  assertSubscribablePlan,
-} from "./subscriptions.guards.js";
+import { assertNoLiveSubscriptionFor, assertSubscribablePlan } from "./subscriptions.guards.js";
 import { getBoostOptions, getCommercialRules } from "../commercial/commercial-rules.service.js";
 import { resolveCheckoutExecution, assertSubscriptionsRealAllowed } from "./payments.gate.js";
 import {
@@ -857,6 +854,22 @@ export function verifyWebhookSignature(signatureHeader, requestIdHeader, dataId)
   return timingSafeEqualHex(expected, v1);
 }
 
+/**
+ * "authorized" reserva saldo, mas ainda aguarda captura. Somente "approved"
+ * comprova a cobrança efetiva (documentação oficial do Mercado Pago).
+ */
+export function normalizeOneTimePaymentStatus(status) {
+  const statusMap = {
+    approved: "approved",
+    authorized: "pending",
+    in_process: "pending",
+    pending: "pending",
+    rejected: "rejected",
+    cancelled: "canceled",
+  };
+  return statusMap[status] || "pending";
+}
+
 async function fetchPaymentStatus(resourceId, topic) {
   if (!MP_ACCESS_TOKEN) {
     return {
@@ -889,18 +902,9 @@ async function fetchPaymentStatus(resourceId, topic) {
   }
 
   const payment = await mpRequest(`/v1/payments/${resourceId}`, { method: "GET" });
-  const statusMap = {
-    approved: "approved",
-    authorized: "approved",
-    in_process: "pending",
-    pending: "pending",
-    rejected: "rejected",
-    cancelled: "canceled",
-  };
-
   return {
     mercadoPagoId: String(payment.id),
-    status: statusMap[payment.status] || "pending",
+    status: normalizeOneTimePaymentStatus(payment.status),
     amount: Number(payment.transaction_amount || 0),
     paymentType: "one_time",
     metadata: payment.metadata || {},
@@ -1211,7 +1215,25 @@ export async function handleWebhookNotification({
     throw new AppError("invalid signature", 401);
   }
 
-  const resourceId = String(payload?.data?.id ?? dataId ?? "");
+  // O ID verificado pela assinatura prevalece sobre o corpo: o manifesto HMAC
+  // do MP autentica data.id (query), não o JSON. Um corpo divergente é rejeitado.
+  const signedId = String(dataId || payloadDataIdFromRaw(rawBody) || "").trim();
+  const bodyId = String(payload?.data?.id ?? "").trim();
+  if (signedId && bodyId && signedId.toLowerCase() !== bodyId.toLowerCase()) {
+    logger.warn(
+      {
+        ...buildDomainFields({
+          action: "payments.webhook.verify",
+          result: "error",
+          requestId: traceRequestId,
+        }),
+      },
+      "[payments] webhook data.id divergente da assinatura"
+    );
+    throw new AppError("webhook data.id mismatch", 401);
+  }
+
+  const resourceId = signedId;
   if (!resourceId) {
     logger.info(
       {
@@ -1281,11 +1303,49 @@ export async function handleWebhookNotification({
     return { ok: true, warning: "payment intent not found" };
   }
 
+  // Recusa associação de um pagamento do MP a outro intent. O identificador
+  // do MP é consultado na API oficial; metadata/callback sozinho não aprova nada.
+  const reference = String(paymentData.externalReference || "").trim();
+  const metadataIntentId = String(paymentData.metadata?.intent_id || "").trim();
+  if (
+    (reference && reference !== String(intent.id)) ||
+    (metadataIntentId && metadataIntentId !== String(intent.id))
+  ) {
+    logger.warn(
+      { intentId: intent.id, resourceId },
+      "[payments] divergência da referência do pagamento"
+    );
+    return { ok: true, ignored: true, reason: "payment_reference_mismatch" };
+  }
+
+  // Cobrança única precisa ter o valor exato persistido ao criar o checkout.
+  // Pagamentos de assinatura são conciliados pelo fluxo recorrente específico.
+  const isRecurringIntent =
+    intent.checkout_resource_type === "preapproval" ||
+    intent.metadata?.payment_type === "recurring";
+  if (paymentData.status === "approved" && !isRecurringIntent) {
+    const expectedCents = Math.round(Number(intent.amount) * 100);
+    const paidCents = Math.round(Number(paymentData.amount) * 100);
+    if (
+      !Number.isSafeInteger(expectedCents) ||
+      expectedCents <= 0 ||
+      !Number.isSafeInteger(paidCents) ||
+      paidCents !== expectedCents
+    ) {
+      logger.warn(
+        { intentId: intent.id, resourceId },
+        "[payments] divergência do valor pago — benefício bloqueado"
+      );
+      return { ok: true, ignored: true, reason: "payment_amount_mismatch" };
+    }
+  }
+
   const mergedMetadata = {
     ...(intent.metadata || {}),
     ...(paymentData.metadata || {}),
   };
 
+  let staleNotification = false;
   await withTransaction(async (client) => {
     const lockedIntentResult = await client.query(
       `
@@ -1299,6 +1359,18 @@ export async function handleWebhookNotification({
 
     const lockedIntent = lockedIntentResult.rows[0] || intent;
     const alreadyApproved = lockedIntent.status === "approved";
+
+    // Notificações podem chegar fora de ordem. Uma cobrança já aprovada não
+    // pode voltar para pending/rejected e abrir caminho para aplicar o boost
+    // novamente. Estornos e chargebacks exigem conciliação própria.
+    if (alreadyApproved && paymentData.status !== "approved") {
+      staleNotification = true;
+      logger.warn(
+        { intentId: lockedIntent.id, paymentId: paymentData.mercadoPagoId },
+        "[payments] estado posterior à aprovação exige conciliação; intent preservado"
+      );
+      return;
+    }
 
     await client.query(
       `
@@ -1430,13 +1502,19 @@ export async function handleWebhookNotification({
     }
 
     if (lockedIntent.context === "boost" && paymentData.status === "approved" && !alreadyApproved) {
+      // Os dias do destaque vêm apenas do intent persistido no checkout.
+      // Dados recebidos do webhook não podem ampliar o benefício contratado.
       const boostIntent = {
         ...lockedIntent,
-        metadata: mergedMetadata,
+        metadata: lockedIntent.metadata,
       };
       await applyBoostApproval(client, boostIntent);
     }
   });
+
+  if (staleNotification) {
+    return { ok: true, ignored: true, reason: "approved_intent_preserved" };
+  }
 
   logger.info(
     {

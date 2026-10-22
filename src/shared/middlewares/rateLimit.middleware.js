@@ -1,4 +1,6 @@
 import rateLimit from "express-rate-limit";
+import { isIP } from "node:net";
+import { createHash } from "node:crypto";
 
 import { isAuthenticatedInternalCall } from "./bot-blocker.middleware.js";
 
@@ -69,13 +71,57 @@ export function clientRateLimitKey(req) {
   return req.ip || req.socket?.remoteAddress || "unknown";
 }
 
+/**
+ * Identidade de IP usada nas ações sensíveis de autenticação.
+ * Só aceita X-Cnc-Client-Ip se enviado pelo BFF autenticado por token interno.
+ * Headers de IP recebidos diretamente de clientes públicos são ignorados.
+ */
+export function sensitiveAuthRateLimitKey(req) {
+  if (isAuthenticatedInternalCall(req)) {
+    const ip = String(req.headers["x-cnc-client-ip"] || "").trim();
+    if (isIP(ip)) return ip;
+  }
+  const peer = String(req.ip || req.socket?.remoteAddress || "").trim();
+  return isIP(peer) ? peer : "unknown";
+}
+
+/**
+ * Segunda dimensão de proteção, independente do IP encaminhado por proxies.
+ * Dificulta credential stuffing e spam de recuperação para a mesma conta,
+ * mesmo se um cabeçalho X-Forwarded-For for controlado pelo cliente.
+ * Nunca guardar o e-mail puro na chave do rate limiter.
+ */
+export function sensitiveAuthIdentityKey(req) {
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  if (!email || email.length > 254) return `unknown:${sensitiveAuthRateLimitKey(req)}`;
+  return createHash("sha256").update(email).digest("hex");
+}
+
+export const loginIdentityRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `login-identity:${sensitiveAuthIdentityKey(req)}`,
+  message: { error: "Muitas tentativas. Tente novamente mais tarde." },
+});
+
+export const passwordRecoveryIdentityRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `recovery-identity:${sensitiveAuthIdentityKey(req)}`,
+  message: { error: "Muitas solicitações. Aguarde antes de tentar novamente." },
+});
+
 export const loginRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 10, // 10 tentativas
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => clientRateLimitKey(req),
-  skip: skipIfAuthenticatedInternal,
+  keyGenerator: sensitiveAuthRateLimitKey,
+  // Login e cadastro via BFF são ações de usuário: nunca dispensar rate limit.
   message: {
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
@@ -87,11 +133,33 @@ export const registerRateLimit = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => clientRateLimitKey(req),
-  skip: skipIfAuthenticatedInternal,
+  keyGenerator: sensitiveAuthRateLimitKey,
+  // Login e cadastro via BFF são ações de usuário: nunca dispensar rate limit.
   message: {
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
+});
+
+/**
+ * A solicitação de recuperação envia e-mail; limite dedicado reduz spam e
+ * abuso. O reset também limita tentativas de adivinhar tokens.
+ */
+export const passwordRecoveryRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `password-recovery:${sensitiveAuthRateLimitKey(req)}`,
+  message: { error: "Muitas solicitações. Aguarde alguns minutos." },
+});
+
+export const passwordResetRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `password-reset:${sensitiveAuthRateLimitKey(req)}`,
+  message: { error: "Muitas tentativas. Aguarde alguns minutos." },
 });
 
 /**

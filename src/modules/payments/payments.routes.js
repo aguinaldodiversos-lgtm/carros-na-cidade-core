@@ -19,16 +19,38 @@ function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
 
-function resolvePublicUrls(req) {
-  const origin = String(req.body?.success_url || "").trim()
-    ? null
-    : `${req.protocol}://${req.get("host")}`;
-
-  const successUrl = String(req.body?.success_url || `${origin}/pagamento/sucesso`).trim();
-  const failureUrl = String(req.body?.failure_url || `${origin}/pagamento/erro`).trim();
-  const pendingUrl = String(req.body?.pending_url || `${origin}/pagamento/erro`).trim();
-
-  return { successUrl, failureUrl, pendingUrl };
+export function resolvePublicUrls() {
+  // URLs de retorno são controladas pelo servidor, nunca pelo cliente ou header Host.
+  const base =
+    process.env.FRONTEND_URL ||
+    process.env.SITE_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.PUBLIC_SITE_URL ||
+    (process.env.NODE_ENV === "production"
+      ? "https://www.carrosnacidade.com"
+      : "http://localhost:3000");
+  let origin;
+  try {
+    const url = new URL(base);
+    if (
+      process.env.NODE_ENV === "production" &&
+      (url.protocol !== "https:" ||
+        !["carrosnacidade.com", "www.carrosnacidade.com"].includes(url.hostname))
+    ) {
+      throw new Error("Domínio não autorizado");
+    }
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) {
+      throw new Error("Origem inválida");
+    }
+    origin = url.origin;
+  } catch {
+    throw new AppError("Origem de retorno do pagamento não configurada corretamente.", 500);
+  }
+  return {
+    successUrl: `${origin}/pagamento/sucesso`,
+    failureUrl: `${origin}/pagamento/erro`,
+    pendingUrl: `${origin}/pagamento/erro`,
+  };
 }
 
 router.post(

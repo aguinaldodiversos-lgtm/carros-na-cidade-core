@@ -65,8 +65,9 @@ export default function PagamentoSucessoPage() {
         });
 
         if (response.status === 401) {
-          // Sem sessão: comportamento legado (não conseguimos confirmar).
-          if (!cancelledRef.current) setState("approved");
+          // Sem sessão não existe comprovante de aprovação. Nunca exibir
+          // "Pagamento aprovado" apenas porque o visitante retornou do checkout.
+          if (!cancelledRef.current) setState("still_pending");
           return;
         }
 

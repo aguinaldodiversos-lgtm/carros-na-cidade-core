@@ -71,6 +71,17 @@ const nextConfig = {
       //
       // As novas áreas dos Produtos A e B nascem sob estes mesmos prefixos e
       // herdam a política sem tocar nesta configuração de novo.
+      {
+        // Esta página recebe o token de recuperação na query string.
+        // O navegador não deve transmiti-lo como Referer a terceiros ou
+        // armazenar a resposta em cache público/intermediário.
+        source: "/recuperar-senha",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
       ...["/dashboard", "/dashboard/:path*", "/dashboard-loja", "/dashboard-loja/:path*"].map(
         (source) => ({
           source,

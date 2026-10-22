@@ -59,6 +59,21 @@ describe("next.config.mjs — headers() para /images/*", () => {
  * RASTREAR, não INDEXAR — e não diz nada a proxies/caches sobre uma resposta
  * que contém dados de uma pessoa específica. Estes testes travam a política.
  */
+describe("next.config.mjs — recuperação de senha e proteção do token", () => {
+  it("bloqueia Referer, cache e indexação na página do link secreto", async () => {
+    const result = await getHeadersFn()();
+    const rule = result.find((r) => r.source === "/recuperar-senha");
+    expect(rule).toBeDefined();
+    expect(rule?.headers).toEqual(
+      expect.arrayContaining([
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "Cache-Control", value: "private, no-store" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+      ])
+    );
+  });
+});
+
 describe("next.config.mjs — headers() das áreas privadas", () => {
   const PRIVATE_SOURCES = [
     "/dashboard",

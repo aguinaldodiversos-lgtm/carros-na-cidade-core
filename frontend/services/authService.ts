@@ -355,6 +355,8 @@ export async function authenticateUser(
     return authenticateAgainstBackend(email, password, forwardHeaders);
   }
 
+  // Contas demonstrativas são exclusivas do ambiente de desenvolvimento.
+  if (process.env.NODE_ENV === "production") return null;
   return authenticateLocally(email, password);
 }
 
@@ -504,13 +506,14 @@ export async function resetPassword(
   const normalizedToken = normalizeString(token);
   const proxied = await postAuthProxy(
     "/api/auth/reset-password",
-    { token: normalizedToken, password },
+    { token: normalizedToken, newPassword: password },
     ipHeaders
   );
 
   if (proxied) return true;
 
-  return Boolean(normalizedToken && password.length >= 6);
+  // Nunca afirmar que uma senha foi redefinida sem resposta positiva do backend.
+  return false;
 }
 
 async function parseLocalApiResponse(response: Response) {

@@ -1,11 +1,17 @@
 import express from "express";
 import {
   loginRateLimit,
+  loginIdentityRateLimit,
   registerRateLimit,
+  passwordRecoveryIdentityRateLimit,
+  passwordRecoveryRateLimit,
+  passwordResetRateLimit,
 } from "../../shared/middlewares/rateLimit.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { pool } from "../../infrastructure/database/db.js";
+import { sendResetPasswordEmail } from "../../services/email.service.js";
+import { logger } from "../../shared/logger.js";
 
 import * as AuthServiceNS from "./auth.service.js";
 import * as PasswordServiceNS from "./password.service.js";
@@ -86,6 +92,7 @@ async function getUsersColumnSet() {
 router.post(
   "/login",
   loginRateLimit,
+  loginIdentityRateLimit,
   asyncHandler(async (req, res) => {
     const email = requireString(req.body?.email, "email", { lowercase: true });
     const password = requireString(req.body?.password, "password");
@@ -284,9 +291,17 @@ async function handleForgotPassword(req, res) {
   );
 
   try {
-    await fn(email);
-  } catch {
-    // não enumerar usuários
+    const result = await fn(email);
+    // O serviço retorna o token somente para usuários existentes; nunca ao navegador.
+    if (result?.token) {
+      const delivered = await sendResetPasswordEmail(email, result.token);
+      if (!delivered) {
+        logger.warn("[auth] recuperação de senha: e-mail não entregue");
+      }
+    }
+  } catch (err) {
+    // Mantém a mesma resposta para e-mails existentes ou inexistentes.
+    logger.error({ err }, "[auth] falha interna na solicitação de recuperação de senha");
   }
 
   return res.status(200).json({
@@ -295,8 +310,18 @@ async function handleForgotPassword(req, res) {
   });
 }
 
-router.post("/forgot-password", asyncHandler(handleForgotPassword));
-router.post("/password/forgot", asyncHandler(handleForgotPassword));
+router.post(
+  "/forgot-password",
+  passwordRecoveryRateLimit,
+  passwordRecoveryIdentityRateLimit,
+  asyncHandler(handleForgotPassword)
+);
+router.post(
+  "/password/forgot",
+  passwordRecoveryRateLimit,
+  passwordRecoveryIdentityRateLimit,
+  asyncHandler(handleForgotPassword)
+);
 
 async function handleResetPassword(req, res) {
   const token = requireString(req.body?.token, "token");
@@ -313,8 +338,8 @@ async function handleResetPassword(req, res) {
   return res.status(200).json(result ?? { ok: true });
 }
 
-router.post("/reset-password", asyncHandler(handleResetPassword));
-router.post("/password/reset", asyncHandler(handleResetPassword));
+router.post("/reset-password", passwordResetRateLimit, asyncHandler(handleResetPassword));
+router.post("/password/reset", passwordResetRateLimit, asyncHandler(handleResetPassword));
 
 /** EMAIL VERIFY */
 async function handleVerifyEmail(req, res) {

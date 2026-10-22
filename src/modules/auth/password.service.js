@@ -3,6 +3,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { logger } from "../../shared/logger.js";
+import { revokeAllUserRefreshTokens } from "./sessions/refreshToken.repository.js";
 
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
 const RESET_TOKEN_BYTES = Number(process.env.PASSWORD_RESET_TOKEN_BYTES || 32);
@@ -96,9 +97,28 @@ export async function resetPasswordWithToken({ token, newPassword }) {
   const tokenHash = sha256(t);
   const passwordHash = await bcrypt.hash(pwd, SALT_ROUNDS);
 
+  // Login prefere password_hash quando a base possui ambas as colunas.
+  // A redefinição precisa escolher a MESMA coluna, inclusive no schema legado.
+  const columnsResult = await query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'users'
+        AND column_name IN ('password_hash', 'password')`
+  );
+  const columns = new Set((columnsResult.rows || []).map((row) => row.column_name));
+  const passwordColumn = columns.has("password_hash")
+    ? "password_hash"
+    : columns.has("password")
+      ? "password"
+      : null;
+  if (!passwordColumn) {
+    throw new AppError("Coluna de senha não configurada.", 500);
+  }
+
   const { rows } = await query(
     `UPDATE users
-        SET password = $1,
+        SET ${passwordColumn} = $1,
             reset_token = NULL,
             reset_token_expires = NULL
       WHERE reset_token = $2
@@ -109,6 +129,8 @@ export async function resetPasswordWithToken({ token, newPassword }) {
   );
 
   if (!rows?.length) throw new AppError("Token inválido ou expirado.", 400);
+  // Uma senha recuperada encerra sessões renováveis antigas do usuário.
+  await revokeAllUserRefreshTokens(rows[0].id);
   return { ok: true };
 }
 

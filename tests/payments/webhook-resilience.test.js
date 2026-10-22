@@ -31,14 +31,14 @@ const URL_ENV_KEYS = [
 
 let handleWebhookNotification;
 let getMercadoPagoBackendPublicUrl;
+let normalizeOneTimePaymentStatus;
 let savedEnv;
 
 beforeAll(async () => {
   process.env.MP_ACCESS_TOKEN = "TEST-token-resilience";
   delete process.env.MP_WEBHOOK_SECRET;
-  ({ handleWebhookNotification, getMercadoPagoBackendPublicUrl } = await import(
-    "../../src/modules/payments/payments.service.js"
-  ));
+  ({ handleWebhookNotification, getMercadoPagoBackendPublicUrl, normalizeOneTimePaymentStatus } =
+    await import("../../src/modules/payments/payments.service.js"));
 });
 
 beforeEach(() => {
@@ -136,5 +136,132 @@ describe("getBackendPublicUrl — precedência sem APP_BASE_URL", () => {
 
   it("lança 500 quando nenhuma var de backend está definida", () => {
     expect(() => getMercadoPagoBackendPublicUrl()).toThrow(/URL pública do backend/i);
+  });
+});
+
+// Etapa P0: webhook nunca concede benefício por um pagamento de valor ou
+// referência diferentes do checkout persistido. Sem transação de escrita.
+describe("webhook anti-fraude — divergência com intent", () => {
+  async function simulatePayment({ amount, externalReference }) {
+    const db = await import("../../src/infrastructure/database/db.js");
+    db.query.mockReset().mockResolvedValue({
+      rows: [
+        {
+          id: "intent-safe-1",
+          amount: 39.9,
+          context: "boost",
+          checkout_resource_type: "preference",
+          metadata: { boost_days: "7" },
+        },
+      ],
+    });
+    db.withTransaction.mockClear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "mp-payment-1",
+          status: "approved",
+          transaction_amount: amount,
+          external_reference: externalReference,
+          metadata: { intent_id: "intent-safe-1" },
+        }),
+      })
+    );
+
+    const result = await handleWebhookNotification({
+      rawBody: JSON.stringify({ type: "payment", data: { id: "mp-payment-1" } }),
+      signature: null,
+      requestId: null,
+      dataId: "mp-payment-1",
+      traceRequestId: "trace-security",
+    });
+    expect(db.withTransaction).not.toHaveBeenCalled();
+    return result;
+  }
+
+  it("não credita destaque se valor do MP for menor que o contratado", async () => {
+    const result = await simulatePayment({
+      amount: 1,
+      externalReference: "intent-safe-1",
+    });
+    expect(result).toMatchObject({ ignored: true, reason: "payment_amount_mismatch" });
+  });
+
+  it("não credita destaque se referência do MP for de outro checkout", async () => {
+    const result = await simulatePayment({
+      amount: 39.9,
+      externalReference: "intent-other",
+    });
+    expect(result).toMatchObject({ ignored: true, reason: "payment_reference_mismatch" });
+  });
+});
+
+describe("webhook anti-fraude — ID autenticado pelo manifesto", () => {
+  it("rejeita corpo divergente do data.id assinado, antes de consultar o MP", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(
+      handleWebhookNotification({
+        rawBody: JSON.stringify({ type: "payment", data: { id: "id-do-corpo" } }),
+        signature: null,
+        requestId: null,
+        dataId: "id-do-manifesto",
+        traceRequestId: "trace-id-divergente",
+      })
+    ).rejects.toMatchObject({ statusCode: 401 });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("pagamentos aguardando captura", () => {
+  it("authorized não equivale a approved", () => {
+    expect(normalizeOneTimePaymentStatus("authorized")).toBe("pending");
+    expect(normalizeOneTimePaymentStatus("approved")).toBe("approved");
+  });
+});
+
+describe("webhook idempotente — evento atrasado", () => {
+  it("não rebaixa intent aprovado quando chega pending", async () => {
+    const db = await import("../../src/infrastructure/database/db.js");
+    const intent = {
+      id: "intent-approved-1",
+      user_id: "user-test",
+      context: "boost",
+      amount: 39.9,
+      status: "approved",
+      checkout_resource_type: "preference",
+      metadata: { boost_days: "7", intent_id: "intent-approved-1" },
+    };
+    db.query.mockReset().mockResolvedValue({ rows: [intent] });
+    const clientQuery = vi.fn().mockResolvedValue({ rows: [intent] });
+    db.withTransaction.mockReset().mockImplementation(async (fn) => fn({ query: clientQuery }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "mp-payment-old",
+          status: "pending",
+          transaction_amount: 39.9,
+          external_reference: "intent-approved-1",
+          metadata: { intent_id: "intent-approved-1" },
+        }),
+      })
+    );
+
+    const result = await handleWebhookNotification({
+      rawBody: JSON.stringify({ type: "payment", data: { id: "mp-payment-old" } }),
+      signature: null,
+      requestId: null,
+      dataId: "mp-payment-old",
+      traceRequestId: "trace-late",
+    });
+    expect(result).toMatchObject({ ignored: true, reason: "approved_intent_preserved" });
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(String(clientQuery.mock.calls[0][0])).toContain("FOR UPDATE");
   });
 });
