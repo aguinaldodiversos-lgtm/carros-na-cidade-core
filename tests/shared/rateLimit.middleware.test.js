@@ -130,8 +130,14 @@ describe("sensitiveAuthRateLimitKey — não aceita headers falsificados", () =>
 
 describe("limite por identidade mesmo com IP variável", () => {
   it("gera a mesma chave para o mesmo e-mail com capitalização diferente", () => {
-    const a = mockReq({ headers: { "x-forwarded-for": "198.51.100.1" }, body: { email: " QA@EXAMPLE.COM " } });
-    const b = mockReq({ headers: { "x-forwarded-for": "198.51.100.2" }, body: { email: "qa@example.com" } });
+    const a = mockReq({
+      headers: { "x-forwarded-for": "198.51.100.1" },
+      body: { email: " QA@EXAMPLE.COM " },
+    });
+    const b = mockReq({
+      headers: { "x-forwarded-for": "198.51.100.2" },
+      body: { email: "qa@example.com" },
+    });
     expect(sensitiveAuthIdentityKey(a)).toBe(sensitiveAuthIdentityKey(b));
     expect(sensitiveAuthIdentityKey(a)).not.toContain("@");
     expect(sensitiveAuthIdentityKey(a)).toHaveLength(64);
