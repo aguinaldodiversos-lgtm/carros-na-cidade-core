@@ -194,7 +194,24 @@ for (const caminho of alvos) {
     continue;
   }
 
-  if (!(await prettier.check(fonte, opcoes))) reprovados.push(caminho);
+  if (!(await prettier.check(fonte, opcoes))) {
+    reprovados.push(caminho);
+    // Temporário em PR de segurança: exibe apenas o diff de formatação.
+    const formatted = await prettier.format(fonte, opcoes);
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cnc-fmt-"));
+    const target = path.join(tempDir, "formatted.txt");
+    fs.writeFileSync(target, formatted, "utf8");
+    try {
+      execFileSync("diff", ["-u", caminho, target], { encoding: "utf8" });
+    } catch (error) {
+      console.error(`BEGIN_FORMAT_DIFF ${caminho}\n${error.stdout}\nEND_FORMAT_DIFF`);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
 }
 
 if (WRITE) {
