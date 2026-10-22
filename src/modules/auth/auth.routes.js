@@ -1,7 +1,9 @@
 import express from "express";
 import {
   loginRateLimit,
+  loginIdentityRateLimit,
   registerRateLimit,
+  passwordRecoveryIdentityRateLimit,
   passwordRecoveryRateLimit,
   passwordResetRateLimit,
 } from "../../shared/middlewares/rateLimit.middleware.js";
@@ -90,6 +92,7 @@ async function getUsersColumnSet() {
 router.post(
   "/login",
   loginRateLimit,
+  loginIdentityRateLimit,
   asyncHandler(async (req, res) => {
     const email = requireString(req.body?.email, "email", { lowercase: true });
     const password = requireString(req.body?.password, "password");
@@ -307,8 +310,18 @@ async function handleForgotPassword(req, res) {
   });
 }
 
-router.post("/forgot-password", passwordRecoveryRateLimit, asyncHandler(handleForgotPassword));
-router.post("/password/forgot", passwordRecoveryRateLimit, asyncHandler(handleForgotPassword));
+router.post(
+  "/forgot-password",
+  passwordRecoveryRateLimit,
+  passwordRecoveryIdentityRateLimit,
+  asyncHandler(handleForgotPassword)
+);
+router.post(
+  "/password/forgot",
+  passwordRecoveryRateLimit,
+  passwordRecoveryIdentityRateLimit,
+  asyncHandler(handleForgotPassword)
+);
 
 async function handleResetPassword(req, res) {
   const token = requireString(req.body?.token, "token");
