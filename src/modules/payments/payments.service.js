@@ -1345,6 +1345,7 @@ export async function handleWebhookNotification({
     ...(paymentData.metadata || {}),
   };
 
+  let staleNotification = false;
   await withTransaction(async (client) => {
     const lockedIntentResult = await client.query(
       `
@@ -1358,6 +1359,18 @@ export async function handleWebhookNotification({
 
     const lockedIntent = lockedIntentResult.rows[0] || intent;
     const alreadyApproved = lockedIntent.status === "approved";
+
+    // Notificações podem chegar fora de ordem. Uma cobrança já aprovada não
+    // pode voltar para pending/rejected e abrir caminho para aplicar o boost
+    // novamente. Estornos e chargebacks exigem conciliação própria.
+    if (alreadyApproved && paymentData.status !== "approved") {
+      staleNotification = true;
+      logger.warn(
+        { intentId: lockedIntent.id, paymentId: paymentData.mercadoPagoId },
+        "[payments] estado posterior à aprovação exige conciliação; intent preservado"
+      );
+      return;
+    }
 
     await client.query(
       `
@@ -1498,6 +1511,10 @@ export async function handleWebhookNotification({
       await applyBoostApproval(client, boostIntent);
     }
   });
+
+  if (staleNotification) {
+    return { ok: true, ignored: true, reason: "approved_intent_preserved" };
+  }
 
   logger.info(
     {
