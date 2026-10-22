@@ -92,8 +92,7 @@ export function sensitiveAuthRateLimitKey(req) {
  * Nunca guardar o e-mail puro na chave do rate limiter.
  */
 export function sensitiveAuthIdentityKey(req) {
-  const email =
-    typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
   if (!email || email.length > 254) return `unknown:${sensitiveAuthRateLimitKey(req)}`;
   return createHash("sha256").update(email).digest("hex");
 }
