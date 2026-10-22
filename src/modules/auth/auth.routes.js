@@ -2,6 +2,8 @@ import express from "express";
 import {
   loginRateLimit,
   registerRateLimit,
+  passwordRecoveryRateLimit,
+  passwordResetRateLimit,
 } from "../../shared/middlewares/rateLimit.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
@@ -305,8 +307,8 @@ async function handleForgotPassword(req, res) {
   });
 }
 
-router.post("/forgot-password", asyncHandler(handleForgotPassword));
-router.post("/password/forgot", asyncHandler(handleForgotPassword));
+router.post("/forgot-password", passwordRecoveryRateLimit, asyncHandler(handleForgotPassword));
+router.post("/password/forgot", passwordRecoveryRateLimit, asyncHandler(handleForgotPassword));
 
 async function handleResetPassword(req, res) {
   const token = requireString(req.body?.token, "token");
@@ -323,8 +325,8 @@ async function handleResetPassword(req, res) {
   return res.status(200).json(result ?? { ok: true });
 }
 
-router.post("/reset-password", asyncHandler(handleResetPassword));
-router.post("/password/reset", asyncHandler(handleResetPassword));
+router.post("/reset-password", passwordResetRateLimit, asyncHandler(handleResetPassword));
+router.post("/password/reset", passwordResetRateLimit, asyncHandler(handleResetPassword));
 
 /** EMAIL VERIFY */
 async function handleVerifyEmail(req, res) {
