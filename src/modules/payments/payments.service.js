@@ -1214,7 +1214,13 @@ export async function handleWebhookNotification({
   const bodyId = String(payload?.data?.id ?? "").trim();
   if (signedId && bodyId && signedId.toLowerCase() !== bodyId.toLowerCase()) {
     logger.warn(
-      { ...buildDomainFields({ action: "payments.webhook.verify", result: "error", requestId: traceRequestId }) },
+      {
+        ...buildDomainFields({
+          action: "payments.webhook.verify",
+          result: "error",
+          requestId: traceRequestId,
+        }),
+      },
       "[payments] webhook data.id divergente da assinatura"
     );
     throw new AppError("webhook data.id mismatch", 401);
