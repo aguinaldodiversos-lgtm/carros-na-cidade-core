@@ -81,17 +81,23 @@ function metric(total, window) {
  * devolve 409 quando a conta tem mais de uma e nenhuma foi escolhida — o mesmo
  * contrato do feed, para que a tela não precise de um segundo caminho de erro.
  */
-export async function getDealerOpportunitiesSummary(userId, rawQuery = {}) {
+export async function getDealerOpportunitiesSummary(
+  userId,
+  rawQuery = {},
+  rights = { buyers: true, vehicle_evaluation: true }
+) {
   const dealerUserId = requireUserId(userId);
 
   const { advertiserId, cityId } = await requireDealerStore(dealerUserId, {
     advertiserId: rawQuery.advertiser_id,
   });
 
+  const includeBuyers = rights.buyers === true;
+  const includeVehicles = rights.vehicle_evaluation === true;
   const [buyers, saleRequests, deals] = await Promise.all([
-    repo.countActiveBuyers(cityId),
-    repo.countOpenSaleRequests(cityId),
-    repo.countDealsInProgress({ cityId, advertiserId }),
+    includeBuyers ? repo.countActiveBuyers(cityId) : Promise.resolve(null),
+    includeVehicles ? repo.countOpenSaleRequests(cityId) : Promise.resolve(null),
+    includeVehicles ? repo.countDealsInProgress({ cityId, advertiserId }) : Promise.resolve(null),
   ]);
 
   /*
@@ -106,10 +112,10 @@ export async function getDealerOpportunitiesSummary(userId, rawQuery = {}) {
     a diferença aparece justamente quando um dos lados é pequeno.
   */
   const newToday = {
-    total: Number(buyers.today ?? 0) + Number(saleRequests.today ?? 0),
+    total: Number(buyers?.today ?? 0) + Number(saleRequests?.today ?? 0),
     trend: computeTrend(
-      Number(buyers.last_7d ?? 0) + Number(saleRequests.last_7d ?? 0),
-      Number(buyers.previous_7d ?? 0) + Number(saleRequests.previous_7d ?? 0)
+      Number(buyers?.last_7d ?? 0) + Number(saleRequests?.last_7d ?? 0),
+      Number(buyers?.previous_7d ?? 0) + Number(saleRequests?.previous_7d ?? 0)
     ),
   };
 
@@ -128,10 +134,10 @@ export async function getDealerOpportunitiesSummary(userId, rawQuery = {}) {
 
   return {
     summary: {
-      active_buyers: metric(buyers.total, buyers),
-      sale_requests: metric(saleRequests.total, saleRequests),
-      new_today: newToday,
-      deals_in_progress: metric(deals.total, deals),
+      active_buyers: includeBuyers ? metric(buyers.total, buyers) : null,
+      sale_requests: includeVehicles ? metric(saleRequests.total, saleRequests) : null,
+      new_today: includeBuyers || includeVehicles ? newToday : null,
+      deals_in_progress: includeVehicles ? metric(deals.total, deals) : null,
     },
   };
 }
