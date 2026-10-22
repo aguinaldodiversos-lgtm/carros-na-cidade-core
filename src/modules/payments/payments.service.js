@@ -10,10 +10,7 @@ import {
 import { isEventsDomainEnabled } from "../../shared/config/features.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
-import {
-  assertNoLiveSubscriptionFor,
-  assertSubscribablePlan,
-} from "./subscriptions.guards.js";
+import { assertNoLiveSubscriptionFor, assertSubscribablePlan } from "./subscriptions.guards.js";
 import { getBoostOptions, getCommercialRules } from "../commercial/commercial-rules.service.js";
 import { resolveCheckoutExecution, assertSubscriptionsRealAllowed } from "./payments.gate.js";
 import {
