@@ -854,6 +854,22 @@ export function verifyWebhookSignature(signatureHeader, requestIdHeader, dataId)
   return timingSafeEqualHex(expected, v1);
 }
 
+/**
+ * "authorized" reserva saldo, mas ainda aguarda captura. Somente "approved"
+ * comprova a cobrança efetiva (documentação oficial do Mercado Pago).
+ */
+export function normalizeOneTimePaymentStatus(status) {
+  const statusMap = {
+    approved: "approved",
+    authorized: "pending",
+    in_process: "pending",
+    pending: "pending",
+    rejected: "rejected",
+    cancelled: "canceled",
+  };
+  return statusMap[status] || "pending";
+}
+
 async function fetchPaymentStatus(resourceId, topic) {
   if (!MP_ACCESS_TOKEN) {
     return {
@@ -886,18 +902,9 @@ async function fetchPaymentStatus(resourceId, topic) {
   }
 
   const payment = await mpRequest(`/v1/payments/${resourceId}`, { method: "GET" });
-  const statusMap = {
-    approved: "approved",
-    authorized: "approved",
-    in_process: "pending",
-    pending: "pending",
-    rejected: "rejected",
-    cancelled: "canceled",
-  };
-
   return {
     mercadoPagoId: String(payment.id),
-    status: statusMap[payment.status] || "pending",
+    status: normalizeOneTimePaymentStatus(payment.status),
     amount: Number(payment.transaction_amount || 0),
     paymentType: "one_time",
     metadata: payment.metadata || {},
