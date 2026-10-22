@@ -222,3 +222,46 @@ describe("pagamentos aguardando captura", () => {
     expect(normalizeOneTimePaymentStatus("approved")).toBe("approved");
   });
 });
+
+describe("webhook idempotente — evento atrasado", () => {
+  it("não rebaixa intent aprovado quando chega pending", async () => {
+    const db = await import("../../src/infrastructure/database/db.js");
+    const intent = {
+      id: "intent-approved-1",
+      user_id: "user-test",
+      context: "boost",
+      amount: 39.9,
+      status: "approved",
+      checkout_resource_type: "preference",
+      metadata: { boost_days: "7", intent_id: "intent-approved-1" },
+    };
+    db.query.mockReset().mockResolvedValue({ rows: [intent] });
+    const clientQuery = vi.fn().mockResolvedValue({ rows: [intent] });
+    db.withTransaction.mockReset().mockImplementation(async (fn) => fn({ query: clientQuery }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "mp-payment-old",
+          status: "pending",
+          transaction_amount: 39.9,
+          external_reference: "intent-approved-1",
+          metadata: { intent_id: "intent-approved-1" },
+        }),
+      })
+    );
+
+    const result = await handleWebhookNotification({
+      rawBody: JSON.stringify({ type: "payment", data: { id: "mp-payment-old" } }),
+      signature: null,
+      requestId: null,
+      dataId: "mp-payment-old",
+      traceRequestId: "trace-late",
+    });
+    expect(result).toMatchObject({ ignored: true, reason: "approved_intent_preserved" });
+    expect(clientQuery).toHaveBeenCalledTimes(1);
+    expect(String(clientQuery.mock.calls[0][0])).toContain("FOR UPDATE");
+  });
+});
