@@ -91,9 +91,12 @@ describe("Oportunidades após ativação paga", () => {
     await requireDealerOpportunity("buyers")({ user: { id: "dealer-1" } }, { set }, next);
     expect(set).toHaveBeenCalledWith("Cache-Control", "private, no-store");
     expect(next).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 403, details: expect.objectContaining({
-        code: "OPPORTUNITY_PLAN_REQUIRED",
-      }) })
+      expect.objectContaining({
+        statusCode: 403,
+        details: expect.objectContaining({
+          code: "OPPORTUNITY_PLAN_REQUIRED",
+        }),
+      })
     );
   });
 
