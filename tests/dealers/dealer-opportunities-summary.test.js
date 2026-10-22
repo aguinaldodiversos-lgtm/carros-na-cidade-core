@@ -452,3 +452,38 @@ describe("privacidade", () => {
     ]);
   });
 });
+
+describe("resumo respeita direitos de assinatura quando o gate for ativado", () => {
+  it("não devolve contagens de compradores a um lojista Start", async () => {
+    seedIntent({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    seedSaleRequest({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    const { getDealerOpportunitiesSummary } = await import(
+      "../../src/modules/dealers/dealer-opportunities-summary.service.js"
+    );
+    const result = await getDealerOpportunitiesSummary(DEALER, {}, {
+      buyers: false,
+      vehicle_evaluation: true,
+    });
+    expect(result.summary.active_buyers).toBeNull();
+    expect(result.summary.sale_requests?.total).toBe(1);
+    expect(result.summary.new_today?.total).toBe(1);
+  });
+
+  it("sem nenhuma permissão, não devolve contagens nem tendências", async () => {
+    seedIntent({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    seedSaleRequest({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    const { getDealerOpportunitiesSummary } = await import(
+      "../../src/modules/dealers/dealer-opportunities-summary.service.js"
+    );
+    const result = await getDealerOpportunitiesSummary(DEALER, {}, {
+      buyers: false,
+      vehicle_evaluation: false,
+    });
+    expect(result.summary).toEqual({
+      active_buyers: null,
+      sale_requests: null,
+      new_today: null,
+      deals_in_progress: null,
+    });
+  });
+});
