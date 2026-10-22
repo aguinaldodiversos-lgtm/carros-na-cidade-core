@@ -460,10 +460,8 @@ describe("resumo respeita direitos de assinatura quando o gate for ativado", () 
     const { getDealerOpportunitiesSummary } = await import(
       "../../src/modules/dealers/dealer-opportunities-summary.service.js"
     );
-    const result = await getDealerOpportunitiesSummary(DEALER, {}, {
-      buyers: false,
-      vehicle_evaluation: true,
-    });
+    const rights = { buyers: false, vehicle_evaluation: true };
+    const result = await getDealerOpportunitiesSummary(DEALER, {}, rights);
     expect(result.summary.active_buyers).toBeNull();
     expect(result.summary.sale_requests?.total).toBe(1);
     expect(result.summary.new_today?.total).toBe(1);
@@ -475,10 +473,8 @@ describe("resumo respeita direitos de assinatura quando o gate for ativado", () 
     const { getDealerOpportunitiesSummary } = await import(
       "../../src/modules/dealers/dealer-opportunities-summary.service.js"
     );
-    const result = await getDealerOpportunitiesSummary(DEALER, {}, {
-      buyers: false,
-      vehicle_evaluation: false,
-    });
+    const rights = { buyers: false, vehicle_evaluation: false };
+    const result = await getDealerOpportunitiesSummary(DEALER, {}, rights);
     expect(result.summary).toEqual({
       active_buyers: null,
       sale_requests: null,
