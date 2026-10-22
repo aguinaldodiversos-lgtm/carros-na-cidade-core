@@ -139,7 +139,6 @@ describe("getBackendPublicUrl — precedência sem APP_BASE_URL", () => {
   });
 });
 
-
 // Etapa P0: webhook nunca concede benefício por um pagamento de valor ou
 // referência diferentes do checkout persistido. Sem transação de escrita.
 describe("webhook anti-fraude — divergência com intent", () => {
