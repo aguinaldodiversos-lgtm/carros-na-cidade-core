@@ -14,6 +14,7 @@ import express from "express";
 
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { requireDealerAccount } from "../../shared/middlewares/dealer.middleware.js";
+import { getDealerOpportunityRights } from "../../shared/middlewares/opportunities-entitlement.middleware.js";
 import { getDealerOpportunitiesSummary } from "./dealer-opportunities-summary.service.js";
 
 const router = express.Router();
@@ -30,12 +31,15 @@ router.use(requireDealerAccount());
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const payload = await getDealerOpportunitiesSummary(req.user?.id, req.query ?? {});
+    const rights = await getDealerOpportunityRights(req.user.id);
+    // Em modo pago, nunca calcular ou expor métricas de um produto sem
+    // direito de acesso. Contagens e tendências também são dados comerciais.
+    const payload = await getDealerOpportunitiesSummary(req.user.id, req.query ?? {}, rights);
     // `no-store`: são contagens que mudam a cada publicação na cidade, e um
     // resumo em cache mostraria "0 veículos" numa tela cujo botão abre uma lista
     // com dez.
     res.set("Cache-Control", "private, no-store");
-    res.json({ success: true, ...payload });
+    res.json({ success: true, rights, ...payload });
   })
 );
 
