@@ -4,6 +4,7 @@ import RecoverPasswordPanel from "@/components/auth/RecoverPasswordPanel";
 export const metadata: Metadata = {
   title: "Recuperar senha",
   description: "Recupere o acesso da sua conta no Carros na Cidade.",
+  robots: { index: false, follow: false },
   alternates: {
     canonical: "/recuperar-senha",
   },
