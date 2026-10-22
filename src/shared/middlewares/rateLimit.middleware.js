@@ -1,4 +1,5 @@
 import rateLimit from "express-rate-limit";
+import { isIP } from "node:net";
 
 import { isAuthenticatedInternalCall } from "./bot-blocker.middleware.js";
 
@@ -69,13 +70,27 @@ export function clientRateLimitKey(req) {
   return req.ip || req.socket?.remoteAddress || "unknown";
 }
 
+/**
+ * Identidade de IP usada nas ações sensíveis de autenticação.
+ * Só aceita X-Cnc-Client-Ip se enviado pelo BFF autenticado por token interno.
+ * Headers de IP recebidos diretamente de clientes públicos são ignorados.
+ */
+export function sensitiveAuthRateLimitKey(req) {
+  if (isAuthenticatedInternalCall(req)) {
+    const ip = String(req.headers["x-cnc-client-ip"] || "").trim();
+    if (isIP(ip)) return ip;
+  }
+  const peer = String(req.ip || req.socket?.remoteAddress || "").trim();
+  return isIP(peer) ? peer : "unknown";
+}
+
 export const loginRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 10, // 10 tentativas
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => clientRateLimitKey(req),
-  skip: skipIfAuthenticatedInternal,
+  keyGenerator: sensitiveAuthRateLimitKey,
+  // Login e cadastro via BFF são ações de usuário: nunca dispensar rate limit.
   message: {
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
@@ -87,11 +102,33 @@ export const registerRateLimit = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => clientRateLimitKey(req),
-  skip: skipIfAuthenticatedInternal,
+  keyGenerator: sensitiveAuthRateLimitKey,
+  // Login e cadastro via BFF são ações de usuário: nunca dispensar rate limit.
   message: {
     error: "Muitas tentativas. Tente novamente mais tarde.",
   },
+});
+
+/**
+ * A solicitação de recuperação envia e-mail; limite dedicado reduz spam e
+ * abuso. O reset também limita tentativas de adivinhar tokens.
+ */
+export const passwordRecoveryRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `password-recovery:${sensitiveAuthRateLimitKey(req)}`,
+  message: { error: "Muitas solicitações. Aguarde alguns minutos." },
+});
+
+export const passwordResetRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `password-reset:${sensitiveAuthRateLimitKey(req)}`,
+  message: { error: "Muitas tentativas. Aguarde alguns minutos." },
 });
 
 /**
