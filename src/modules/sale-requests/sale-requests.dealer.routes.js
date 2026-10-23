@@ -43,10 +43,13 @@ function asyncHandler(fn) {
 // mundo, inclusive lojista legítimo.
 router.use(authMiddleware);
 router.use(requireDealerAccount());
-router.use(requireDealerOpportunity(OPPORTUNITY_FEATURE.VEHICLE_EVALUATION));
+// O gate vale para descobrir solicitações e criar NOVAS propostas.
+// Etapas de inspeção/decisão abaixo continuam acessíveis somente à loja
+// SELECIONADA, cujo ID é validado sob lock no serviço, mesmo após expiração.
+const requireEvaluationPlan = requireDealerOpportunity(OPPORTUNITY_FEATURE.VEHICLE_EVALUATION);
 
-router.get("/", asyncHandler(controller.listSaleOpportunities));
-router.get("/:id", asyncHandler(controller.getSaleOpportunity));
+router.get("/", requireEvaluationPlan, asyncHandler(controller.listSaleOpportunities));
+router.get("/:id", requireEvaluationPlan, asyncHandler(controller.getSaleOpportunity));
 
 // POST — o único verbo de ESCRITA desta área.
 //
@@ -54,7 +57,7 @@ router.get("/:id", asyncHandler(controller.getSaleOpportunity));
 // domínio já limita o custo de um cliente insistente. Cada proposta precisa
 // SUPERAR a maior atual, então uma repetição do mesmo valor é recusada dentro da
 // transação, e escalar de verdade custa dinheiro real ao lojista a cada tentativa.
-router.post("/:id/offers", asyncHandler(controller.createSaleOffer));
+router.post("/:id/offers", requireEvaluationPlan, asyncHandler(controller.createSaleOffer));
 
 /**
  * Fase 4.5 — o que a loja SELECIONADA faz depois de vencer.
