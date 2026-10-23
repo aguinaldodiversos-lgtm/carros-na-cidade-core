@@ -189,10 +189,14 @@ function buildApp() {
   return app;
 }
 
-const asDealer = (req, user = DEALER) =>
-  req.set("x-test-user", user).set("x-test-account", "CNPJ");
+const asDealer = (req, user = DEALER) => req.set("x-test-user", user).set("x-test-account", "CNPJ");
 
-function seedIntent({ cityId = ATIBAIA, createdDaysAgo = 1, status = "active", expiresInDays = 20 }) {
+function seedIntent({
+  cityId = ATIBAIA,
+  createdDaysAgo = 1,
+  status = "active",
+  expiresInDays = 20,
+}) {
   db.purchaseIntents.push({
     city_id: cityId,
     status,
@@ -351,7 +355,7 @@ describe("a variação de 7 dias", () => {
   });
 
   it("queda vem com `direction: down` e percentual POSITIVO", async () => {
-    for (const days of [1] ) seedIntent({ createdDaysAgo: days });
+    for (const days of [1]) seedIntent({ createdDaysAgo: days });
     for (const days of [9, 10, 11, 12]) seedIntent({ createdDaysAgo: days });
 
     const response = await asDealer(request(buildApp()).get(BASE));
@@ -450,5 +454,36 @@ describe("privacidade", () => {
       "new_today",
       "sale_requests",
     ]);
+  });
+});
+
+describe("resumo respeita direitos de assinatura quando o gate for ativado", () => {
+  it("não devolve contagens de compradores a um lojista Start", async () => {
+    seedIntent({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    seedSaleRequest({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    const { getDealerOpportunitiesSummary } = await import(
+      "../../src/modules/dealers/dealer-opportunities-summary.service.js"
+    );
+    const rights = { buyers: false, vehicle_evaluation: true };
+    const result = await getDealerOpportunitiesSummary(DEALER, {}, rights);
+    expect(result.summary.active_buyers).toBeNull();
+    expect(result.summary.sale_requests?.total).toBe(1);
+    expect(result.summary.new_today?.total).toBe(1);
+  });
+
+  it("sem nenhuma permissão, não devolve contagens nem tendências", async () => {
+    seedIntent({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    seedSaleRequest({ cityId: ATIBAIA, createdDaysAgo: 0 });
+    const { getDealerOpportunitiesSummary } = await import(
+      "../../src/modules/dealers/dealer-opportunities-summary.service.js"
+    );
+    const rights = { buyers: false, vehicle_evaluation: false };
+    const result = await getDealerOpportunitiesSummary(DEALER, {}, rights);
+    expect(result.summary).toEqual({
+      active_buyers: null,
+      sale_requests: null,
+      new_today: null,
+      deals_in_progress: null,
+    });
   });
 });

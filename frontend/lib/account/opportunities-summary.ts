@@ -31,13 +31,13 @@ export type OpportunityMetric = {
 
 export type DealerOpportunitiesSummary = {
   /** Procuras ativas e não vencidas na cidade da loja. */
-  active_buyers: OpportunityMetric;
+  active_buyers: OpportunityMetric | null;
   /** Solicitações de venda em `receiving_offers` na cidade da loja. */
-  sale_requests: OpportunityMetric;
+  sale_requests: OpportunityMetric | null;
   /** Entradas de HOJE nos dois produtos, somadas. */
-  new_today: OpportunityMetric;
+  new_today: OpportunityMetric | null;
   /** Negócios em que a oferta selecionada é DESTA loja. */
-  deals_in_progress: OpportunityMetric;
+  deals_in_progress: OpportunityMetric | null;
 };
 
 export class OpportunitiesSummaryError extends Error {
@@ -61,9 +61,13 @@ export async function fetchOpportunitiesSummary(
       : "";
 
   const response = await fetch(`${BASE}${suffix}`, { cache: "no-store" });
-  const payload = (await response.json().catch(() => null)) as
-    | { success?: boolean; message?: string; code?: string; details?: { code?: string }; summary?: DealerOpportunitiesSummary }
-    | null;
+  const payload = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    message?: string;
+    code?: string;
+    details?: { code?: string };
+    summary?: DealerOpportunitiesSummary;
+  } | null;
 
   if (!response.ok || payload?.success === false || !payload?.summary) {
     throw new OpportunitiesSummaryError(

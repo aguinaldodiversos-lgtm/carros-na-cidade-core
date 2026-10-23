@@ -128,7 +128,7 @@ function MetricCard({
 }: {
   label: string;
   hint: string;
-  metric: OpportunityMetric;
+  metric: OpportunityMetric | null;
   entriesLabel: string;
   tone: MetricTone;
   icon: React.ReactNode;
@@ -149,17 +149,28 @@ function MetricCard({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[27px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-[#101B3D]">
-          {metric.total.toLocaleString("pt-BR")}
-        </p>
-        <p
-          className="mt-1 min-h-[31px] text-[12px] font-semibold leading-snug text-[#576986] xl:min-h-[35px]"
-          title={hint}
-        >
-          {label}
-        </p>
-        <TrendLine metric={metric} entriesLabel={entriesLabel} />
-        {href && linkLabel ? (
+        {metric ? (
+          <>
+            <p className="text-[27px] font-extrabold leading-none tracking-[-0.04em] tabular-nums text-[#101B3D]">
+              {metric.total.toLocaleString("pt-BR")}
+            </p>
+            <p
+              className="mt-1 min-h-[31px] text-[12px] font-semibold leading-snug text-[#576986] xl:min-h-[35px]"
+              title={hint}
+            >
+              {label}
+            </p>
+            <TrendLine metric={metric} entriesLabel={entriesLabel} />
+          </>
+        ) : (
+          <>
+            <p className="text-[13px] font-extrabold text-[#101B3D]">{label}</p>
+            <p className="mt-2 text-[12px] text-[#667793]">
+              Indicador disponível mediante assinatura do plano correspondente.
+            </p>
+          </>
+        )}
+        {metric && href && linkLabel ? (
           <Link
             href={href}
             className={`mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-bold underline-offset-2 hover:underline ${colors.link}`}
@@ -295,7 +306,11 @@ export default function OpportunityHubMetrics() {
           />
           <MetricCard
             label="Novas hoje"
-            hint="Novas procuras e veículos publicados hoje na cidade da sua loja."
+            hint={
+              summary.active_buyers
+                ? "Novas procuras e veículos publicados hoje na cidade da sua loja."
+                : "Novos veículos publicados hoje na cidade da sua loja."
+            }
             entriesLabel="novas entradas em 7 dias"
             metric={summary.new_today}
             tone="amber"
