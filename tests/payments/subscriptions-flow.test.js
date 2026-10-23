@@ -424,7 +424,7 @@ describe("getMySubscription — read-only, escopo por sessão", () => {
         {
           plan_id: "cnpj-store-start",
           status: "active",
-          expires_at: "2026-08-01T00:00:00.000Z",
+          effective_expires_at: "2026-08-01T00:00:00.000Z",
           cancel_at_period_end: false,
           plan_name: "Plano Loja Start",
         },
@@ -453,6 +453,105 @@ describe("getMySubscription — read-only, escopo por sessão", () => {
     db.query.mockRejectedValueOnce(new Error("db down"));
     const r = await getMySubscription({ userId: "u1" });
     expect(r).toEqual({ status: "none" });
+  });
+});
+
+describe("regressões — assinatura recorrente e concessão administrativa", () => {
+  it("consulta e cancela pagamento recorrente mesmo com payment_id legado NULL", async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          user_id: "u1",
+          plan_id: "cnpj-store-pro",
+          status: "active",
+          provider: "mercado_pago",
+          provider_preapproval_id: "PRE-CANONICAL-1",
+          payment_id: null,
+          current_period_end: "2026-12-01T00:00:00.000Z",
+          expires_at: null,
+          created_at: "2026-10-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const result = await cancelUserSubscription({ userId: "u1" });
+    expect(result).toMatchObject({
+      cancelled: true,
+      status: "cancelled",
+      expires_at: "2026-12-01T00:00:00.000Z",
+    });
+    expect(db.query.mock.calls[0][0]).toContain("provider_preapproval_id");
+    expect(db.query.mock.calls[0][0]).toContain("current_period_end");
+    expect(db.query.mock.calls[0][0]).toContain("COALESCE(source, '') <> $2");
+    expect(db.query.mock.calls[0][1][0]).toBe("u1");
+    const update = db.withTransaction.mock.calls[0];
+    expect(update).toBeTruthy();
+  });
+
+  it("não informa cancelamento concluído se o UPDATE local afetar zero linhas", async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          user_id: "u1",
+          plan_id: "cnpj-store-pro",
+          status: "active",
+          provider: "mercado_pago",
+          provider_preapproval_id: "PRE-CANONICAL-ZERO",
+          current_period_end: "2026-12-01T00:00:00.000Z",
+          created_at: "2026-10-01T00:00:00.000Z",
+        },
+      ],
+    });
+    db.withTransaction.mockImplementationOnce((fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }) })
+    );
+
+    await expect(cancelUserSubscription({ userId: "u1" })).rejects.toMatchObject({
+      statusCode: 502,
+      message: expect.stringContaining("não sincronizado"),
+    });
+    expect(db.withTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("cortesia admin isolada não entra na consulta de cancelamento Mercado Pago", async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    await expect(cancelUserSubscription({ userId: "u1" })).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    const [sql, params] = db.query.mock.calls[0];
+    expect(sql).toContain("COALESCE(source, '') <> $2");
+    expect(params).toContain("admin_grant");
+    expect(db.withTransaction).not.toHaveBeenCalled();
+  });
+
+  it("GET assinatura cancelada mostra vigência recorrente até o fim do ciclo pago", async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          plan_id: "cnpj-store-start",
+          status: "cancelled",
+          effective_expires_at: "2026-12-01T00:00:00.000Z",
+          cancel_at_period_end: true,
+          plan_name: "Plano Loja Start",
+        },
+      ],
+    });
+    const result = await getMySubscription({ userId: "u1" });
+    expect(result).toMatchObject({
+      status: "cancelled",
+      plan_id: "cnpj-store-start",
+      cancel_at_period_end: true,
+      expires_at: "2026-12-01T00:00:00.000Z",
+    });
+    const [sql] = db.query.mock.calls[0];
+    expect(sql).toContain("COALESCE(us.current_period_end, us.expires_at)");
+    expect(sql).toContain("COALESCE(us.cancel_at_period_end, false) = true");
+    expect(sql).toContain("COALESCE(us.current_period_end, us.expires_at) > NOW()");
+  });
+
+  it("sem assinatura vigente o painel não inventa um plano ativo", async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    expect(await getMySubscription({ userId: "u1" })).toEqual({ status: "none" });
   });
 });
 

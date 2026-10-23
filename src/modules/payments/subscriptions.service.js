@@ -28,6 +28,7 @@ import {
   assertNoLiveSubscriptionFor,
   assertSubscribablePlan,
   findLiveSubscriptionForUser,
+  findLivePaidSubscriptionForUser,
 } from "./subscriptions.guards.js";
 
 // Re-exporta para compat retroativa (consumidores importavam daqui).
@@ -102,7 +103,9 @@ export async function createSubscriptionCheckout({
  * cancellation por outras vias.
  */
 export async function cancelUserSubscription({ userId, requestId }) {
-  const sub = await findLiveSubscriptionForUser(userId);
+  // Cortesias do administrador não são assinaturas do Mercado Pago.
+  // Nunca tentar cancelar admin_grant usando endpoint financeiro.
+  const sub = await findLivePaidSubscriptionForUser(userId);
   if (!sub) {
     throw new AppError("Nenhuma assinatura ativa encontrada.", 404);
   }
@@ -139,9 +142,12 @@ export async function cancelUserSubscription({ userId, requestId }) {
   // status local vira 'cancelled'. Senão (MP retornou outro estado por
   // alguma razão), traduz pelo helper para manter sincronia.
   const localStatus = mapPreapprovalStatusToLocal(mpResult.status);
+  if (localStatus !== "cancelled") {
+    throw new AppError("O Mercado Pago não confirmou o cancelamento. Consulte a assinatura.", 502);
+  }
 
   await withTransaction(async (client) => {
-    await client.query(
+    const updated = await client.query(
       `
       UPDATE user_subscriptions
       SET
@@ -154,6 +160,15 @@ export async function cancelUserSubscription({ userId, requestId }) {
       `,
       [userId, sub.plan_id, localStatus, sub.created_at]
     );
+    // O provedor pode ter confirmado o cancelamento, mas um UPDATE sem row
+    // significa que a assinatura local não foi reconciliada. Nunca informar
+    // sucesso ao usuário nesse caso.
+    if (updated.rowCount !== 1) {
+      throw new AppError(
+        "Cancelamento confirmado no Mercado Pago, mas não sincronizado no portal. Contate o suporte.",
+        502
+      );
+    }
   });
 
   logger.info(
@@ -173,11 +188,12 @@ export async function cancelUserSubscription({ userId, requestId }) {
     plan_id: sub.plan_id,
     status: localStatus,
     cancel_at_period_end: true,
-    // Data "até quando o benefício continua". O cancel só marca
-    // cancel_at_period_end=true e NÃO altera expires_at, então o valor lido na
-    // sub viva ainda é o correto. Devolvido aqui para a tela mostrar
-    // "ativa até [data]" imediatamente, sem refazer o GET /subscriptions/me.
-    expires_at: sub.expires_at ? new Date(sub.expires_at).toISOString() : null,
+    // Assinaturas recorrentes usam current_period_end; expires_at é legado.
+    // Mantemos o campo público expires_at para compatibilidade com o painel.
+    expires_at:
+      sub.current_period_end || sub.expires_at
+        ? new Date(sub.current_period_end || sub.expires_at).toISOString()
+        : null,
   };
 }
 
@@ -198,12 +214,12 @@ const RENDERABLE_LIVE_STATUSES = Object.freeze(["active", "pending", "paused"]);
  * Retorna a linha mais recente que seja:
  *   - viva (status active/pending/paused), OU
  *   - já cancelada mas ainda dentro do período pago
- *     (cancel_at_period_end=true e expires_at no futuro),
+ *     (cancel_at_period_end=true e período efetivo no futuro),
  * para que a tela consiga mostrar "cancelada — ativa até [data]".
  *
  * Sem assinatura relevante (ex.: plano gratuito) → `{ status: 'none' }`,
- * nunca um erro. `expires_at` é a coluna canônica "até quando o benefício
- * continua" neste schema.
+ * nunca um erro. O período canônico recorrente é `current_period_end`;
+ * `expires_at` continua sendo o campo compatível na resposta da API.
  */
 export async function getMySubscription({ userId }) {
   try {
@@ -212,7 +228,7 @@ export async function getMySubscription({ userId }) {
       SELECT
         us.plan_id,
         us.status,
-        us.expires_at,
+        COALESCE(us.current_period_end, us.expires_at) AS effective_expires_at,
         us.cancel_at_period_end,
         p.name AS plan_name
       FROM user_subscriptions us
@@ -222,8 +238,7 @@ export async function getMySubscription({ userId }) {
           us.status = ANY($2::text[])
           OR (
             COALESCE(us.cancel_at_period_end, false) = true
-            AND us.expires_at IS NOT NULL
-            AND us.expires_at > NOW()
+            AND COALESCE(us.current_period_end, us.expires_at) > NOW()
           )
         )
       ORDER BY us.created_at DESC
@@ -239,7 +254,9 @@ export async function getMySubscription({ userId }) {
       status: row.status,
       plan_id: row.plan_id,
       plan_name: row.plan_name || null,
-      expires_at: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+      expires_at: row.effective_expires_at
+        ? new Date(row.effective_expires_at).toISOString()
+        : null,
       cancel_at_period_end: Boolean(row.cancel_at_period_end),
     };
   } catch (err) {

@@ -70,6 +70,8 @@ export async function findLiveSubscriptionForUser(userId) {
       plan_id,
       status,
       expires_at,
+      current_period_end,
+      provider_preapproval_id,
       payment_id,
       created_at
     FROM user_subscriptions
@@ -102,6 +104,10 @@ export async function findLivePaidSubscriptionForUser(userId) {
       source,
       payment_id,
       provider,
+      provider_preapproval_id,
+      expires_at,
+      current_period_end,
+      cancel_at_period_end,
       created_at
     FROM user_subscriptions
     WHERE user_id = $1
