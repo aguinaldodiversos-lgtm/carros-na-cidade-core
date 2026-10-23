@@ -459,17 +459,19 @@ describe("getMySubscription — read-only, escopo por sessão", () => {
 describe("regressões — assinatura recorrente e concessão administrativa", () => {
   it("consulta e cancela pagamento recorrente mesmo com payment_id legado NULL", async () => {
     db.query.mockResolvedValueOnce({
-      rows: [{
-        user_id: "u1",
-        plan_id: "cnpj-store-pro",
-        status: "active",
-        provider: "mercado_pago",
-        provider_preapproval_id: "PRE-CANONICAL-1",
-        payment_id: null,
-        current_period_end: "2026-12-01T00:00:00.000Z",
-        expires_at: null,
-        created_at: "2026-10-01T00:00:00.000Z",
-      }],
+      rows: [
+        {
+          user_id: "u1",
+          plan_id: "cnpj-store-pro",
+          status: "active",
+          provider: "mercado_pago",
+          provider_preapproval_id: "PRE-CANONICAL-1",
+          payment_id: null,
+          current_period_end: "2026-12-01T00:00:00.000Z",
+          expires_at: null,
+          created_at: "2026-10-01T00:00:00.000Z",
+        },
+      ],
     });
 
     const result = await cancelUserSubscription({ userId: "u1" });
@@ -499,13 +501,15 @@ describe("regressões — assinatura recorrente e concessão administrativa", ()
 
   it("GET assinatura cancelada mostra vigência recorrente até o fim do ciclo pago", async () => {
     db.query.mockResolvedValueOnce({
-      rows: [{
-        plan_id: "cnpj-store-start",
-        status: "cancelled",
-        effective_expires_at: "2026-12-01T00:00:00.000Z",
-        cancel_at_period_end: true,
-        plan_name: "Plano Loja Start",
-      }],
+      rows: [
+        {
+          plan_id: "cnpj-store-start",
+          status: "cancelled",
+          effective_expires_at: "2026-12-01T00:00:00.000Z",
+          cancel_at_period_end: true,
+          plan_name: "Plano Loja Start",
+        },
+      ],
     });
     const result = await getMySubscription({ userId: "u1" });
     expect(result).toMatchObject({

@@ -181,9 +181,10 @@ export async function cancelUserSubscription({ userId, requestId }) {
     cancel_at_period_end: true,
     // Assinaturas recorrentes usam current_period_end; expires_at é legado.
     // Mantemos o campo público expires_at para compatibilidade com o painel.
-    expires_at: sub.current_period_end || sub.expires_at
-      ? new Date(sub.current_period_end || sub.expires_at).toISOString()
-      : null,
+    expires_at:
+      sub.current_period_end || sub.expires_at
+        ? new Date(sub.current_period_end || sub.expires_at).toISOString()
+        : null,
   };
 }
 
