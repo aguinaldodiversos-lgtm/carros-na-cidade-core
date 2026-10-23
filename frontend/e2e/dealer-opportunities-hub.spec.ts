@@ -386,11 +386,8 @@ test.describe("@dealer-hub desktop", () => {
   });
 
   test("resumo indisponível some com a faixa em vez de mostrar zero", async ({ page }) => {
-    await page
-      .context()
-      .addCookies([
-        { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-      ]);
+    // A consulta de permissões continua válida mesmo quando o resumo falha.
+    await prepare(page);
     await page.route(SUMMARY_URL, (route) =>
       route.fulfill({
         status: 503,
