@@ -356,7 +356,7 @@ export async function countOpenByCity({ cityId, filters }) {
  * NULL não é verdadeira), então o pior caso de um call site distraído é a loja
  * vencedora receber 404 — falha fechada, e não vazamento.
  */
-export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId) {
+export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId, { selectedOnly = false } = {}) {
   const result = await query(
     `
     SELECT
@@ -370,7 +370,7 @@ ${CURRENT_ROUND_JOIN}
     WHERE sr.id = $1
       AND sr.city_id = $2
       AND (
-        sr.status = $3
+        (NOT $6::boolean AND sr.status = $3)
         OR (sr.status = ANY($4::text[]) AND sel.advertiser_id = $5)
       )
     LIMIT 1
@@ -392,6 +392,7 @@ ${CURRENT_ROUND_JOIN}
       // ter de vir aqui a cada estado novo, e esse custo é o ponto.
       SALE_REQUEST_SELECTED_STATUSES,
       advertiserId,
+      selectedOnly,
     ]
   );
   return result.rows[0] ?? null;
