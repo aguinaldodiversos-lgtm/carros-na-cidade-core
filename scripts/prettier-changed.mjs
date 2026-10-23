@@ -194,21 +194,7 @@ for (const caminho of alvos) {
     continue;
   }
 
-  if (!(await prettier.check(fonte, opcoes))) {
-    reprovados.push(caminho);
-    const formatado = await prettier.format(fonte, opcoes);
-    console.error(`[formatted-source] ${caminho} ${JSON.stringify(formatado)}`);
-    const original = fonte.split("\n");
-    const esperado = formatado.split("\n");
-    const limite = Math.max(original.length, esperado.length);
-    for (let linha = 0; linha < limite; linha += 1) {
-      if (original[linha] === esperado[linha]) continue;
-      console.error(`[format-diff] ${caminho} primeira diferença na linha ${linha + 1}`);
-      console.error(`[format-diff] original: ${JSON.stringify(original.slice(Math.max(0, linha - 2), linha + 11))}`);
-      console.error(`[format-diff] esperado: ${JSON.stringify(esperado.slice(Math.max(0, linha - 2), linha + 11))}`);
-      break;
-    }
-  }
+  if (!(await prettier.check(fonte, opcoes))) reprovados.push(caminho);
 }
 
 if (WRITE) {
