@@ -194,7 +194,10 @@ for (const caminho of alvos) {
     continue;
   }
 
-  if (!(await prettier.check(fonte, opcoes))) reprovados.push(caminho);
+  if (!(await prettier.check(fonte, opcoes))) {
+    reprovados.push(caminho);
+    console.error(`[formatted-source] ${caminho} ${JSON.stringify(await prettier.format(fonte, opcoes))}`);
+  }
 }
 
 if (WRITE) {
