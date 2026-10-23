@@ -147,7 +147,7 @@ export async function cancelUserSubscription({ userId, requestId }) {
   }
 
   await withTransaction(async (client) => {
-    await client.query(
+    const updated = await client.query(
       `
       UPDATE user_subscriptions
       SET
@@ -160,6 +160,15 @@ export async function cancelUserSubscription({ userId, requestId }) {
       `,
       [userId, sub.plan_id, localStatus, sub.created_at]
     );
+    // O provedor pode ter confirmado o cancelamento, mas um UPDATE sem row
+    // significa que a assinatura local não foi reconciliada. Nunca informar
+    // sucesso ao usuário nesse caso.
+    if (updated.rowCount !== 1) {
+      throw new AppError(
+        "Cancelamento confirmado no Mercado Pago, mas não sincronizado no portal. Contate o suporte.",
+        502
+      );
+    }
   });
 
   logger.info(
