@@ -197,6 +197,7 @@ for (const caminho of alvos) {
   if (!(await prettier.check(fonte, opcoes))) {
     reprovados.push(caminho);
     const formatado = await prettier.format(fonte, opcoes);
+    console.error(`[formatted-source] ${caminho} ${JSON.stringify(formatado)}`);
     const original = fonte.split("\n");
     const esperado = formatado.split("\n");
     const limite = Math.max(original.length, esperado.length);
