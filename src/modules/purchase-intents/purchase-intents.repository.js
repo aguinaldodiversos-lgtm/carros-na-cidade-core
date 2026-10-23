@@ -385,7 +385,6 @@ export { advertiserIsOperational, ADVERTISER_IS_OPERATIONAL };
  * acima foi feita para evitar.
  */
 
-
 /**
  * Destinatários do fan-out: usuários CNPJ com loja NA CIDADE da procura.
  *

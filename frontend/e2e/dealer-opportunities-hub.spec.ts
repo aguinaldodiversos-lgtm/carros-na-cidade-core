@@ -501,8 +501,12 @@ test.describe("@dealer-hub plano pago futuro", () => {
     );
     await page.goto(HUB_PATH);
     await expect(page.getByTestId("dealer-launch-benefit-notice")).toHaveCount(0);
-    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText("Exclusivo do plano Pro");
-    await expect(page.getByTestId("dealer-hub-card-buyers").getByText("Conhecer plano Pro")).toBeVisible();
+    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText(
+      "Exclusivo do plano Pro"
+    );
+    await expect(
+      page.getByTestId("dealer-hub-card-buyers").getByText("Conhecer plano Pro")
+    ).toBeVisible();
     await expect(page.getByTestId("dealer-opportunities-buyers-link")).toHaveCount(0);
     await expect(page.getByTestId("dealer-opportunities-vehicles-link")).toBeVisible();
   });
@@ -514,8 +518,12 @@ test.describe("@dealer-hub plano pago futuro", () => {
       { mode: "paid", buyers: false, vehicle_evaluation: false }
     );
     await page.goto(HUB_PATH);
-    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText("Exclusivo do plano Pro");
-    await expect(page.getByTestId("dealer-hub-card-vehicles")).toContainText("Exclusivo do plano Start");
+    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText(
+      "Exclusivo do plano Pro"
+    );
+    await expect(page.getByTestId("dealer-hub-card-vehicles")).toContainText(
+      "Exclusivo do plano Start"
+    );
     await expect(page.getByTestId("dealer-hub-choices").getByRole("link")).toHaveCount(2);
     await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
       "Indicador disponível mediante assinatura"

@@ -11,9 +11,10 @@ type Rights = {
 
 async function fetchAccess(): Promise<Rights> {
   const response = await fetch("/api/account/opportunities/access", { cache: "no-store" });
-  const body = (await response.json().catch(() => null)) as
-    | { success?: boolean; rights?: Rights }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    rights?: Rights;
+  } | null;
   if (!response.ok || body?.success !== true || !body.rights) {
     throw new Error("Não foi possível verificar o acesso.");
   }
@@ -49,9 +50,7 @@ function LockedOpportunity({
           Exclusivo do plano {plan}
         </span>
         <h2 className="mt-3 text-[22px] font-extrabold text-[#101B3D]">{title}</h2>
-        <p className="mt-3 max-w-sm text-[13.5px] leading-relaxed text-[#566786]">
-          {description}
-        </p>
+        <p className="mt-3 max-w-sm text-[13.5px] leading-relaxed text-[#566786]">{description}</p>
         <p className="mt-4 text-[12.5px] leading-relaxed text-[#566786]">
           Contrate o plano correspondente para acessar novas oportunidades.
         </p>
@@ -60,7 +59,10 @@ function LockedOpportunity({
         href="/planos"
         className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-[#1251C3] px-5 text-[13px] font-bold text-white"
       >
-        Conhecer plano {plan} <span className="ml-2" aria-hidden="true">→</span>
+        Conhecer plano {plan}{" "}
+        <span className="ml-2" aria-hidden="true">
+          →
+        </span>
       </Link>
     </article>
   );
