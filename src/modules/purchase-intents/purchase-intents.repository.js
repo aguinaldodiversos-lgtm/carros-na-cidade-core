@@ -17,6 +17,7 @@
 
 import { query } from "../../infrastructure/database/db.js";
 import { ADVERTISER_STATUS } from "../../shared/constants/status.js";
+import { PAID_OPPORTUNITY_SUBSCRIPTION_PREDICATE } from "../../shared/middlewares/opportunities-entitlement.middleware.js";
 import { DEALER_OPPORTUNITY_SORT_SPEC } from "./purchase-intents.constants.js";
 import {
   advertiserIsOperational,
@@ -410,7 +411,20 @@ export { advertiserIsOperational, ADVERTISER_IS_OPERATIONAL };
  * O JOIN em `users` existe SÓ para validar CNPJ. A consulta de oportunidades
  * (a que responde ao lojista) continua sem tocar em `users`.
  */
-export async function listDealerRecipientsByCity(cityId) {
+export async function listDealerRecipientsByCity(cityId, { paidOnly = false } = {}) {
+  // Não há JOIN extra no lançamento. Quando a fase paga começar,
+  // EXISTS aplica a MESMA vigência/validação de pagamento do backend.
+  const paidClause = paidOnly
+    ? `
+      AND EXISTS (
+        SELECT 1
+        FROM user_subscriptions us
+        WHERE us.user_id = adv.user_id
+          AND us.plan_id = 'cnpj-store-pro'
+          AND ${PAID_OPPORTUNITY_SUBSCRIPTION_PREDICATE}
+      )`
+    : "";
+
   const result = await query(
     `
     SELECT DISTINCT adv.user_id AS user_id
@@ -420,6 +434,7 @@ export async function listDealerRecipientsByCity(cityId) {
       AND ${ADVERTISER_IS_OPERATIONAL}
       AND adv.user_id IS NOT NULL
       AND LOWER(BTRIM(COALESCE(u.document_type, ''))) = 'cnpj'
+      ${paidClause}
     `,
     [cityId, ADVERTISER_STATUS.ACTIVE]
   );
