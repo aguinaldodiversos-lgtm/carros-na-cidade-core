@@ -62,7 +62,8 @@ router.get(
     const result = await dealerService.getDealerSaleOpportunity(
       req.user.id,
       req.params.id,
-      req.query || {}
+      req.query || {},
+      { selectedOnly: true }
     );
     if (result.sale_opportunity?.is_selected !== true) {
       throw new AppError("Oportunidade não encontrada.", 404);
