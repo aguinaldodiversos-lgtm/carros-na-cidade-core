@@ -346,7 +346,7 @@ export async function listDealerSaleOpportunities(userId, rawQuery = {}, { now =
  * a mesma resposta viraria um oráculo para qualquer CNPJ da cidade sondar ids e
  * descobrir quais solicitações foram fechadas.
  */
-export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
+export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}, { selectedOnly = false } = {}) {
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 
@@ -356,7 +356,7 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
 
   // A loja entra na PRÓPRIA query de visibilidade: é ela que decide se uma
   // solicitação já decidida ainda pode ser aberta, e por quem.
-  const row = await repo.getVisibleByIdForCity(saleRequestId, cityId, advertiserId);
+  const row = await repo.getVisibleByIdForCity(saleRequestId, cityId, advertiserId, { selectedOnly });
   if (!row) {
     logger.info(
       {
