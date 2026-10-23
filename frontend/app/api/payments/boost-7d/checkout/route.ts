@@ -23,9 +23,6 @@ export const dynamic = "force-dynamic";
 
 type Payload = {
   ad_id?: string;
-  success_url?: string;
-  failure_url?: string;
-  pending_url?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -45,13 +42,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Backend nao configurado" }, { status: 500 });
     }
 
-    const origin = request.nextUrl.origin;
-    const forwardBody: Record<string, string> = {
-      ad_id: adId,
-      success_url: body.success_url || `${origin}/pagamento/sucesso`,
-      failure_url: body.failure_url || `${origin}/pagamento/erro`,
-      pending_url: body.pending_url || `${origin}/pagamento/erro`,
-    };
+    // O backend define os retornos pela origem oficial configurada.
+    // O cliente não escolhe redirects nem por body nem por Host.
+    const forwardBody = { ad_id: adId };
 
     const response = await fetch(backendUrl, {
       method: "POST",

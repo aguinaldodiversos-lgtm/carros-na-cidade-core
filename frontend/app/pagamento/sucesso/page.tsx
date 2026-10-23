@@ -8,14 +8,12 @@ import { useEffect, useRef, useState } from "react";
  * webhook validar a aprovação no backend. Antes, esta página afirmava
  * "Pagamento aprovado" mesmo quando o webhook ainda não tinha rodado — UX
  * incoerente. Agora ela consulta /api/dashboard/me a cada 3s até confirmar
- * que `current_plan.billing_model` saiu de "free", ou até esgotar o budget
- * (~30s), e só então fixa um estado terminal.
- *
- * Usuário anônimo (sem sessão) cai no estado "approved" imediatamente — não
- * temos como confirmar pelo dashboard, então preservamos a mensagem antiga.
+ * a conta possui um plano pago, ou até esgotar o budget (~30s).
+ * Um plano já existente não comprova que a compra recém-iniciada foi aprovada:
+ * a página informa o estado da conta sem alegar confirmação de transação.
  */
 
-type PollingState = "checking" | "approved" | "still_pending";
+type PollingState = "checking" | "plan_active" | "still_pending";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 10;
@@ -77,7 +75,7 @@ export default function PagamentoSucessoPage() {
           if (isPaidPlan(plan)) {
             if (!cancelledRef.current) {
               setPlanLabel(plan?.id ? String(plan.id) : null);
-              setState("approved");
+              setState("plan_active");
             }
             return;
           }
@@ -111,8 +109,8 @@ export default function PagamentoSucessoPage() {
           <>
             <h1 className="text-3xl font-extrabold text-[#1d2538]">Validando seu pagamento...</h1>
             <p className="mt-2 text-sm text-[#53607b]">
-              Recebemos a confirmacao do Mercado Pago. Aguarde alguns segundos enquanto o backend
-              registra a ativacao do seu plano.
+              Você retornou do checkout. Estamos verificando sua conta; a aprovação desta compra
+              depende da confirmação da transação no sistema.
             </p>
             <div
               role="status"
@@ -123,13 +121,12 @@ export default function PagamentoSucessoPage() {
               Conferindo o status no backend
             </div>
           </>
-        ) : state === "approved" ? (
+        ) : state === "plan_active" ? (
           <>
-            <h1 className="text-3xl font-extrabold text-[#1d2538]">Pagamento aprovado</h1>
+            <h1 className="text-3xl font-extrabold text-[#1d2538]">Plano ativo na sua conta</h1>
             <p className="mt-2 text-sm text-[#53607b]">
-              {planLabel
-                ? `Plano ativo: ${planLabel}. Os benefícios já estão disponíveis na sua conta.`
-                : "Pagamento confirmado. Os benefícios já estão disponíveis na sua conta."}
+              {planLabel ? `Plano ativo: ${planLabel}. ` : "Identificamos um plano ativo. "}
+              Isso não confirma a aprovação desta compra. Consulte o comprovante no Mercado Pago.
             </p>
             <div className="mt-5 flex justify-center gap-3">
               <Link
@@ -150,9 +147,9 @@ export default function PagamentoSucessoPage() {
           <>
             <h1 className="text-3xl font-extrabold text-[#1d2538]">Pagamento em validação</h1>
             <p className="mt-2 text-sm text-[#53607b]">
-              O Mercado Pago confirmou o checkout, mas o webhook do backend ainda não terminou de
-              processar. A ativacao costuma levar de 1 a 5 minutos. Atualize esta página em alguns
-              instantes ou abra o painel para acompanhar.
+              Não foi possível confirmar esta transação pelo status da conta. Confira o pagamento no
+              Mercado Pago e acompanhe os benefícios no seu painel. Caso tenha pago, não inicie uma
+              segunda cobrança antes de verificar a primeira.
             </p>
             <div className="mt-5 flex justify-center gap-3">
               <Link

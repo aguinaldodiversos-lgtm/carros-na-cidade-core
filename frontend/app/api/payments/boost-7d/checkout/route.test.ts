@@ -92,6 +92,9 @@ describe("BFF /api/payments/boost-7d/checkout", () => {
         price: 1,
         boost_option_id: "boost-30d",
         days: 999,
+        success_url: "https://phishing.invalid/sucesso",
+        failure_url: "https://phishing.invalid/erro",
+        pending_url: "https://phishing.invalid/pendente",
       })
     );
 
@@ -104,5 +107,8 @@ describe("BFF /api/payments/boost-7d/checkout", () => {
     expect(forwarded).not.toHaveProperty("price");
     expect(forwarded).not.toHaveProperty("days");
     expect(forwarded).not.toHaveProperty("boost_option_id");
+    expect(forwarded).not.toHaveProperty("success_url");
+    expect(forwarded).not.toHaveProperty("failure_url");
+    expect(forwarded).not.toHaveProperty("pending_url");
   });
 });
