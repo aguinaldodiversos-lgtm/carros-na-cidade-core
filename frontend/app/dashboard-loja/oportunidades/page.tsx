@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireLojistaDashboardSession } from "@/lib/account/dashboard-session";
 import OpportunityHubMetrics from "@/components/account/opportunities/OpportunityHubMetrics";
+import DealerOpportunityAccess from "@/components/account/opportunities/DealerOpportunityAccess";
 import OpportunityHubChoiceCard from "@/components/account/opportunities/OpportunityHubChoiceCard";
 import OpportunityHubHowItWorks, {
   type HowItWorksFlow,
@@ -139,60 +140,68 @@ export default async function OportunidadesHubPage() {
         </div>
       </header>
 
-      <div
-        className="flex items-start gap-3 rounded-2xl border border-[#CEE5FC] bg-[#F4F9FF] px-4 py-3.5 text-[#215080]"
-        data-testid="dealer-launch-benefit-notice"
-        aria-label="Benefício de lançamento"
-      >
-        <svg
-          aria-hidden="true"
-          className="mt-0.5 h-5 w-5 shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        >
-          <path d="M12 3v18M3 12h18M4 7h16v14H4zM3 7h18" strokeLinecap="round" />
-        </svg>
-        <div>
-          <p className="text-[13px] font-extrabold">Benefício especial de lançamento</p>
-          <p className="mt-1 text-[12.5px] leading-relaxed">
-            Durante o lançamento, Compradores Procurando e Veículos para Avaliação estão disponíveis
-            gratuitamente para lojistas cadastrados. Futuramente, Compradores Procurando será
-            exclusivo do plano Pro, e Veículos para Avaliação dos planos Start e Pro.
-          </p>
-        </div>
-      </div>
-
-      <div
-        className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5"
-        data-testid="dealer-hub-choices"
-      >
-        <OpportunityHubChoiceCard
-          tone="blue"
-          art={<BuyersArt className="w-full" />}
-          title="Compradores Procurando"
-          description="Veja pessoas que estão procurando veículos e envie ofertas do seu estoque."
-          benefits={BUYERS_BENEFITS}
-          ctaLabel="Ver compradores procurando"
-          ctaHref="/dashboard-loja/oportunidades/compradores"
-          howItWorksHref="#como-funciona"
-          testId="dealer-hub-card-buyers"
-          ctaTestId="dealer-opportunities-buyers-link"
-        />
-        <OpportunityHubChoiceCard
-          tone="teal"
-          art={<VehiclesArt className="w-full" />}
-          title="Veículos para avaliação"
-          description="Analise veículos enviados por proprietários e faça ofertas para compra."
-          benefits={VEHICLES_BENEFITS}
-          ctaLabel="Ver veículos para avaliação"
-          ctaHref="/dashboard-loja/oportunidades/veiculos"
-          howItWorksHref="#como-funciona"
-          testId="dealer-hub-card-vehicles"
-          ctaTestId="dealer-opportunities-vehicles-link"
-        />
-      </div>
+      <DealerOpportunityAccess
+        launchNotice={
+          (
+          <div
+            className="flex items-start gap-3 rounded-2xl border border-[#CEE5FC] bg-[#F4F9FF] px-4 py-3.5 text-[#215080]"
+            data-testid="dealer-launch-benefit-notice"
+            aria-label="Benefício de lançamento"
+          >
+            <svg
+              aria-hidden="true"
+              className="mt-0.5 h-5 w-5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <path d="M12 3v18M3 12h18M4 7h16v14H4zM3 7h18" strokeLinecap="round" />
+            </svg>
+            <div>
+              <p className="text-[13px] font-extrabold">Benefício especial de lançamento</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed">
+                Durante o lançamento, Compradores Procurando e Veículos para Avaliação estão disponíveis
+                gratuitamente para lojistas cadastrados. Futuramente, Compradores Procurando será
+                exclusivo do plano Pro, e Veículos para Avaliação dos planos Start e Pro.
+              </p>
+            </div>
+          </div>
+          )
+        }
+        buyersCard={
+          (
+            <OpportunityHubChoiceCard
+              tone="blue"
+              art={<BuyersArt className="w-full" />}
+              title="Compradores Procurando"
+              description="Veja pessoas que estão procurando veículos e envie ofertas do seu estoque."
+              benefits={BUYERS_BENEFITS}
+              ctaLabel="Ver compradores procurando"
+              ctaHref="/dashboard-loja/oportunidades/compradores"
+              howItWorksHref="#como-funciona"
+              testId="dealer-hub-card-buyers"
+              ctaTestId="dealer-opportunities-buyers-link"
+            />
+          )
+        }
+        vehiclesCard={
+          (
+            <OpportunityHubChoiceCard
+              tone="teal"
+              art={<VehiclesArt className="w-full" />}
+              title="Veículos para avaliação"
+              description="Analise veículos enviados por proprietários e faça ofertas para compra."
+              benefits={VEHICLES_BENEFITS}
+              ctaLabel="Ver veículos para avaliação"
+              ctaHref="/dashboard-loja/oportunidades/veiculos"
+              howItWorksHref="#como-funciona"
+              testId="dealer-hub-card-vehicles"
+              ctaTestId="dealer-opportunities-vehicles-link"
+            />
+          )
+        }
+      />
 
       <OpportunityHubMetrics />
       <OpportunityHubHowItWorks flows={FLOWS} />
