@@ -108,7 +108,7 @@ describe("detalhe de avaliação já selecionada", () => {
     expect(result.status).toBe(200);
     expect(result.headers["cache-control"]).toBe("private, no-store");
     expect(result.body.sale_opportunity.is_selected).toBe(true);
-    expect(getDealerSaleOpportunity).toHaveBeenCalledWith("20", "1", {});
+    expect(getDealerSaleOpportunity).toHaveBeenCalledWith("20", "1", {}, { selectedOnly: true });
   });
 
   it("impede acesso a ficha não selecionada de loja sem plano", async () => {
