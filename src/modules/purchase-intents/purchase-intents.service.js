@@ -14,6 +14,7 @@
 // disso existe na Fase 2 — a entidade é a procura, e só.
 
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { isPaidOpportunityGateEnabled } from "../../shared/middlewares/opportunities-entitlement.middleware.js";
 import { logger } from "../../shared/logger.js";
 import { buildDomainFields } from "../../shared/domainLog.js";
 import { resolveDealerCityId as resolveSharedDealerCityId } from "../../shared/account/dealer-store.js";
@@ -230,7 +231,9 @@ async function notifyDealersOfNewIntent(intent) {
 
   let recipients = [];
   try {
-    recipients = await repo.listDealerRecipientsByCity(intent.city_id);
+    recipients = await repo.listDealerRecipientsByCity(intent.city_id, {
+      paidOnly: isPaidOpportunityGateEnabled(),
+    });
   } catch (error) {
     logger.error(
       {
