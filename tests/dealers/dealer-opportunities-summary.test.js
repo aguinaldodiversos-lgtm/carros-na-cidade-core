@@ -189,10 +189,14 @@ function buildApp() {
   return app;
 }
 
-const asDealer = (req, user = DEALER) =>
-  req.set("x-test-user", user).set("x-test-account", "CNPJ");
+const asDealer = (req, user = DEALER) => req.set("x-test-user", user).set("x-test-account", "CNPJ");
 
-function seedIntent({ cityId = ATIBAIA, createdDaysAgo = 1, status = "active", expiresInDays = 20 }) {
+function seedIntent({
+  cityId = ATIBAIA,
+  createdDaysAgo = 1,
+  status = "active",
+  expiresInDays = 20,
+}) {
   db.purchaseIntents.push({
     city_id: cityId,
     status,
@@ -351,7 +355,7 @@ describe("a variação de 7 dias", () => {
   });
 
   it("queda vem com `direction: down` e percentual POSITIVO", async () => {
-    for (const days of [1] ) seedIntent({ createdDaysAgo: days });
+    for (const days of [1]) seedIntent({ createdDaysAgo: days });
     for (const days of [9, 10, 11, 12]) seedIntent({ createdDaysAgo: days });
 
     const response = await asDealer(request(buildApp()).get(BASE));
