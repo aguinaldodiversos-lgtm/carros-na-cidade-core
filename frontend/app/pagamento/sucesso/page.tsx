@@ -147,9 +147,9 @@ export default function PagamentoSucessoPage() {
           <>
             <h1 className="text-3xl font-extrabold text-[#1d2538]">Pagamento em validação</h1>
             <p className="mt-2 text-sm text-[#53607b]">
-              Não foi possível confirmar esta transação pelo status da conta. Confira o pagamento
-              no Mercado Pago e acompanhe os benefícios no seu painel. Caso tenha pago, não inicie
-              uma segunda cobrança antes de verificar a primeira.
+              Não foi possível confirmar esta transação pelo status da conta. Confira o pagamento no
+              Mercado Pago e acompanhe os benefícios no seu painel. Caso tenha pago, não inicie uma
+              segunda cobrança antes de verificar a primeira.
             </p>
             <div className="mt-5 flex justify-center gap-3">
               <Link
