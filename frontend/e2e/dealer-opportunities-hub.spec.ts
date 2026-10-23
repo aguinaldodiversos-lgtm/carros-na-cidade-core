@@ -22,6 +22,8 @@ import crypto from "node:crypto";
 
 const DEV_SESSION_SECRET = "cnc-dev-session-secret";
 const SUMMARY_URL = "**/api/account/opportunities/summary*";
+const ACCESS_URL = "**/api/account/opportunities/access*";
+type Rights = { mode: "launch" | "paid"; buyers: boolean; vehicle_evaluation: boolean };
 const HUB_PATH = "/dashboard-loja/oportunidades";
 const SHOTS = "../reports/screenshots/fase-4-11b";
 
@@ -56,12 +58,25 @@ function buildSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function prepare(page: Page, summaryOverrides: Record<string, unknown> = {}) {
+async function prepare(
+  page: Page,
+  summaryOverrides: Record<string, unknown> = {},
+  rights: Rights = { mode: "launch", buyers: true, vehicle_evaluation: true }
+) {
   await page
     .context()
     .addCookies([
       { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
     ]);
+
+  await page.route(ACCESS_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Cache-Control": "private, no-store" },
+      body: JSON.stringify({ success: true, rights }),
+    })
+  );
 
   await page.route(SUMMARY_URL, (route) =>
     route.fulfill({
@@ -371,11 +386,8 @@ test.describe("@dealer-hub desktop", () => {
   });
 
   test("resumo indisponível some com a faixa em vez de mostrar zero", async ({ page }) => {
-    await page
-      .context()
-      .addCookies([
-        { name: "cnc_session", value: signedDealerSessionCookie(), domain: "127.0.0.1", path: "/" },
-      ]);
+    // A consulta de permissões continua válida mesmo quando o resumo falha.
+    await prepare(page);
     await page.route(SUMMARY_URL, (route) =>
       route.fulfill({
         status: 503,
@@ -472,5 +484,46 @@ test.describe("@dealer-hub responsivo", () => {
 
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: `${SHOTS}/05-hub-tablet-768.png` });
+  });
+});
+
+test.describe("@dealer-hub plano pago futuro", () => {
+  test.use({ viewport: { width: 1280, height: 820 } });
+
+  test("Start bloqueia compradores e preserva avaliação", async ({ page }) => {
+    await prepare(
+      page,
+      { active_buyers: null },
+      { mode: "paid", buyers: false, vehicle_evaluation: true }
+    );
+    await page.goto(HUB_PATH);
+    await expect(page.getByTestId("dealer-launch-benefit-notice")).toHaveCount(0);
+    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText(
+      "Exclusivo do plano Pro"
+    );
+    await expect(
+      page.getByTestId("dealer-hub-card-buyers").getByText("Conhecer plano Pro")
+    ).toBeVisible();
+    await expect(page.getByTestId("dealer-opportunities-buyers-link")).toHaveCount(0);
+    await expect(page.getByTestId("dealer-opportunities-vehicles-link")).toBeVisible();
+  });
+
+  test("conta sem assinatura mostra os dois caminhos de atualização", async ({ page }) => {
+    await prepare(
+      page,
+      { active_buyers: null, sale_requests: null, new_today: null, deals_in_progress: null },
+      { mode: "paid", buyers: false, vehicle_evaluation: false }
+    );
+    await page.goto(HUB_PATH);
+    await expect(page.getByTestId("dealer-hub-card-buyers")).toContainText(
+      "Exclusivo do plano Pro"
+    );
+    await expect(page.getByTestId("dealer-hub-card-vehicles")).toContainText(
+      "Exclusivo do plano Start"
+    );
+    await expect(page.getByTestId("dealer-hub-choices").getByRole("link")).toHaveCount(2);
+    await expect(page.getByTestId("dealer-hub-metric-buyers")).toContainText(
+      "Indicador disponível mediante assinatura"
+    );
   });
 });

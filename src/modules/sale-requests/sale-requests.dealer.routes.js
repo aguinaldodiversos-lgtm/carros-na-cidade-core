@@ -28,8 +28,11 @@ import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { requireDealerAccount } from "../../shared/middlewares/dealer.middleware.js";
 import {
   OPPORTUNITY_FEATURE,
+  getDealerOpportunityRights,
   requireDealerOpportunity,
 } from "../../shared/middlewares/opportunities-entitlement.middleware.js";
+import { AppError } from "../../shared/middlewares/error.middleware.js";
+import * as dealerService from "./sale-requests.dealer.service.js";
 import * as controller from "./sale-requests.dealer.controller.js";
 
 const router = express.Router();
@@ -43,10 +46,34 @@ function asyncHandler(fn) {
 // mundo, inclusive lojista legítimo.
 router.use(authMiddleware);
 router.use(requireDealerAccount());
-router.use(requireDealerOpportunity(OPPORTUNITY_FEATURE.VEHICLE_EVALUATION));
+// O gate vale para descobrir solicitações e criar NOVAS propostas.
+// Etapas de inspeção/decisão abaixo continuam acessíveis somente à loja
+// SELECIONADA, cujo ID é validado sob lock no serviço, mesmo após expiração.
+const requireEvaluationPlan = requireDealerOpportunity(OPPORTUNITY_FEATURE.VEHICLE_EVALUATION);
 
-router.get("/", asyncHandler(controller.listSaleOpportunities));
-router.get("/:id", asyncHandler(controller.getSaleOpportunity));
+router.get("/", requireEvaluationPlan, asyncHandler(controller.listSaleOpportunities));
+router.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const rights = await getDealerOpportunityRights(req.user.id);
+    if (rights.vehicle_evaluation) return controller.getSaleOpportunity(req, res);
+
+    // A consulta de domínio só devolve uma ficha decidida à loja selecionada.
+    const result = await dealerService.getDealerSaleOpportunity(
+      req.user.id,
+      req.params.id,
+      req.query || {}
+    );
+    if (result.sale_opportunity?.is_selected !== true) {
+      throw new AppError("Funcionalidade indisponível no seu plano.", 403, true, {
+        code: "OPPORTUNITY_PLAN_REQUIRED",
+        required_plan: "cnpj-store-start",
+      });
+    }
+    res.set("Cache-Control", "private, no-store");
+    return res.json({ success: true, ...result });
+  })
+);
 
 // POST — o único verbo de ESCRITA desta área.
 //
@@ -54,7 +81,7 @@ router.get("/:id", asyncHandler(controller.getSaleOpportunity));
 // domínio já limita o custo de um cliente insistente. Cada proposta precisa
 // SUPERAR a maior atual, então uma repetição do mesmo valor é recusada dentro da
 // transação, e escalar de verdade custa dinheiro real ao lojista a cada tentativa.
-router.post("/:id/offers", asyncHandler(controller.createSaleOffer));
+router.post("/:id/offers", requireEvaluationPlan, asyncHandler(controller.createSaleOffer));
 
 /**
  * Fase 4.5 — o que a loja SELECIONADA faz depois de vencer.

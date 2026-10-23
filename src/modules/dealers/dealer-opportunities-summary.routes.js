@@ -28,6 +28,17 @@ function asyncHandler(fn) {
 router.use(authMiddleware);
 router.use(requireDealerAccount());
 
+// Não depende da cidade/loja selecionada: só informa os direitos de acesso.
+// Continua exigindo sessão e conta CNPJ, e nunca revela dados de oportunidades.
+router.get(
+  "/access",
+  asyncHandler(async (req, res) => {
+    const rights = await getDealerOpportunityRights(req.user.id);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, rights });
+  })
+);
+
 router.get(
   "/",
   asyncHandler(async (req, res) => {

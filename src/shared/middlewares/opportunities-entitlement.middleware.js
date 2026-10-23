@@ -31,6 +31,36 @@ export function opportunityRightsForPlan(planId) {
   };
 }
 
+/**
+ * Mesma regra SQL no direito da conta e no fan-out das notificações:
+ * uma loja sem assinatura paga válida nunca recebe novas procuras.
+ * Alias da tabela de assinaturas: `us`.
+ */
+export const PAID_OPPORTUNITY_SUBSCRIPTION_PREDICATE = `
+  (
+    (
+      us.source = 'admin_grant'
+      AND us.status = 'active'
+      AND us.expires_at IS NOT NULL
+      AND us.expires_at > NOW()
+      AND (us.starts_at IS NULL OR us.starts_at <= NOW())
+    )
+    OR
+    (
+      COALESCE(us.source, '') <> 'admin_grant'
+      AND (
+        us.status = 'active'
+        OR (
+          us.status IN ('canceled', 'cancelled')
+          AND COALESCE(us.cancel_at_period_end, false)
+        )
+      )
+      AND (us.payment_id IS NOT NULL OR us.last_payment_id IS NOT NULL)
+      AND COALESCE(us.current_period_end, us.expires_at) > NOW()
+    )
+  )
+`;
+
 export async function getDealerOpportunityRights(userId) {
   if (!isPaidOpportunityGateEnabled()) {
     return { mode: "launch", buyers: true, vehicle_evaluation: true };
@@ -45,28 +75,7 @@ export async function getDealerOpportunityRights(userId) {
     FROM user_subscriptions us
     WHERE us.user_id = $1
       AND us.plan_id IN ('cnpj-store-start', 'cnpj-store-pro')
-      AND (
-        (
-          us.source = 'admin_grant'
-          AND us.status = 'active'
-          AND us.expires_at IS NOT NULL
-          AND us.expires_at > NOW()
-          AND (us.starts_at IS NULL OR us.starts_at <= NOW())
-        )
-        OR
-        (
-          COALESCE(us.source, '') <> 'admin_grant'
-          AND (
-            us.status = 'active'
-            OR (
-              us.status IN ('canceled', 'cancelled')
-              AND COALESCE(us.cancel_at_period_end, false)
-            )
-          )
-          AND (us.payment_id IS NOT NULL OR us.last_payment_id IS NOT NULL)
-          AND COALESCE(us.current_period_end, us.expires_at) > NOW()
-        )
-      )
+      AND ${PAID_OPPORTUNITY_SUBSCRIPTION_PREDICATE}
     ORDER BY CASE WHEN us.plan_id = 'cnpj-store-pro' THEN 0 ELSE 1 END,
              us.created_at DESC
     LIMIT 1
