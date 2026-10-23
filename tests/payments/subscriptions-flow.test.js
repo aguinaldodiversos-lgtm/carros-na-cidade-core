@@ -488,6 +488,31 @@ describe("regressões — assinatura recorrente e concessão administrativa", ()
     expect(update).toBeTruthy();
   });
 
+  it("não informa cancelamento concluído se o UPDATE local afetar zero linhas", async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          user_id: "u1",
+          plan_id: "cnpj-store-pro",
+          status: "active",
+          provider: "mercado_pago",
+          provider_preapproval_id: "PRE-CANONICAL-ZERO",
+          current_period_end: "2026-12-01T00:00:00.000Z",
+          created_at: "2026-10-01T00:00:00.000Z",
+        },
+      ],
+    });
+    db.withTransaction.mockImplementationOnce((fn) =>
+      fn({ query: vi.fn().mockResolvedValue({ rowCount: 0, rows: [] }) })
+    );
+
+    await expect(cancelUserSubscription({ userId: "u1" })).rejects.toMatchObject({
+      statusCode: 502,
+      message: expect.stringContaining("não sincronizado"),
+    });
+    expect(db.withTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it("cortesia admin isolada não entra na consulta de cancelamento Mercado Pago", async () => {
     db.query.mockResolvedValueOnce({ rows: [] });
     await expect(cancelUserSubscription({ userId: "u1" })).rejects.toMatchObject({
