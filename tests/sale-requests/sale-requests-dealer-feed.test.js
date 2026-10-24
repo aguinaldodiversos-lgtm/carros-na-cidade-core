@@ -770,9 +770,7 @@ describe("paginação por cursor", () => {
     let cursor = null;
 
     for (let page = 0; page < 10; page += 1) {
-      const url = cursor
-        ? `?limit=3&cursor=${encodeURIComponent(cursor)}`
-        : "?limit=3";
+      const url = cursor ? `?limit=3&cursor=${encodeURIComponent(cursor)}` : "?limit=3";
       const response = await asDealer(app, DEALER_ID, url);
       expect(response.status).toBe(200);
 
@@ -912,9 +910,7 @@ describe("detalhe", () => {
     const advertiserId = seedDealer({ id: 100 });
     const openRequest = seedRequest();
 
-    expect(
-      await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId)
-    ).not.toBeNull();
+    expect(await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId)).not.toBeNull();
     expect(
       await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId, {
         selectedOnly: true,
