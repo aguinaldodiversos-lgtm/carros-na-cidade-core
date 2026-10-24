@@ -1136,18 +1136,10 @@ describe("modo pago com assinatura vencida — autorização HTTP composta", () 
     expect(noStore.status).toBe(409);
     expect(noStore.body.details?.code).toBe("SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED");
 
-    const wrong = await asDealer(
-      buildApp(),
-      DEALER_ID,
-      `/${row.id}?advertiser_id=${otherStoreId}`
-    );
+    const wrong = await asDealer(buildApp(), DEALER_ID, `/${row.id}?advertiser_id=${otherStoreId}`);
     await assertPrivate404(wrong);
 
-    const winner = await asDealer(
-      buildApp(),
-      DEALER_ID,
-      `/${row.id}?advertiser_id=${winnerId}`
-    );
+    const winner = await asDealer(buildApp(), DEALER_ID, `/${row.id}?advertiser_id=${winnerId}`);
     expect(winner.status).toBe(200);
     expect(winner.body.sale_opportunity.is_selected).toBe(true);
   });
