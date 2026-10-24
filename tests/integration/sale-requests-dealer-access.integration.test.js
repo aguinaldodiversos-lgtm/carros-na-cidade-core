@@ -157,7 +157,9 @@ beforeEach(async () => {
 afterAll(async () => {
   await pool.end().catch(() => {});
   await closeDatabasePool().catch(() => {});
-  await adminPool.query("DROP DATABASE IF EXISTS " + quoteDatabaseName(databaseName) + " WITH (FORCE)");
+  await adminPool.query(
+    "DROP DATABASE IF EXISTS " + quoteDatabaseName(databaseName) + " WITH (FORCE)"
+  );
   await adminPool.end().catch(() => {});
 });
 
@@ -167,31 +169,22 @@ describe("B2: selectedOnly em PostgreSQL real", () => {
       selectedOnly: false,
     });
     expect(String(normal?.id)).toBe(String(world.openId));
-    const restricted = await getVisibleByIdForCity(
-      world.openId,
-      world.cityId,
-      world.winnerId,
-      { selectedOnly: true }
-    );
+    const restricted = await getVisibleByIdForCity(world.openId, world.cityId, world.winnerId, {
+      selectedOnly: true,
+    });
     expect(restricted).toBeNull();
   });
 
   it("permite a ficha selecionada somente à loja vencedora em ambos os modos", async () => {
     for (const selectedOnly of [false, true]) {
-      const winner = await getVisibleByIdForCity(
-        world.selectedId,
-        world.cityId,
-        world.winnerId,
-        { selectedOnly }
-      );
+      const winner = await getVisibleByIdForCity(world.selectedId, world.cityId, world.winnerId, {
+        selectedOnly,
+      });
       expect(String(winner?.id)).toBe(String(world.selectedId));
 
-      const loser = await getVisibleByIdForCity(
-        world.selectedId,
-        world.cityId,
-        world.loserId,
-        { selectedOnly }
-      );
+      const loser = await getVisibleByIdForCity(world.selectedId, world.cityId, world.loserId, {
+        selectedOnly,
+      });
       expect(loser).toBeNull();
 
       const foreignCity = await getVisibleByIdForCity(
