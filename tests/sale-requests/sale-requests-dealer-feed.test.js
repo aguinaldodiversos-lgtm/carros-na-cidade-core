@@ -51,6 +51,9 @@ const dealerRoutes = (
   await import("../../src/modules/sale-requests/sale-requests.dealer.routes.js")
 ).default;
 const { errorHandler } = await import("../../src/shared/middlewares/error.middleware.js");
+const { getVisibleByIdForCity } = await import(
+  "../../src/modules/sale-requests/sale-requests.dealer.repository.js"
+);
 
 const BASE = "/api/account/opportunities/sale-requests";
 
@@ -905,6 +908,41 @@ describe("métricas do cabeçalho", () => {
 
 // ============================================================================
 describe("detalhe", () => {
+  it("a consulta restrita não carrega solicitações abertas de contas sem direito", async () => {
+    const advertiserId = seedDealer({ id: 100 });
+    const openRequest = seedRequest();
+
+    expect(await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId)).not.toBeNull();
+    expect(
+      await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId, {
+        selectedOnly: true,
+      })
+    ).toBeNull();
+  });
+
+  it("a consulta restrita permite somente a loja escolhida após seleção", async () => {
+    const winnerId = seedDealer({ id: 100 });
+    const loserId = seedDealer({ id: 200, userId: OTHER_DEALER_ID });
+    const selected = seedRequest({ status: "offer_selected", selected_offer_id: 1 });
+    db.saleRequestOffers.push({
+      id: 1,
+      sale_request_id: selected.id,
+      advertiser_id: winnerId,
+      dealer_user_id: DEALER_ID,
+      amount: "65000.00",
+    });
+
+    expect(
+      await getVisibleByIdForCity(selected.id, ATIBAIA.id, winnerId, { selectedOnly: true })
+    ).not.toBeNull();
+    expect(
+      await getVisibleByIdForCity(selected.id, ATIBAIA.id, loserId, { selectedOnly: true })
+    ).toBeNull();
+    expect(
+      await getVisibleByIdForCity(selected.id, BRAGANCA.id, winnerId, { selectedOnly: true })
+    ).toBeNull();
+  });
+
   it("devolve a ficha completa e a galeria ordenada", async () => {
     seedDealer();
     const row = seedRequest({ known_issues: "Ar-condicionado gelando pouco." });
