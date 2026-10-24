@@ -614,7 +614,7 @@ describe("a notificação da loja escolhida (§21)", () => {
     await select(buildApp(), { id: row.id, offerId: aCurrent.id });
 
     expect(db.userNotifications[0].action_path).toBe(
-      `/dashboard-loja/oportunidades/veiculos/${row.id}`
+      `/dashboard-loja/oportunidades/veiculos/${row.id}?loja=${STORE_A}`
     );
   });
 });
