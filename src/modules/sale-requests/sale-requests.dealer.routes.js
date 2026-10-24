@@ -47,8 +47,10 @@ function asyncHandler(fn) {
 router.use(authMiddleware);
 router.use(requireDealerAccount());
 // O gate vale para descobrir solicitações e criar NOVAS propostas.
-// Etapas de inspeção/decisão abaixo continuam acessíveis somente à loja
-// SELECIONADA, cujo ID é validado sob lock no serviço, mesmo após expiração.
+// A loja selecionada pode continuar a consultar sua ficha e enviar horários
+// por /:id/inspection/slots, mesmo após o vencimento do plano. O serviço
+// verifica a posse sob lock. /inspection/complete e /decision são rotas
+// LEGADAS/APOSENTADAS, mantidas por compatibilidade e sempre recusadas (409).
 const requireEvaluationPlan = requireDealerOpportunity(OPPORTUNITY_FEATURE.VEHICLE_EVALUATION);
 
 router.get("/", requireEvaluationPlan, asyncHandler(controller.listSaleOpportunities));
@@ -82,14 +84,13 @@ router.get(
 router.post("/:id/offers", requireEvaluationPlan, asyncHandler(controller.createSaleOffer));
 
 /**
- * Fase 4.5 — o que a loja SELECIONADA faz depois de vencer.
+ * Fase 4.5 — continuidade da negociação para a loja SELECIONADA.
  *
- * As três rotas exigem, além da cadeia declarada no topo (CNPJ + cidade da
- * loja), que o advertiser em nome do qual se age seja EXATAMENTE aquele cuja
- * proposta foi selecionada. Essa terceira camada não está aqui: ela vive no
- * `WHERE` do lock (`lockRequestForDealer`), onde não pode ser esquecida por uma
- * rota nova — a linha simplesmente não casa, e a resposta é o mesmo 404 que a
- * loja perdedora já recebia na 4.4.
+ * Somente /inspection/slots permanece operacional. O advertiser que age deve
+ * ser aquele cuja proposta foi escolhida; essa checagem ocorre no WHERE do
+ * lock (lockRequestForDealer), e outra loja recebe 404. As rotas antigas
+ * /inspection/complete e /decision permanecem montadas por compatibilidade,
+ * mas o fluxo aposentado as recusa com 409.
  *
  * Caminhos aninhados sob `/inspection` porque descrevem passos de UM objeto (a
  * avaliação), e não recursos independentes. `/:id/decision` fica fora dele: a
