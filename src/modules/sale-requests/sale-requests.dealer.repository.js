@@ -41,10 +41,7 @@
  * onde o FROM possa ficar para trás.
  */
 import { query } from "../../infrastructure/database/db.js";
-import {
-  SALE_REQUEST_SELECTED_STATUSES,
-  SALE_REQUEST_STATUS,
-} from "./sale-requests.constants.js";
+import { SALE_REQUEST_SELECTED_STATUSES, SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import { SALE_OPPORTUNITY_SORT_SPEC } from "./sale-requests.dealer.constants.js";
 
 /**
@@ -256,9 +253,7 @@ export async function listOpenByCity({ cityId, filters, sort, limit, cursor }) {
     // defeito passa despercebido em qualquer teste que só carregue a tela.
     // É o mesmo cast que `listByOwner` já usa em `sale-requests.repository.js`.
     const keyParam =
-      spec.keyType === "timestamp"
-        ? `$${params.length - 1}::timestamptz`
-        : `$${params.length - 1}`;
+      spec.keyType === "timestamp" ? `$${params.length - 1}::timestamptz` : `$${params.length - 1}`;
 
     cursorClause = `AND (${spec.column}, sr.id) ${comparator} (${keyParam}, $${params.length})`;
   }
@@ -420,9 +415,7 @@ ${CURRENT_ROUND_JOIN}
 export async function listCoverImagesByRequestIds(saleRequestIds) {
   const ids = Array.from(
     new Set(
-      (saleRequestIds || [])
-        .map((id) => String(id ?? "").trim())
-        .filter((id) => /^\d+$/.test(id))
+      (saleRequestIds || []).map((id) => String(id ?? "").trim()).filter((id) => /^\d+$/.test(id))
     )
   );
 
