@@ -29,6 +29,7 @@ const proxy = createBackendProxy({
   timeoutMessage: "Tempo esgotado ao carregar o resumo de oportunidades.",
 });
 
-export async function GET(request: NextRequest, context: { params: { path?: string[] } }) {
-  return proxy(request, context);
+// Rota estática: o Next não fornece params. O proxy recebe contexto vazio.
+export async function GET(request: NextRequest) {
+  return proxy(request, { params: {} });
 }
