@@ -108,7 +108,7 @@ describe("detalhe de avaliação já selecionada", () => {
     expect(result.status).toBe(200);
     expect(result.headers["cache-control"]).toBe("private, no-store");
     expect(result.body.sale_opportunity.is_selected).toBe(true);
-    expect(getDealerSaleOpportunity).toHaveBeenCalledWith("20", "1", {});
+    expect(getDealerSaleOpportunity).toHaveBeenCalledWith("20", "1", {}, { selectedOnly: true });
   });
 
   it("impede acesso a ficha não selecionada de loja sem plano", async () => {
@@ -116,8 +116,9 @@ describe("detalhe de avaliação já selecionada", () => {
       sale_opportunity: { id: 1, is_selected: false, status: "receiving_offers" },
     });
     const result = await request(app).get("/dealer/1");
-    expect(result.status).toBe(403);
-    expect(result.body).not.toHaveProperty("sale_opportunity");
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({ success: false, error: "not_found" });
+    expect(result.headers["cache-control"]).toBe("private, no-store");
   });
 
   it("não altera o 404 emitido pela consulta escopada à loja e cidade", async () => {
