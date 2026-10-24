@@ -2013,11 +2013,14 @@ function handle(text, params, now) {
   // devolveria a ficha para todo mundo e o teste passaria enquanto a privacidade
   // estivesse quebrada.
   if (
-    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( sr\.status = \$3 OR \(sr\.status = ANY\(\$4::text\[\]\) AND sel\.advertiser_id = \$5\) \)/i.test(
+    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( \(NOT \$6::boolean AND sr\.status = \$3\) OR \(sr\.status = ANY\(\$4::text\[\]\) AND sel\.advertiser_id = \$5\) \)/i.test(
       text
     )
   ) {
-    const [id, cityId, openStatus, selectedStatuses, advertiserId] = params;
+    const [id, cityId, openStatus, selectedStatuses, advertiserId, selectedOnly] = params;
+    if (typeof selectedOnly !== "boolean") {
+      throw new Error("fake-db: selectedOnly deve ser booleano no predicado SQL");
+    }
 
     const row = db.saleRequests.find(
       (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
@@ -2031,7 +2034,7 @@ function handle(text, params, now) {
       : null;
 
     const visible =
-      row.status === openStatus ||
+      (!selectedOnly && row.status === openStatus) ||
       ((Array.isArray(selectedStatuses) ? selectedStatuses : [selectedStatuses]).includes(
         row.status
       ) &&
