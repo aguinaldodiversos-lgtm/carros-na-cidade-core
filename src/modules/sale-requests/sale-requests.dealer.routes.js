@@ -62,13 +62,11 @@ router.get(
     const result = await dealerService.getDealerSaleOpportunity(
       req.user.id,
       req.params.id,
-      req.query || {}
+      req.query || {},
+      { selectedOnly: true }
     );
     if (result.sale_opportunity?.is_selected !== true) {
-      throw new AppError("Funcionalidade indisponível no seu plano.", 403, true, {
-        code: "OPPORTUNITY_PLAN_REQUIRED",
-        required_plan: "cnpj-store-start",
-      });
+      throw new AppError("Oportunidade não encontrada.", 404);
     }
     res.set("Cache-Control", "private, no-store");
     return res.json({ success: true, ...result });
