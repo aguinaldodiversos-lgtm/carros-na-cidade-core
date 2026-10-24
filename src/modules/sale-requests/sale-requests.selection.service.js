@@ -214,7 +214,7 @@ function selectionIdempotencyKey(saleRequestId, offerId) {
  * preliminar, e uma loja que leia "fechado" no sino vai agir como quem comprou.
  */
 async function notifySelectedDealer(
-  { saleRequestId, offerId, dealerUserId, amount },
+  { saleRequestId, offerId, dealerUserId, advertiserId, amount },
   exec
 ) {
   await createUserNotification(
@@ -225,7 +225,7 @@ async function notifySelectedDealer(
       body: "Uma proposta enviada por sua loja foi selecionada pelo proprietário.",
       entityType: "sale_request",
       entityId: saleRequestId,
-      actionPath: `/dashboard-loja/oportunidades/veiculos/${saleRequestId}`,
+      actionPath: `/dashboard-loja/oportunidades/veiculos/${saleRequestId}?loja=${encodeURIComponent(String(advertiserId))}`,
       payload: { amount, offer_id: String(offerId) },
       idempotencyKey: selectionIdempotencyKey(saleRequestId, offerId),
     },
@@ -438,6 +438,7 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
         saleRequestId,
         offerId,
         dealerUserId: offer.dealer_user_id,
+        advertiserId: offer.advertiser_id,
         amount: offer.amount,
       },
       exec
