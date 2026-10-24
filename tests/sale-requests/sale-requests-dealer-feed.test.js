@@ -1134,7 +1134,7 @@ describe("modo pago com assinatura vencida — autorização HTTP composta", () 
 
     const noStore = await asDealer(buildApp(), DEALER_ID, `/${row.id}`);
     expect(noStore.status).toBe(409);
-    expect(noStore.body.details?.code).toBe("STORE_SELECTION_REQUIRED");
+    expect(noStore.body.details?.code).toBe("SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED");
 
     const wrong = await asDealer(
       buildApp(),
