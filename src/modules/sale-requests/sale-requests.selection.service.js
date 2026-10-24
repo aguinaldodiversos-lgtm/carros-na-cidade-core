@@ -45,11 +45,7 @@ import * as selectionRepo from "./sale-requests.selection.repository.js";
 import { findCurrentOfferForAdvertiser } from "./sale-requests.offers.repository.js";
 import * as roundsRepo from "./sale-requests.rounds.repository.js";
 import { SALE_REQUEST_CODE, SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
-import {
-  parseSaleOfferId,
-  parseSaleRequestId,
-  requireUserId,
-} from "./sale-requests.validation.js";
+import { parseSaleOfferId, parseSaleRequestId, requireUserId } from "./sale-requests.validation.js";
 
 /**
  * Nome comercial de exibição da loja.
@@ -345,12 +341,7 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
       };
     }
 
-    const offer = await selectionRepo.findOfferForSelection(
-      saleRequestId,
-      offerId,
-      round.id,
-      exec
-    );
+    const offer = await selectionRepo.findOfferForSelection(saleRequestId, offerId, round.id, exec);
     if (!offer) {
       return {
         ok: false,
