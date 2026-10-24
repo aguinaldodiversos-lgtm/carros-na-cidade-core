@@ -106,6 +106,9 @@ jobs:
       - name: Integration tests (ads + search policy + DB)
         run: npm run ci:integration
 
+      - name: Dealer selectedOnly authorization (real PostgreSQL)
+        run: npx vitest run tests/integration/sale-requests-dealer-access.integration.test.js
+
       - name: Job summary
         if: success()
         run: echo "### Integration (ads) passed" >> "$GITHUB_STEP_SUMMARY"

@@ -12,16 +12,25 @@
 
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, fakeClock, fakeQuery, resetDb } from "./fake-db.js";
 import { EVALUATION_ROW } from "./evaluation-fixture.js";
 
+// Gate pago real; apenas o resultado da consulta de assinatura é simulado.
+// As demais consultas percorrem os serviços e o repositório reais até fake-db.
+function queryWithExpiredSubscription(sql, params) {
+  if (/FROM user_subscriptions us/i.test(sql)) {
+    return Promise.resolve({ rows: [], rowCount: 0 });
+  }
+  return fakeQuery(sql, params);
+}
+
 vi.mock("../../src/infrastructure/database/db.js", () => ({
-  query: (sql, params) => fakeQuery(sql, params),
-  pool: { query: (sql, params) => fakeQuery(sql, params) },
-  withTransaction: (callback) => callback({ query: (sql, params) => fakeQuery(sql, params) }),
-  default: { query: (sql, params) => fakeQuery(sql, params) },
+  query: queryWithExpiredSubscription,
+  pool: { query: queryWithExpiredSubscription },
+  withTransaction: (callback) => callback({ query: queryWithExpiredSubscription }),
+  default: { query: queryWithExpiredSubscription },
 }));
 
 /**
@@ -51,6 +60,9 @@ const dealerRoutes = (
   await import("../../src/modules/sale-requests/sale-requests.dealer.routes.js")
 ).default;
 const { errorHandler } = await import("../../src/shared/middlewares/error.middleware.js");
+const { getVisibleByIdForCity } = await import(
+  "../../src/modules/sale-requests/sale-requests.dealer.repository.js"
+);
 
 const BASE = "/api/account/opportunities/sale-requests";
 
@@ -145,9 +157,14 @@ function asDealer(app, userId = DEALER_ID, path = "") {
 }
 
 beforeEach(() => {
+  delete process.env.OPPORTUNITIES_PAID_GATE_ENABLED;
   resetDb({ cities: [ATIBAIA, BRAGANCA], nextRequestId: 1, nextImageId: 1 });
   seq = 0;
   fakeClock.now = () => NOW;
+});
+
+afterEach(() => {
+  delete process.env.OPPORTUNITIES_PAID_GATE_ENABLED;
 });
 
 // ============================================================================
@@ -767,9 +784,7 @@ describe("paginação por cursor", () => {
     let cursor = null;
 
     for (let page = 0; page < 10; page += 1) {
-      const url = cursor
-        ? `?limit=3&cursor=${encodeURIComponent(cursor)}`
-        : "?limit=3";
+      const url = cursor ? `?limit=3&cursor=${encodeURIComponent(cursor)}` : "?limit=3";
       const response = await asDealer(app, DEALER_ID, url);
       expect(response.status).toBe(200);
 
@@ -905,6 +920,41 @@ describe("métricas do cabeçalho", () => {
 
 // ============================================================================
 describe("detalhe", () => {
+  it("a consulta restrita não carrega solicitações abertas de contas sem direito", async () => {
+    const advertiserId = seedDealer({ id: 100 });
+    const openRequest = seedRequest();
+
+    expect(await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId)).not.toBeNull();
+    expect(
+      await getVisibleByIdForCity(openRequest.id, ATIBAIA.id, advertiserId, {
+        selectedOnly: true,
+      })
+    ).toBeNull();
+  });
+
+  it("a consulta restrita permite somente a loja escolhida após seleção", async () => {
+    const winnerId = seedDealer({ id: 100 });
+    const loserId = seedDealer({ id: 200, userId: OTHER_DEALER_ID });
+    const selected = seedRequest({ status: "offer_selected", selected_offer_id: 1 });
+    db.saleRequestOffers.push({
+      id: 1,
+      sale_request_id: selected.id,
+      advertiser_id: winnerId,
+      dealer_user_id: DEALER_ID,
+      amount: "65000.00",
+    });
+
+    expect(
+      await getVisibleByIdForCity(selected.id, ATIBAIA.id, winnerId, { selectedOnly: true })
+    ).not.toBeNull();
+    expect(
+      await getVisibleByIdForCity(selected.id, ATIBAIA.id, loserId, { selectedOnly: true })
+    ).toBeNull();
+    expect(
+      await getVisibleByIdForCity(selected.id, BRAGANCA.id, winnerId, { selectedOnly: true })
+    ).toBeNull();
+  });
+
   it("devolve a ficha completa e a galeria ordenada", async () => {
     seedDealer();
     const row = seedRequest({ known_issues: "Ar-condicionado gelando pouco." });
@@ -995,6 +1045,103 @@ describe("detalhe", () => {
 
     expect(mine.status).toBe(200);
     expect(theirs.status).toBe(404);
+  });
+});
+
+// ============================================================================
+// B1: exercício real de rota → entitlement pago → service → repository → fake-db.
+// O único stub de consulta é o resultado de assinatura ausente; o serviço NÃO é mockado.
+describe("modo pago com assinatura vencida — autorização HTTP composta", () => {
+  beforeEach(() => {
+    process.env.OPPORTUNITIES_PAID_GATE_ENABLED = "true";
+  });
+
+  function selectForStore(row, advertiserId, dealerUserId = DEALER_ID) {
+    const offerId = db.nextOfferId++;
+    db.saleRequestOffers.push({
+      id: offerId,
+      sale_request_id: row.id,
+      advertiser_id: advertiserId,
+      dealer_user_id: dealerUserId,
+      amount: "65000.00",
+    });
+    row.status = "offer_selected";
+    row.selected_offer_id = offerId;
+    row.selected_offer_at = new Date(NOW).toISOString();
+  }
+
+  async function assertPrivate404(response) {
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ success: false, error: "not_found" });
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+  }
+
+  it("não libera a lista nem novas propostas sem plano, usando entitlement real", async () => {
+    seedDealer();
+    const row = seedRequest();
+
+    const list = await asDealer(buildApp());
+    expect(list.status).toBe(403);
+    expect(list.headers["cache-control"]).toBe("private, no-store");
+
+    const offer = await request(buildApp())
+      .post(`${BASE}/${row.id}/offers`)
+      .set("x-test-user", DEALER_ID)
+      .set("x-test-account", "CNPJ")
+      .send({ amount: "65000" });
+    expect(offer.status).toBe(403);
+  });
+
+  it("ficha aberta e ID inexistente recebem o mesmo 404 privado", async () => {
+    seedDealer();
+    const row = seedRequest();
+
+    const visible = await asDealer(buildApp(), DEALER_ID, `/${row.id}`);
+    const nonexistent = await asDealer(buildApp(), DEALER_ID, "/99999");
+    await assertPrivate404(visible);
+    await assertPrivate404(nonexistent);
+  });
+
+  it("loja selecionada continua com 200 após vencimento; concorrente recebe 404", async () => {
+    const winnerId = seedDealer({ id: 100 });
+    seedDealer({ id: 200, userId: OTHER_DEALER_ID });
+    const row = seedRequest();
+    selectForStore(row, winnerId);
+
+    const winner = await asDealer(buildApp(), DEALER_ID, `/${row.id}`);
+    expect(winner.status).toBe(200);
+    expect(winner.body.sale_opportunity.is_selected).toBe(true);
+    expect(winner.headers["cache-control"]).toBe("private, no-store");
+
+    const loser = await asDealer(buildApp(), OTHER_DEALER_ID, `/${row.id}`);
+    await assertPrivate404(loser);
+  });
+
+  it("não permite alcançar ficha de outra cidade, nem quando ela já foi selecionada", async () => {
+    const storeId = seedDealer({ cityId: ATIBAIA.id });
+    const row = seedRequest({ city_id: BRAGANCA.id });
+    selectForStore(row, storeId);
+
+    const response = await asDealer(buildApp(), DEALER_ID, `/${row.id}`);
+    await assertPrivate404(response);
+  });
+
+  it("multiloja exige escolha explícita e permite apenas a loja vencedora", async () => {
+    const winnerId = seedDealer({ id: 100 });
+    const otherStoreId = seedDealer({ id: 101 });
+    const row = seedRequest();
+    selectForStore(row, winnerId);
+
+    const noStore = await asDealer(buildApp(), DEALER_ID, `/${row.id}`);
+    expect(noStore.status).toBe(409);
+    expect(noStore.body.details?.code).toBe("SALE_OPPORTUNITY_STORE_SELECTION_REQUIRED");
+
+    const wrong = await asDealer(buildApp(), DEALER_ID, `/${row.id}?advertiser_id=${otherStoreId}`);
+    await assertPrivate404(wrong);
+
+    const winner = await asDealer(buildApp(), DEALER_ID, `/${row.id}?advertiser_id=${winnerId}`);
+    expect(winner.status).toBe(200);
+    expect(winner.body.sale_opportunity.is_selected).toBe(true);
   });
 });
 

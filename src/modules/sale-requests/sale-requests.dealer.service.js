@@ -40,10 +40,7 @@ import * as offersRepo from "./sale-requests.offers.repository.js";
 import { buildCanonicalImageUrlFromStorageKey } from "../ads/ads.public-images.js";
 import * as repo from "./sale-requests.dealer.repository.js";
 import { parseSaleRequestId, requireUserId } from "./sale-requests.validation.js";
-import {
-  SALE_REQUEST_SELECTED_STATUSES,
-  SALE_REQUEST_STATUS,
-} from "./sale-requests.constants.js";
+import { SALE_REQUEST_SELECTED_STATUSES, SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import { readDealerInspectionState } from "./sale-requests.inspection.service.js";
 import { readOwnerFinalDecisionForDealer } from "./sale-requests.final-decision.service.js";
 import { SALE_OPPORTUNITY_PAGE } from "./sale-requests.dealer.constants.js";
@@ -237,7 +234,6 @@ function serializeSelection(row) {
   };
 }
 
-
 /**
  * Feed de veículos disponíveis para avaliação na cidade da loja.
  *
@@ -248,7 +244,11 @@ function serializeSelection(row) {
  * produto ainda não tem, e um número inventado no topo da tela é justamente o
  * que faz alguém decidir errado com confiança.
  */
-export async function listDealerSaleOpportunities(userId, rawQuery = {}, { now = new Date() } = {}) {
+export async function listDealerSaleOpportunities(
+  userId,
+  rawQuery = {},
+  { now = new Date() } = {}
+) {
   const dealerUserId = requireUserId(userId);
 
   // A validação vem ANTES da resolução da loja de propósito: um filtro inválido
@@ -346,7 +346,12 @@ export async function listDealerSaleOpportunities(userId, rawQuery = {}, { now =
  * a mesma resposta viraria um oráculo para qualquer CNPJ da cidade sondar ids e
  * descobrir quais solicitações foram fechadas.
  */
-export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
+export async function getDealerSaleOpportunity(
+  userId,
+  rawId,
+  rawQuery = {},
+  { selectedOnly = false } = {}
+) {
   const dealerUserId = requireUserId(userId);
   const saleRequestId = parseSaleRequestId(rawId);
 
@@ -356,7 +361,9 @@ export async function getDealerSaleOpportunity(userId, rawId, rawQuery = {}) {
 
   // A loja entra na PRÓPRIA query de visibilidade: é ela que decide se uma
   // solicitação já decidida ainda pode ser aberta, e por quem.
-  const row = await repo.getVisibleByIdForCity(saleRequestId, cityId, advertiserId);
+  const row = await repo.getVisibleByIdForCity(saleRequestId, cityId, advertiserId, {
+    selectedOnly,
+  });
   if (!row) {
     logger.info(
       {

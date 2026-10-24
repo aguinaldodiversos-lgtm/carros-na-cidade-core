@@ -267,11 +267,7 @@ describe("a lista de propostas ATUAIS do proprietário", () => {
     await getDetail(buildApp(), { id: row.id });
 
     const stored = db.saleRequestOffers.filter((offer) => offer.sale_request_id === row.id);
-    expect(stored.map((offer) => offer.amount)).toEqual([
-      "62500.00",
-      "65000.00",
-      "67000.00",
-    ]);
+    expect(stored.map((offer) => offer.amount)).toEqual(["62500.00", "65000.00", "67000.00"]);
   });
 
   it("ordena por valor DESC — a maior primeiro, e marcada", async () => {
@@ -575,9 +571,9 @@ describe("a notificação da loja escolhida (§21)", () => {
 
     await select(buildApp(), { id: row.id, offerId: aCurrent.id });
 
-    expect(
-      db.userNotifications.some((item) => String(item.recipient_user_id) === DEALER_B)
-    ).toBe(false);
+    expect(db.userNotifications.some((item) => String(item.recipient_user_id) === DEALER_B)).toBe(
+      false
+    );
   });
 
   it("usa chave idempotente determinística por (solicitação, oferta)", async () => {
@@ -614,7 +610,7 @@ describe("a notificação da loja escolhida (§21)", () => {
     await select(buildApp(), { id: row.id, offerId: aCurrent.id });
 
     expect(db.userNotifications[0].action_path).toBe(
-      `/dashboard-loja/oportunidades/veiculos/${row.id}`
+      `/dashboard-loja/oportunidades/veiculos/${row.id}?loja=${STORE_A}`
     );
   });
 });

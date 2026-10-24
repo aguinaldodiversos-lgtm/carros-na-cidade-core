@@ -45,11 +45,7 @@ import * as selectionRepo from "./sale-requests.selection.repository.js";
 import { findCurrentOfferForAdvertiser } from "./sale-requests.offers.repository.js";
 import * as roundsRepo from "./sale-requests.rounds.repository.js";
 import { SALE_REQUEST_CODE, SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
-import {
-  parseSaleOfferId,
-  parseSaleRequestId,
-  requireUserId,
-} from "./sale-requests.validation.js";
+import { parseSaleOfferId, parseSaleRequestId, requireUserId } from "./sale-requests.validation.js";
 
 /**
  * Nome comercial de exibição da loja.
@@ -214,7 +210,7 @@ function selectionIdempotencyKey(saleRequestId, offerId) {
  * preliminar, e uma loja que leia "fechado" no sino vai agir como quem comprou.
  */
 async function notifySelectedDealer(
-  { saleRequestId, offerId, dealerUserId, amount },
+  { saleRequestId, offerId, dealerUserId, advertiserId, amount },
   exec
 ) {
   await createUserNotification(
@@ -225,7 +221,7 @@ async function notifySelectedDealer(
       body: "Uma proposta enviada por sua loja foi selecionada pelo proprietário.",
       entityType: "sale_request",
       entityId: saleRequestId,
-      actionPath: `/dashboard-loja/oportunidades/veiculos/${saleRequestId}`,
+      actionPath: `/dashboard-loja/oportunidades/veiculos/${saleRequestId}?loja=${encodeURIComponent(String(advertiserId))}`,
       payload: { amount, offer_id: String(offerId) },
       idempotencyKey: selectionIdempotencyKey(saleRequestId, offerId),
     },
@@ -345,12 +341,7 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
       };
     }
 
-    const offer = await selectionRepo.findOfferForSelection(
-      saleRequestId,
-      offerId,
-      round.id,
-      exec
-    );
+    const offer = await selectionRepo.findOfferForSelection(saleRequestId, offerId, round.id, exec);
     if (!offer) {
       return {
         ok: false,
@@ -438,6 +429,7 @@ export async function selectSaleRequestOffer(userId, rawId, body = {}) {
         saleRequestId,
         offerId,
         dealerUserId: offer.dealer_user_id,
+        advertiserId: offer.advertiser_id,
         amount: offer.amount,
       },
       exec

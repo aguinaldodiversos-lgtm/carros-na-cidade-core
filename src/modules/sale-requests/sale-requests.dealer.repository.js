@@ -41,10 +41,7 @@
  * onde o FROM possa ficar para trás.
  */
 import { query } from "../../infrastructure/database/db.js";
-import {
-  SALE_REQUEST_SELECTED_STATUSES,
-  SALE_REQUEST_STATUS,
-} from "./sale-requests.constants.js";
+import { SALE_REQUEST_SELECTED_STATUSES, SALE_REQUEST_STATUS } from "./sale-requests.constants.js";
 import { SALE_OPPORTUNITY_SORT_SPEC } from "./sale-requests.dealer.constants.js";
 
 /**
@@ -256,9 +253,7 @@ export async function listOpenByCity({ cityId, filters, sort, limit, cursor }) {
     // defeito passa despercebido em qualquer teste que só carregue a tela.
     // É o mesmo cast que `listByOwner` já usa em `sale-requests.repository.js`.
     const keyParam =
-      spec.keyType === "timestamp"
-        ? `$${params.length - 1}::timestamptz`
-        : `$${params.length - 1}`;
+      spec.keyType === "timestamp" ? `$${params.length - 1}::timestamptz` : `$${params.length - 1}`;
 
     cursorClause = `AND (${spec.column}, sr.id) ${comparator} (${keyParam}, $${params.length})`;
   }
@@ -356,7 +351,12 @@ export async function countOpenByCity({ cityId, filters }) {
  * NULL não é verdadeira), então o pior caso de um call site distraído é a loja
  * vencedora receber 404 — falha fechada, e não vazamento.
  */
-export async function getVisibleByIdForCity(saleRequestId, cityId, advertiserId) {
+export async function getVisibleByIdForCity(
+  saleRequestId,
+  cityId,
+  advertiserId,
+  { selectedOnly = false } = {}
+) {
   const result = await query(
     `
     SELECT
@@ -370,7 +370,7 @@ ${CURRENT_ROUND_JOIN}
     WHERE sr.id = $1
       AND sr.city_id = $2
       AND (
-        sr.status = $3
+        (NOT $6::boolean AND sr.status = $3)
         OR (sr.status = ANY($4::text[]) AND sel.advertiser_id = $5)
       )
     LIMIT 1
@@ -392,6 +392,7 @@ ${CURRENT_ROUND_JOIN}
       // ter de vir aqui a cada estado novo, e esse custo é o ponto.
       SALE_REQUEST_SELECTED_STATUSES,
       advertiserId,
+      selectedOnly,
     ]
   );
   return result.rows[0] ?? null;
@@ -414,9 +415,7 @@ ${CURRENT_ROUND_JOIN}
 export async function listCoverImagesByRequestIds(saleRequestIds) {
   const ids = Array.from(
     new Set(
-      (saleRequestIds || [])
-        .map((id) => String(id ?? "").trim())
-        .filter((id) => /^\d+$/.test(id))
+      (saleRequestIds || []).map((id) => String(id ?? "").trim()).filter((id) => /^\d+$/.test(id))
     )
   );
 

@@ -91,9 +91,7 @@ export function resetDb(seed = {}) {
   db.nextOwnerDecisionId = seed.nextOwnerDecisionId ?? 1;
   db.nextRoundId = seed.nextRoundId ?? 1;
   db.nextOutcomeId = seed.nextOutcomeId ?? 1;
-  db.usedStorageKeys = new Set(
-    (seed.saleRequestImages ?? []).map((image) => image.storage_key)
-  );
+  db.usedStorageKeys = new Set((seed.saleRequestImages ?? []).map((image) => image.storage_key));
 }
 
 function normalize(sql) {
@@ -438,7 +436,11 @@ function offerInRound(offer, roundId, saleRequestId) {
   if (offer.round_id != null) return sameId(offer.round_id, roundId);
 
   const round = db.saleRequestRounds.find((r) => sameId(r.id, roundId));
-  return Boolean(round) && Number(round.round_number) === 1 && sameId(round.sale_request_id, saleRequestId);
+  return (
+    Boolean(round) &&
+    Number(round.round_number) === 1 &&
+    sameId(round.sale_request_id, saleRequestId)
+  );
 }
 
 function currentRoundOf(saleRequestId) {
@@ -495,8 +497,7 @@ function currentSelectionOf(saleRequestId) {
   return (
     db.saleRequestOfferSelections.find(
       (s) =>
-        sameId(s.sale_request_id, saleRequestId) &&
-        sameId(s.offer_id, request.selected_offer_id)
+        sameId(s.sale_request_id, saleRequestId) && sameId(s.offer_id, request.selected_offer_id)
     ) ?? null
   );
 }
@@ -511,9 +512,7 @@ function currentSelectionOf(saleRequestId) {
 function inspectionOf(saleRequestId) {
   const selection = currentSelectionOf(saleRequestId);
   if (!selection) return null;
-  return (
-    db.saleRequestInspections.find((i) => sameId(i.selection_id, selection.id)) ?? null
-  );
+  return db.saleRequestInspections.find((i) => sameId(i.selection_id, selection.id)) ?? null;
 }
 
 /** A oferta SELECIONADA de uma solicitacao, ou null. */
@@ -557,7 +556,6 @@ function projectInspection(inspection) {
 }
 
 function handle(text, params, now) {
-
   // ==========================================================================
   // FASE 4.7 — RODADAS E HANDOFF
   // ==========================================================================
@@ -573,7 +571,8 @@ function handle(text, params, now) {
     const [saleRequestId, roundNumber, minimum] = params;
 
     const already = db.saleRequestRounds.find(
-      (r) => sameId(r.sale_request_id, saleRequestId) && Number(r.round_number) === Number(roundNumber)
+      (r) =>
+        sameId(r.sale_request_id, saleRequestId) && Number(r.round_number) === Number(roundNumber)
     );
     if (already) return { rows: [], rowCount: 0 };
 
@@ -641,7 +640,11 @@ function handle(text, params, now) {
   }
 
   // --- SELECT: lista de rodadas --------------------------------------------
-  if (/^SELECT id, round_number, minimum_accepted_price, created_at FROM sale_request_rounds WHERE sale_request_id = \$1/i.test(text)) {
+  if (
+    /^SELECT id, round_number, minimum_accepted_price, created_at FROM sale_request_rounds WHERE sale_request_id = \$1/i.test(
+      text
+    )
+  ) {
     const rows = db.saleRequestRounds
       .filter((r) => sameId(r.sale_request_id, params[0]))
       .sort((a, b) => Number(a.round_number) - Number(b.round_number))
@@ -929,12 +932,8 @@ function handle(text, params, now) {
   // `decided_by_user_id` e `post_inspection_decision_id` ficam de fora aqui
   // porque ficam de fora la — e o teste de privacidade depende de o fake
   // respeitar isso, e nao de o DTO lembrar de omitir.
-  if (
-    /FROM sale_request_owner_final_decisions WHERE sale_request_id = \$1/i.test(text)
-  ) {
-    const row = db.saleRequestOwnerDecisions.find((d) =>
-      sameId(d.sale_request_id, params[0])
-    );
+  if (/FROM sale_request_owner_final_decisions WHERE sale_request_id = \$1/i.test(text)) {
+    const row = db.saleRequestOwnerDecisions.find((d) => sameId(d.sale_request_id, params[0]));
     if (!row) return { rows: [], rowCount: 0 };
 
     return {
@@ -1047,16 +1046,12 @@ function handle(text, params, now) {
   // o service para antes de tentar criar uma agenda sem dono.
   if (/^SELECT s\.id FROM sale_requests sr JOIN sale_request_offer_selections s/i.test(text)) {
     const selection = currentSelectionOf(params[0]);
-    return selection
-      ? { rows: [{ id: selection.id }], rowCount: 1 }
-      : { rows: [], rowCount: 0 };
+    return selection ? { rows: [{ id: selection.id }], rowCount: 1 } : { rows: [], rowCount: 0 };
   }
 
   // --- SELECT: o id da DECISAO, relido depois do lock ----------------------
   if (
-    /^SELECT id FROM sale_request_post_inspection_decisions WHERE sale_request_id = \$1/i.test(
-      text
-    )
+    /^SELECT id FROM sale_request_post_inspection_decisions WHERE sale_request_id = \$1/i.test(text)
   ) {
     const row = db.saleRequestDecisions.find((d) => sameId(d.sale_request_id, params[0]));
     return row ? { rows: [{ id: row.id }], rowCount: 1 } : { rows: [], rowCount: 0 };
@@ -1077,9 +1072,7 @@ function handle(text, params, now) {
     }
 
     const inspection = inspectionOf(saleRequestId);
-    const decision = db.saleRequestDecisions.find((d) =>
-      sameId(d.sale_request_id, saleRequestId)
-    );
+    const decision = db.saleRequestDecisions.find((d) => sameId(d.sale_request_id, saleRequestId));
 
     return {
       rows: [
@@ -1190,7 +1183,9 @@ function handle(text, params, now) {
   }
 
   // --- UPDATE: publica a rodada --------------------------------------------
-  if (/^UPDATE sale_request_inspections SET schedule_status = \$3, schedule_round = \$2/i.test(text)) {
+  if (
+    /^UPDATE sale_request_inspections SET schedule_status = \$3, schedule_round = \$2/i.test(text)
+  ) {
     const [inspectionId, roundNo, next, fromA, fromB] = params;
     const row = db.saleRequestInspections.find(
       (i) => sameId(i.id, inspectionId) && [fromA, fromB].includes(i.schedule_status)
@@ -1253,7 +1248,9 @@ function handle(text, params, now) {
 
   // --- UPDATE: confirma o horario ------------------------------------------
   if (
-    /^UPDATE sale_request_inspections SET schedule_status = \$4, confirmed_slot_id = \$2/i.test(text)
+    /^UPDATE sale_request_inspections SET schedule_status = \$4, confirmed_slot_id = \$2/i.test(
+      text
+    )
   ) {
     const [inspectionId, slotId, startsAt, next, from] = params;
     const row = db.saleRequestInspections.find(
@@ -1334,9 +1331,7 @@ function handle(text, params, now) {
     ] = params;
 
     // ON CONFLICT (sale_request_id) DO NOTHING — a rede do paragrafo 37.
-    const exists = db.saleRequestDecisions.some((d) =>
-      sameId(d.sale_request_id, saleRequestId)
-    );
+    const exists = db.saleRequestDecisions.some((d) => sameId(d.sale_request_id, saleRequestId));
     if (exists) return { rows: [], rowCount: 0 };
 
     const row = {
@@ -1397,7 +1392,9 @@ function handle(text, params, now) {
   }
 
   // --- SELECT: a inspecao para leitura de tela -----------------------------
-  if (/JOIN sale_request_inspections i ON i\.selection_id = s\.id JOIN advertisers adv/i.test(text)) {
+  if (
+    /JOIN sale_request_inspections i ON i\.selection_id = s\.id JOIN advertisers adv/i.test(text)
+  ) {
     const inspection = inspectionOf(params[0]);
     return inspection
       ? { rows: [projectInspection(inspection)], rowCount: 1 }
@@ -1429,9 +1426,7 @@ function handle(text, params, now) {
     )
   ) {
     const [saleRequestId, fromStatus, toStatus] = params;
-    const row = db.saleRequests.find(
-      (r) => sameId(r.id, saleRequestId) && r.status === fromStatus
-    );
+    const row = db.saleRequests.find((r) => sameId(r.id, saleRequestId) && r.status === fromStatus);
     if (!row) return { rows: [], rowCount: 0 };
     row.status = toStatus;
     row.updated_at = new Date(now).toISOString();
@@ -1617,7 +1612,9 @@ function handle(text, params, now) {
   }
 
   // --- sale_requests: a proposta SELECIONADA, para exibição -----------------
-  if (/FROM sale_requests sr JOIN sale_request_offers o ON o\.id = sr\.selected_offer_id/i.test(text)) {
+  if (
+    /FROM sale_requests sr JOIN sale_request_offers o ON o\.id = sr\.selected_offer_id/i.test(text)
+  ) {
     const [saleRequestId, ownerUserId] = params;
 
     const saleRequest = db.saleRequests.find(
@@ -1668,8 +1665,7 @@ function handle(text, params, now) {
 
     const exists = db.userNotifications.some(
       (item) =>
-        sameId(item.recipient_user_id, recipientUserId) &&
-        item.idempotency_key === idempotencyKey
+        sameId(item.recipient_user_id, recipientUserId) && item.idempotency_key === idempotencyKey
     );
     if (exists) return { rows: [], rowCount: 0 };
 
@@ -1694,12 +1690,13 @@ function handle(text, params, now) {
   }
 
   // --- user_notifications: a leitura do conflito idempotente ----------------
-  if (/FROM user_notifications WHERE recipient_user_id = \$1 AND idempotency_key = \$2/i.test(text)) {
+  if (
+    /FROM user_notifications WHERE recipient_user_id = \$1 AND idempotency_key = \$2/i.test(text)
+  ) {
     const [recipientUserId, idempotencyKey] = params;
     const row = db.userNotifications.find(
       (item) =>
-        sameId(item.recipient_user_id, recipientUserId) &&
-        item.idempotency_key === idempotencyKey
+        sameId(item.recipient_user_id, recipientUserId) && item.idempotency_key === idempotencyKey
     );
     return { rows: row ? [row] : [], rowCount: row ? 1 : 0 };
   }
@@ -1732,9 +1729,7 @@ function handle(text, params, now) {
     )
   ) {
     const [id, cityId] = params;
-    const row = db.saleRequests.find(
-      (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
-    );
+    const row = db.saleRequests.find((item) => sameId(item.id, id) && sameId(item.city_id, cityId));
     return {
       rows: row
         ? [
@@ -1755,12 +1750,15 @@ function handle(text, params, now) {
   }
 
   // --- sale_request_offers: a MAIOR proposta --------------------------------
-  if (/^SELECT amount FROM sale_request_offers WHERE sale_request_id = \$1 AND round_id = \$2 ORDER BY amount DESC/i.test(text)) {
+  if (
+    /^SELECT amount FROM sale_request_offers WHERE sale_request_id = \$1 AND round_id = \$2 ORDER BY amount DESC/i.test(
+      text
+    )
+  ) {
     const rows = db.saleRequestOffers
       .filter(
         (offer) =>
-          sameId(offer.sale_request_id, params[0]) &&
-          offerInRound(offer, params[1], params[0])
+          sameId(offer.sale_request_id, params[0]) && offerInRound(offer, params[1], params[0])
       )
       .sort((a, b) => {
         const byAmount = Number(b.amount) - Number(a.amount);
@@ -1775,7 +1773,11 @@ function handle(text, params, now) {
   // --- sale_request_offers: a proposta VIGENTE de uma loja ------------------
   //
   // A mais RECENTE, não a maior — é a diferença que o repository documenta.
-  if (/FROM sale_request_offers WHERE sale_request_id = \$1 AND advertiser_id = \$2 AND round_id = \$3 ORDER BY created_at DESC/i.test(text)) {
+  if (
+    /FROM sale_request_offers WHERE sale_request_id = \$1 AND advertiser_id = \$2 AND round_id = \$3 ORDER BY created_at DESC/i.test(
+      text
+    )
+  ) {
     const [saleRequestId, advertiserId, roundId] = params;
     const rows = db.saleRequestOffers
       .filter(
@@ -1825,7 +1827,11 @@ function handle(text, params, now) {
   }
 
   // --- sale_request_offers: contagem de uma solicitação ---------------------
-  if (/^SELECT COUNT\(\*\)::int AS total FROM sale_request_offers WHERE sale_request_id = \$1/i.test(text)) {
+  if (
+    /^SELECT COUNT\(\*\)::int AS total FROM sale_request_offers WHERE sale_request_id = \$1/i.test(
+      text
+    )
+  ) {
     const total = db.saleRequestOffers.filter((offer) =>
       sameId(offer.sale_request_id, params[0])
     ).length;
@@ -2013,15 +2019,16 @@ function handle(text, params, now) {
   // devolveria a ficha para todo mundo e o teste passaria enquanto a privacidade
   // estivesse quebrada.
   if (
-    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( sr\.status = \$3 OR \(sr\.status = ANY\(\$4::text\[\]\) AND sel\.advertiser_id = \$5\) \)/i.test(
+    /WHERE sr\.id = \$1 AND sr\.city_id = \$2 AND \( \(NOT \$6::boolean AND sr\.status = \$3\) OR \(sr\.status = ANY\(\$4::text\[\]\) AND sel\.advertiser_id = \$5\) \)/i.test(
       text
     )
   ) {
-    const [id, cityId, openStatus, selectedStatuses, advertiserId] = params;
+    const [id, cityId, openStatus, selectedStatuses, advertiserId, selectedOnly] = params;
+    if (typeof selectedOnly !== "boolean") {
+      throw new Error("fake-db: selectedOnly deve ser booleano no predicado SQL");
+    }
 
-    const row = db.saleRequests.find(
-      (item) => sameId(item.id, id) && sameId(item.city_id, cityId)
-    );
+    const row = db.saleRequests.find((item) => sameId(item.id, id) && sameId(item.city_id, cityId));
     if (!row) return { rows: [], rowCount: 0 };
 
     // LEFT JOIN pelo `selected_offer_id` — a proposta ESCOLHIDA, não "uma
@@ -2031,7 +2038,7 @@ function handle(text, params, now) {
       : null;
 
     const visible =
-      row.status === openStatus ||
+      (!selectedOnly && row.status === openStatus) ||
       ((Array.isArray(selectedStatuses) ? selectedStatuses : [selectedStatuses]).includes(
         row.status
       ) &&
@@ -2249,9 +2256,7 @@ function handle(text, params, now) {
     const [id, ownerUserId, cancelled, receiving] = params;
     const row = db.saleRequests.find(
       (item) =>
-        sameId(item.id, id) &&
-        sameId(item.owner_user_id, ownerUserId) &&
-        item.status === receiving
+        sameId(item.id, id) && sameId(item.owner_user_id, ownerUserId) && item.status === receiving
     );
     if (!row) return { rows: [], rowCount: 0 };
     row.status = cancelled;
@@ -2293,9 +2298,7 @@ function handle(text, params, now) {
     const hasCursor = /\(sr\.created_at, sr\.id\) </i.test(text);
     const limit = Number(params[params.length - 1]);
 
-    let rows = sortDesc(
-      db.saleRequests.filter((item) => sameId(item.owner_user_id, ownerUserId))
-    );
+    let rows = sortDesc(db.saleRequests.filter((item) => sameId(item.owner_user_id, ownerUserId)));
     if (hasCursor) {
       rows = rows.filter((row) => beforeCursor(row, params[1], params[2]));
     }
