@@ -1,0 +1,20 @@
+name: PR89 A Formatting Preview
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Show exact Prettier changes
+        run: |
+          npx prettier --write tests/integration/sale-requests-dealer-access.integration.test.js tests/sale-requests/sale-requests-dealer-feed.test.js
+          git diff --unified=3 -- tests/integration/sale-requests-dealer-access.integration.test.js tests/sale-requests/sale-requests-dealer-feed.test.js
