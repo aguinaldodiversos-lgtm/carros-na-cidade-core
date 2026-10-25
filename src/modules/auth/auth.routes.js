@@ -273,7 +273,9 @@ router.post(
       if (!previous) throw new AppError("Conta não encontrada.", 404);
 
       const changed =
-        String(previous.document_type ?? "").trim().toLowerCase() !== document_type ||
+        String(previous.document_type ?? "")
+          .trim()
+          .toLowerCase() !== document_type ||
         onlyDigits(previous.document_number) !== document_number;
 
       await tx.query(
