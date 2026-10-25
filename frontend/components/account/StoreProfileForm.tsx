@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from "react";
 
 import type { StoreProfile } from "@/lib/account/backend-account";
-import PurchaseIntentCityField, { type SelectedCity } from "@/components/account/PurchaseIntentCityField";
+import PurchaseIntentCityField, {
+  type SelectedCity,
+} from "@/components/account/PurchaseIntentCityField";
 
 /**
  * Formulário "Dados da loja" (lojista). Edita advertisers.{name,email,whatsapp,
@@ -61,7 +63,16 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
   const whatsappTrimmed = whatsapp.trim();
   const whatsappOk = whatsappTrimmed === "" || normalizeBrPhoneOrNull(whatsappTrimmed) !== null;
   const whatsappEmpty = whatsappTrimmed === "";
-  const canSubmit = nameOk && emailOk && whatsappOk && !submitting && (created || (city !== null && whatsappTrimmed !== "" && email.trim() !== "" && address.trim().length >= 10));
+  const canSubmit =
+    nameOk &&
+    emailOk &&
+    whatsappOk &&
+    !submitting &&
+    (created ||
+      (city !== null &&
+        whatsappTrimmed !== "" &&
+        email.trim() !== "" &&
+        address.trim().length >= 10));
 
   const documentDisplay = initial?.document.number
     ? formatDocument(initial?.document.type ?? null, initial?.document.number ?? "")
@@ -105,7 +116,12 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
         setWhatsapp(data.store.whatsapp);
         setAddress(data.store.address);
       }
-      setFeedback({ tone: "success", text: created ? "Dados da loja salvos com sucesso." : "Cadastro da loja concluído. A verificação será feita pela equipe do portal." });
+      setFeedback({
+        tone: "success",
+        text: created
+          ? "Dados da loja salvos com sucesso."
+          : "Cadastro da loja concluído. A verificação será feita pela equipe do portal.",
+      });
     } catch (err) {
       setFeedback({
         tone: "error",
@@ -139,7 +155,12 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
           helpText="Selecione a cidade do endereço físico da loja. A escolha é obrigatória e não cria anúncios."
         />
       ) : city ? (
-        <p className="text-sm text-[#475569]">Cidade da loja: <strong>{city.name} - {city.state}</strong></p>
+        <p className="text-sm text-[#475569]">
+          Cidade da loja:{" "}
+          <strong>
+            {city.name} - {city.state}
+          </strong>
+        </p>
       ) : null}
 
       {/* Aviso forte quando não há WhatsApp — o comprador fica sem canal de contato. */}
