@@ -158,13 +158,19 @@ export default function AdminAnuncianteDetalhe() {
         checked_physical_store: checkedPhysical,
         reason: verificationReason.trim(),
       });
-      showFlash("success", verified ? "Loja verificada pelo administrador." : "Verificação da loja revogada.");
+      showFlash(
+        "success",
+        verified ? "Loja verificada pelo administrador." : "Verificação da loja revogada."
+      );
       setVerificationReason("");
       setCheckedReceita(false);
       setCheckedPhysical(false);
       adv.reload();
     } catch (error) {
-      showFlash("error", error instanceof Error ? error.message : "Falha ao atualizar verificação.");
+      showFlash(
+        "error",
+        error instanceof Error ? error.message : "Falha ao atualizar verificação."
+      );
     } finally {
       setSavingVerification(false);
     }
@@ -217,8 +223,14 @@ export default function AdminAnuncianteDetalhe() {
             <InfoRow label="Documento" value={d.document_type?.toUpperCase() || "—"} />
             <InfoRow label="CNPJ cadastrado" value={d.document_number || "Não informado"} />
             <InfoRow label="Endereço declarado" value={d.address || "Não informado"} />
-            <InfoRow label="Cidade da loja" value={d.city_name ? `${d.city_name} - ${d.city_state || ""}` : "Não informada"} />
-            <InfoRow label="Loja física averiguada" value={d.verified ? "Sim — verificada" : "Não — pendente"} />
+            <InfoRow
+              label="Cidade da loja"
+              value={d.city_name ? `${d.city_name} - ${d.city_state || ""}` : "Não informada"}
+            />
+            <InfoRow
+              label="Loja física averiguada"
+              value={d.verified ? "Sim — verificada" : "Não — pendente"}
+            />
             <InfoRow label="Cadastro" value={fmtDate(d.created_at)} />
             <InfoRow label="Atualização" value={fmtDate(d.updated_at)} />
             {d.status_reason && <InfoRow label="Motivo do status" value={d.status_reason} />}
@@ -244,7 +256,10 @@ export default function AdminAnuncianteDetalhe() {
                   label="Concedido por"
                   value={d.plan_grant.granted_by_name || d.plan_grant.granted_by_admin_id || "—"}
                 />
-                <InfoRow label="Motivo" value={d.plan_grant.reason_note || d.plan_grant.reason_label} />
+                <InfoRow
+                  label="Motivo"
+                  value={d.plan_grant.reason_note || d.plan_grant.reason_label}
+                />
               </div>
             </div>
           )}
@@ -311,11 +326,15 @@ export default function AdminAnuncianteDetalhe() {
           </div>
 
           {accountType === "CNPJ" && (
-            <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-3" aria-label="Averiguação do estabelecimento">
+            <section
+              className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-3"
+              aria-label="Averiguação do estabelecimento"
+            >
               <h2 className="text-sm font-bold text-cnc-text">Averiguação da loja</h2>
               <p className="text-xs leading-relaxed text-cnc-muted">
                 Verifique a situação cadastral na Receita e confirme que a loja possui endereço
-                comercial e portas abertas. A simples validação dos dígitos do CNPJ não comprova isso.
+                comercial e portas abertas. A simples validação dos dígitos do CNPJ não comprova
+                isso.
               </p>
               <a
                 href="https://solucoes.receita.fazenda.gov.br/Servicos/cnpjreva/"
@@ -328,11 +347,19 @@ export default function AdminAnuncianteDetalhe() {
               {!d.verified && (
                 <>
                   <label className="flex items-start gap-2 text-xs text-cnc-text">
-                    <input type="checkbox" checked={checkedReceita} onChange={(e) => setCheckedReceita(e.target.checked)} />
+                    <input
+                      type="checkbox"
+                      checked={checkedReceita}
+                      onChange={(e) => setCheckedReceita(e.target.checked)}
+                    />
                     Consultei o CNPJ na Receita e confirmei a situação cadastral.
                   </label>
                   <label className="flex items-start gap-2 text-xs text-cnc-text">
-                    <input type="checkbox" checked={checkedPhysical} onChange={(e) => setCheckedPhysical(e.target.checked)} />
+                    <input
+                      type="checkbox"
+                      checked={checkedPhysical}
+                      onChange={(e) => setCheckedPhysical(e.target.checked)}
+                    />
                     Confirmei a existência de estabelecimento físico no endereço declarado.
                   </label>
                 </>
@@ -350,10 +377,18 @@ export default function AdminAnuncianteDetalhe() {
               <button
                 type="button"
                 onClick={() => void saveVerification(!d.verified)}
-                disabled={savingVerification || verificationReason.trim().length < 15 || (!d.verified && (!checkedReceita || !checkedPhysical))}
+                disabled={
+                  savingVerification ||
+                  verificationReason.trim().length < 15 ||
+                  (!d.verified && (!checkedReceita || !checkedPhysical))
+                }
                 className="w-full rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {savingVerification ? "Salvando..." : d.verified ? "Revogar verificação" : "Confirmar loja física"}
+                {savingVerification
+                  ? "Salvando..."
+                  : d.verified
+                    ? "Revogar verificação"
+                    : "Confirmar loja física"}
               </button>
             </section>
           )}
