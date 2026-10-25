@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import AccountPlanCard from "./AccountPlanCard";
 import type { DashboardPayload } from "@/lib/dashboard-types";
 
@@ -9,8 +9,8 @@ import type { DashboardPayload } from "@/lib/dashboard-types";
  *   - "Cancelar plano" só aparece com plano PAGO de LOJISTA
  *     (billing_model !== 'free'). PF nunca vê "cancelar" (não tem assinatura
  *     paga a cancelar) — nem mesmo se o plano vier pago por acaso.
- *   - "Fazer upgrade" sempre presente; PF aponta para /planos, lojista para
- *     /dashboard-loja/plano.
+ *   - "Fazer upgrade" de PF informa exclusividade de CNPJ, sem navegar;
+ *     lojista segue para /dashboard-loja/plano.
  * Não testa visual — só a presença/ausência das ações e o destino.
  */
 
@@ -80,12 +80,15 @@ describe("AccountPlanCard — ações condicionais por plano/variant", () => {
     expect(screen.queryByText("Editar plano")).toBeNull();
   });
 
-  it("particular (PF) gratuito: só Upgrade → /planos, SEM Cancelar", async () => {
+  it("particular (PF) gratuito: informa exclusividade CNPJ sem redirecionar", async () => {
     mockPayload(makePayload("Grátis", "free"));
     render(<AccountPlanCard variant="pf" basePath="/dashboard" />);
 
     const upgrade = await screen.findByTestId("account-plan-upgrade");
-    expect(upgrade.getAttribute("href")).toBe("/planos");
+    expect(upgrade.tagName).toBe("BUTTON");
+    expect(upgrade.getAttribute("href")).toBeNull();
+    fireEvent.click(upgrade);
+    expect(screen.getByTestId("pf-upgrade-notice").textContent).toContain("somente para contas cadastradas com CNPJ");
     expect(screen.queryByTestId("account-plan-cancel")).toBeNull();
     expect(screen.queryByText("Editar plano")).toBeNull();
   });
@@ -96,6 +99,16 @@ describe("AccountPlanCard — ações condicionais por plano/variant", () => {
 
     expect(await screen.findByTestId("account-plan-card")).toBeTruthy();
     expect(screen.queryByTestId("account-plan-cancel")).toBeNull();
+  });
+
+  it("PF também recebe aviso quando falha a leitura do plano", async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 502, message: "backend down" });
+    render(<AccountPlanCard variant="pf" basePath="/dashboard" />);
+
+    const upgrade = await screen.findByRole("button", { name: "Fazer upgrade" });
+    fireEvent.click(upgrade);
+    expect(screen.getByRole("alert").textContent).toContain("contas cadastradas com CNPJ");
+    expect(screen.queryByRole("link", { name: "Ver planos" })).toBeNull();
   });
 
   it("falha na leitura: degrada para atalho, sem quebrar", async () => {
