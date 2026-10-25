@@ -9,8 +9,8 @@
  * + stats). As três ações são NAVEGAÇÃO — não reimplementam lógica:
  *   - lojista: Editar plano / Fazer upgrade / Cancelar plano → /dashboard-loja/plano
  *     (o cancelamento real vive lá, no bloco da Fase A).
- *   - particular (PF): sem assinatura paga a gerenciar → só "Fazer upgrade" →
- *     /planos. Sem "Editar" nem "Cancelar".
+ *   - particular (PF): sem assinatura paga a gerenciar → informa que planos
+ *     comerciais são exclusivos de contas CNPJ; nunca navega ao checkout.
  *   - "Cancelar plano" só aparece quando há plano PAGO (billing_model != free).
  */
 
@@ -37,6 +37,7 @@ function PlanIcon() {
 export default function AccountPlanCard({ variant, basePath }: AccountPlanCardProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [data, setData] = useState<DashboardPayload | null>(null);
+  const [showPfNotice, setShowPfNotice] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -54,7 +55,16 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
     };
   }, []);
 
-  const managePlanHref = variant === "lojista" ? `${basePath}/plano` : "/planos";
+  const managePlanHref = `${basePath}/plano`;
+  const pfNotice = showPfNotice ? (
+    <p
+      role="alert"
+      data-testid="pf-upgrade-notice"
+      className="mt-2 rounded-lg border border-[#BDD5FB] bg-[#EFF5FF] px-3 py-2 text-xs font-medium leading-relaxed text-[#174A92]"
+    >
+      Esta opção está disponível somente para contas cadastradas com CNPJ.
+    </p>
+  ) : null;
 
   if (status === "loading") {
     return (
@@ -70,12 +80,23 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
     return (
       <div className="rounded-2xl border border-[#e8ecf4] bg-white p-4">
         <p className="text-[10px] font-bold uppercase tracking-wide text-[#94a3b8]">Meu plano</p>
-        <Link
-          href={managePlanHref}
-          className="mt-2 inline-block text-sm font-bold text-[#0e62d8] hover:underline"
-        >
-          {variant === "lojista" ? "Ver plano e cobranças" : "Ver planos"}
-        </Link>
+        {variant === "lojista" ? (
+          <Link
+            href={managePlanHref}
+            className="mt-2 inline-block text-sm font-bold text-[#0e62d8] hover:underline"
+          >
+            Ver plano e cobranças
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowPfNotice(true)}
+            className="mt-2 inline-block text-sm font-bold text-[#0e62d8] hover:underline"
+          >
+            Fazer upgrade
+          </button>
+        )}
+        {pfNotice}
       </div>
     );
   }
@@ -88,7 +109,10 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
   const showManage = variant === "lojista" && isPaid;
 
   return (
-    <div className="rounded-2xl border border-[#e8ecf4] bg-white p-4" data-testid="account-plan-card">
+    <div
+      className="rounded-2xl border border-[#e8ecf4] bg-white p-4"
+      data-testid="account-plan-card"
+    >
       <div className="flex items-center gap-3">
         <PlanIcon />
         <div className="min-w-0">
@@ -111,23 +135,49 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
             href={managePlanHref}
             className="flex items-center gap-2 text-sm font-semibold text-[#37425d] hover:text-[#0e62d8]"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden
+            >
               <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
             </svg>
             Editar plano
           </Link>
         ) : null}
 
-        <Link
-          href={managePlanHref}
-          data-testid="account-plan-upgrade"
-          className="flex h-9 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white transition hover:brightness-110"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 19V5m0 0-6 6m6-6 6 6" />
-          </svg>
-          Fazer upgrade
-        </Link>
+        {variant === "pf" ? (
+          <button
+            type="button"
+            onClick={() => setShowPfNotice(true)}
+            data-testid="account-plan-upgrade"
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white transition hover:brightness-110"
+          >
+            Fazer upgrade
+          </button>
+        ) : (
+          <Link
+            href={managePlanHref}
+            data-testid="account-plan-upgrade"
+            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white transition hover:brightness-110"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
+              <path d="M12 19V5m0 0-6 6m6-6 6 6" />
+            </svg>
+            Fazer upgrade
+          </Link>
+        )}
+        {pfNotice}
 
         {showManage ? (
           <Link
@@ -135,7 +185,14 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
             data-testid="account-plan-cancel"
             className="flex items-center gap-2 text-sm font-semibold text-[#b45309] hover:text-[#92400e]"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M9 9l6 6m0-6-6 6" />
             </svg>

@@ -416,6 +416,26 @@ export async function fetchOwnedAd(session: SessionData, adId: string) {
   });
 }
 
+/** Conta PF — identidade protegida e contatos atualizáveis. */
+export type PersonalProfile = {
+  name: string;
+  email: string;
+  document: { type: "CPF" | null; number: string; verified: boolean };
+  phone: string;
+  whatsapp: string;
+  address: string;
+  city: string;
+};
+
+export type PersonalProfileResponse = { success: boolean; profile: PersonalProfile };
+
+export async function fetchPersonalProfile(session: SessionData) {
+  return fetchBackendJson<PersonalProfileResponse>("/api/account/personal", {
+    accessToken: assertAccessToken(session),
+    cache: "no-store",
+  });
+}
+
 /** Cadastro da loja (tabela `advertisers`) — "Dados da loja". */
 export type StoreProfile = {
   name: string;
