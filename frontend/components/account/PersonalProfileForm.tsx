@@ -60,8 +60,7 @@ export default function PersonalProfileForm({ initial }: { initial: PersonalProf
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
   const valid = phoneIsValid(phone) && phoneIsValid(whatsapp) && address.trim().length <= 300;
-  const changed =
-    phone !== saved.phone || whatsapp !== saved.whatsapp || address !== saved.address;
+  const changed = phone !== saved.phone || whatsapp !== saved.whatsapp || address !== saved.address;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
