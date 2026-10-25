@@ -180,6 +180,14 @@ router.post(
       meta
     );
 
+    // Envio auxiliar: indisponibilidade do provedor não bloqueia o cadastro.
+    if (result?.user?.id && typeof EmailVerificationService.sendVerificationEmailForUser === "function") {
+      try {
+        await EmailVerificationService.sendVerificationEmailForUser(result.user.id);
+      } catch (error) {
+        logger.warn({ err: error?.message }, "[auth] confirmação de e-mail não enviada");
+      }
+    }
     return res.status(201).json(result ?? { ok: true });
   })
 );
@@ -361,54 +369,36 @@ async function handleResetPassword(req, res) {
 router.post("/reset-password", passwordResetRateLimit, asyncHandler(handleResetPassword));
 router.post("/password/reset", passwordResetRateLimit, asyncHandler(handleResetPassword));
 
-/** EMAIL VERIFY */
-async function handleVerifyEmail(req, res) {
-  const token = requireString(req.body?.token ?? req.query?.token, "token");
+/** EMAIL VERIFY — consumo por POST impede pré-visualizações de consumirem tokens. */
+router.post(
+  "/verify-email",
+  asyncHandler(async (req, res) => {
+    const token = requireString(req.body?.token, "token");
+    const result = await EmailVerificationService.verifyEmail(token);
+    res.set("Cache-Control", "private, no-store");
+    res.json(result);
+  })
+);
+// Compatibilidade de rota antiga, também exclusivamente POST.
+router.post(
+  "/email/verify",
+  asyncHandler(async (req, res) => {
+    const token = requireString(req.body?.token, "token");
+    const result = await EmailVerificationService.verifyEmail(token);
+    res.set("Cache-Control", "private, no-store");
+    res.json(result);
+  })
+);
 
-  const verify = ensureFn(
-    EmailVerificationService,
-    ["verifyEmailWithToken", "verifyEmailToken", "verifyEmail", "confirmEmail"],
-    "emailVerification.service.js"
-  );
-
-  let result;
-  try {
-    result = await verify(token);
-  } catch {
-    result = await verify({ token });
-  }
-
-  return res.status(200).json(result ?? { ok: true });
-}
-
-router.post("/verify-email", asyncHandler(handleVerifyEmail));
-router.all("/email/verify", asyncHandler(handleVerifyEmail));
-
-/** EMAIL RESEND */
+/** Reenvio protegido pela sessão: jamais aceitar email/userId fornecido no body. */
 router.post(
   "/email/resend",
+  authMiddleware,
+  registerRateLimit,
   asyncHandler(async (req, res) => {
-    const resend = pickFn(EmailVerificationService, [
-      "resendVerificationEmail",
-      "resendEmailVerification",
-      "sendVerificationEmail",
-    ]);
-
-    if (!resend) {
-      return res.status(501).json({ ok: false, error: "Resend não implementado no service." });
-    }
-
-    const { email, userId } = req.body || {};
-    if (!email && !userId) throw new AppError("Informe email ou userId.", 400);
-
-    let result;
-    try {
-      result = await resend({ email, userId });
-    } catch {
-      result = email ? await resend(email) : await resend(userId);
-    }
-
-    return res.status(200).json(result ?? { ok: true });
+    const result = await EmailVerificationService.sendVerificationEmailForUser(req.user.id);
+    res.set("Cache-Control", "private, no-store");
+    res.json(result);
   })
 );
 
