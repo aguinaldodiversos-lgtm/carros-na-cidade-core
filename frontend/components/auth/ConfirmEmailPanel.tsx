@@ -31,8 +31,8 @@ export default function ConfirmEmailPanel({ token }: { token: string }) {
     <section className="mx-auto max-w-lg rounded-2xl border border-[#E0E6EF] bg-white p-8 shadow-sm">
       <h1 className="text-2xl font-extrabold text-[#172646]">Confirmação de e-mail</h1>
       <p className="mt-3 text-sm text-[#475569]">
-        Confirme que este endereço de e-mail pertence a você. A verificação é independente
-        da averiguação do CNPJ e da loja física.
+        Confirme que este endereço de e-mail pertence a você. A verificação é independente da
+        averiguação do CNPJ e da loja física.
       </p>
       {!valid ? (
         <p role="alert" className="mt-5 text-sm text-red-700">
@@ -45,11 +45,20 @@ export default function ConfirmEmailPanel({ token }: { token: string }) {
           disabled={status === "loading" || status === "success"}
           className="mt-6 min-h-11 rounded-xl bg-[#1763D6] px-5 text-sm font-bold text-white disabled:opacity-60"
         >
-          {status === "loading" ? "Confirmando..." : status === "success" ? "Confirmado" : "Confirmar meu e-mail"}
+          {status === "loading"
+            ? "Confirmando..."
+            : status === "success"
+              ? "Confirmado"
+              : "Confirmar meu e-mail"}
         </button>
       )}
       {message ? (
-        <p role="status" className={status === "success" ? "mt-4 text-sm text-emerald-800" : "mt-4 text-sm text-red-700"}>
+        <p
+          role="status"
+          className={
+            status === "success" ? "mt-4 text-sm text-emerald-800" : "mt-4 text-sm text-red-700"
+          }
+        >
           {message}
         </p>
       ) : null}
