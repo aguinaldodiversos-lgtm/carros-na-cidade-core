@@ -1,7 +1,7 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
-import { isValidCnpj } from "./cnpj-validation.js";
+import { isValidCnpj, normalizeCnpj } from "./cnpj-validation.js";
 
 /**
  * "Dados da loja" — leitura/edição do cadastro do lojista (tabela `advertisers`),
@@ -148,6 +148,20 @@ export async function createStoreProfile(userId, input) {
   ) {
     throw new AppError("Informe nome, e-mail, WhatsApp e endereço completo da loja.", 400);
   }
+  // A verificação de documento no cadastro já tenta impedir duplicatas,
+  // mas o onboarding sem anúncio também deve se proteger de contas legadas.
+  const duplicate = await pool.query(
+    `SELECT id FROM users
+       WHERE id::text <> $1::text
+         AND LOWER(TRIM(document_type)) = 'cnpj'
+         AND UPPER(REGEXP_REPLACE(COALESCE(document_number, ''), '[^A-Za-z0-9]', '', 'g')) = $2
+       LIMIT 1`,
+    [String(userId), normalizeCnpj(account.document_number)]
+  );
+  if (duplicate.rows.length) {
+    throw new AppError("Este CNPJ já está associado a outra conta. Procure o suporte.", 409);
+  }
+
   await ensureAdvertiserForUser(userId, {
     cityId: Number(input.city_id),
     source: "account.store.onboarding",
