@@ -433,9 +433,7 @@ export async function expireDueGrants({ userId = null } = {}) {
 
     const affectedUsers = [...new Set(due.rows.map((r) => r.user_id))];
     for (const uid of affectedUsers) {
-      const expiredPlans = due.rows
-        .filter((r) => r.user_id === uid)
-        .map((r) => r.plan_id);
+      const expiredPlans = due.rows.filter((r) => r.user_id === uid).map((r) => r.plan_id);
       const cur = await client.query(`SELECT plan_id FROM users WHERE id = $1`, [uid]);
       const currentPlan = cur.rows[0]?.plan_id || null;
       if (currentPlan && expiredPlans.includes(currentPlan)) {
