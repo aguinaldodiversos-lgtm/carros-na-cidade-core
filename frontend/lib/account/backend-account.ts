@@ -442,6 +442,8 @@ export type StoreProfile = {
   email: string;
   whatsapp: string;
   address: string;
+  city?: { id: number; name: string; state: string } | null;
+  verified?: boolean;
   /** Comprador consegue contato? (COALESCE whatsapp/mobile_phone/phone não vazio) */
   has_contact_channel: boolean;
   document: { type: "CPF" | "CNPJ" | null; number: string };
@@ -459,6 +461,17 @@ export type UpdateStoreProfilePayload = {
 export async function fetchStoreProfile(session: SessionData) {
   return fetchBackendJson<StoreProfileResponse>("/api/account/store", {
     accessToken: assertAccessToken(session),
+  });
+}
+
+export async function createStoreProfile(
+  session: SessionData,
+  payload: UpdateStoreProfilePayload & { city_id: number }
+) {
+  return fetchBackendJson<StoreProfileResponse>("/api/account/store", {
+    method: "POST",
+    accessToken: assertAccessToken(session),
+    body: payload,
   });
 }
 
