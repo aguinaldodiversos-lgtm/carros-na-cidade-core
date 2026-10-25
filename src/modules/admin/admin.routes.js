@@ -273,6 +273,19 @@ router.get(
 );
 
 router.patch(
+  "/advertisers/:id/verification",
+  asyncHandler(async (req, res) => {
+    const result = await advertisersService.updateAdvertiserVerification(
+      req.user.id,
+      req.params.id,
+      req.body || {}
+    );
+    res.set("Cache-Control", "private, no-store");
+    res.json({ ok: true, data: result });
+  })
+);
+
+router.patch(
   "/advertisers/:id/status",
   asyncHandler(async (req, res) => {
     const { status, reason } = req.body || {};
