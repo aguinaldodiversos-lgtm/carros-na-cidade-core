@@ -77,7 +77,7 @@ export async function listAdvertisers({ limit = 50, offset = 0, status, search }
        adv.status, adv.plan, adv.user_id, adv.city_id,
        adv.suspended_at, adv.blocked_at, adv.status_reason,
        adv.created_at, adv.updated_at,
-       u.role AS user_role, u.document_type, u.email AS user_email,
+       u.role AS user_role, u.document_type, u.document_number, u.email AS user_email,
        -- Plano EFETIVO. A coluna adv.plan acima é um snapshot congelado no
        -- momento em que a loja foi criada (ensureAdvertiserForUser) e nunca
        -- mais atualizado: nem pagamento, nem concessão manual, nem expiração
@@ -121,12 +121,22 @@ export async function findById(id) {
     `SELECT
        adv.*,
        u.role AS user_role, u.document_type, u.email AS user_email,
-       u.name AS user_name, u.plan AS user_plan
+       u.name AS user_name, u.plan AS user_plan,
+       c.name AS city_name, c.state AS city_state
      FROM advertisers adv
      LEFT JOIN users u ON u.id = adv.user_id
+     LEFT JOIN cities c ON c.id = adv.city_id
      WHERE adv.id = $1
      LIMIT 1`,
     [id]
+  );
+  return result.rows[0] || null;
+}
+
+export async function setVerification(id, verified) {
+  const result = await query(
+    "UPDATE advertisers SET verified = $2, updated_at = NOW() WHERE id = $1 RETURNING id, verified",
+    [id, verified]
   );
   return result.rows[0] || null;
 }
