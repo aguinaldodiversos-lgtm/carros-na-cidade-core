@@ -78,9 +78,20 @@ describe("cadastro de loja sem anúncio", () => {
     expect(ensureAdvertiserForUser).not.toHaveBeenCalled();
   });
 
+  it("recusa CNPJ associado a outra conta antes de criar loja", async () => {
+    vi.mocked(pool.query)
+      .mockResolvedValueOnce({ rows: [validUser] })
+      .mockResolvedValueOnce({ rows: [{ id: "outro-usuario" }] });
+    await expect(createStoreProfile("pj-1", validPayload)).rejects.toMatchObject({
+      statusCode: 409,
+    });
+    expect(ensureAdvertiserForUser).not.toHaveBeenCalled();
+  });
+
   it("usa ensure idempotente, cidade explícita e guarda verificação falsa", async () => {
     vi.mocked(pool.query)
       .mockResolvedValueOnce({ rows: [validUser] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           { column_name: "name" },
@@ -114,7 +125,7 @@ describe("cadastro de loja sem anúncio", () => {
     );
     expect(store.verified).toBe(false);
     expect(store.city).toEqual({ id: 17, name: "Atibaia", state: "SP" });
-    const sql = vi.mocked(pool.query).mock.calls[2][0];
+    const sql = vi.mocked(pool.query).mock.calls[3][0];
     expect(sql).toContain("WHERE user_id");
     expect(sql).toContain("verified = CASE");
     expect(sql).not.toContain("verified = TRUE");
