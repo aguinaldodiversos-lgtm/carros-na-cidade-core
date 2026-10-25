@@ -11,7 +11,7 @@ import {
   resolvePublishEligibility,
   updateOwnedAdStatus,
 } from "./account.service.js";
-import { getStoreProfile, updateStoreProfile } from "./store-profile.service.js";
+import { createStoreProfile, getStoreProfile, updateStoreProfile } from "./store-profile.service.js";
 import { getPersonalProfile, updatePersonalProfile } from "./personal-profile.service.js";
 
 const router = express.Router();
@@ -158,6 +158,15 @@ router.get(
   asyncHandler(async (req, res) => {
     const store = await getStoreProfile(req.user.id);
     res.json({ success: true, store });
+  })
+);
+
+router.post(
+  "/store",
+  asyncHandler(async (req, res) => {
+    const store = await createStoreProfile(req.user.id, req.body || {});
+    res.set("Cache-Control", "private, no-store");
+    res.status(201).json({ success: true, store });
   })
 );
 
