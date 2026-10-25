@@ -96,7 +96,7 @@ export async function getStoreProfile(userId) {
   const adv = advResult.rows[0];
 
   const userResult = await pool.query(
-    `SELECT document_type, document_number, email_verified_at FROM users WHERE id = $1 LIMIT 1`,
+    `SELECT document_type, document_number FROM users WHERE id = $1 LIMIT 1`,
     [userId]
   );
   const user = userResult.rows[0] || {};
@@ -110,7 +110,6 @@ export async function getStoreProfile(userId) {
       ? { id: Number(adv.city_id), name: adv.city_name || "", state: adv.city_state || "" }
       : null,
     verified: adv.verified === true,
-    email_confirmed: Boolean(user.email_verified_at),
     // O comprador consegue contato quando há QUALQUER número resolvido.
     has_contact_channel: Boolean(adv.contact_number),
     document: {
