@@ -53,9 +53,6 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
   const [address, setAddress] = useState(initial?.address ?? "");
   const [created, setCreated] = useState(Boolean(initial));
   const [verified, setVerified] = useState(Boolean(initial?.verified));
-  const [emailConfirmed, setEmailConfirmed] = useState(Boolean(initial?.email_confirmed));
-  const [resending, setResending] = useState(false);
-  const [emailMessage, setEmailMessage] = useState("");
   const [city, setCity] = useState<SelectedCity | null>(initial?.city ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(
@@ -115,7 +112,6 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
       if (data.store) {
         setCreated(true);
         setVerified(Boolean(data.store.verified));
-        setEmailConfirmed(Boolean(data.store.email_confirmed));
         if (data.store.city) setCity(data.store.city);
         setName(data.store.name);
         setEmail(data.store.email);
@@ -138,32 +134,6 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
     }
   }
 
-  async function resendEmail() {
-    if (resending || emailConfirmed) return;
-    setResending(true);
-    setEmailMessage("");
-    try {
-      const response = await fetch("/api/account/email/resend", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      const body = (await response.json().catch(() => ({}))) as { sent?: boolean };
-      setEmailMessage(
-        response.ok && body.sent
-          ? "Uma nova mensagem de confirmação foi enviada ao e-mail da sua conta."
-          : response.status === 429
-            ? "Aguarde dois minutos para solicitar um novo envio."
-            : "Não foi possível enviar a confirmação agora. Tente mais tarde."
-      );
-    } catch {
-      setEmailMessage("Falha ao enviar a confirmação. Tente novamente.");
-    } finally {
-      setResending(false);
-    }
-  }
-
   return (
     <form
       onSubmit={handleSubmit}
@@ -179,31 +149,6 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
             ? "Loja cadastrada. A verificação do CNPJ e do endereço físico está pendente."
             : "Cadastre sua loja agora, mesmo sem publicar anúncios. O cadastro não exige a contratação de planos nem a criação de anúncios. A equipe fará a verificação do CNPJ e do endereço."}
       </div>
-
-      {created ? (
-        <div className="rounded-[16px] border border-[#DFE7F1] bg-[#F8FAFD] px-4 py-3 text-sm text-[#21456F]">
-          <p>
-            E-mail da conta:{" "}
-            <strong>{emailConfirmed ? "Confirmado por link" : "Confirmação pendente"}</strong>. Isso
-            não impede a publicação de anúncios.
-          </p>
-          {!emailConfirmed ? (
-            <button
-              type="button"
-              onClick={() => void resendEmail()}
-              disabled={resending}
-              className="mt-2 text-sm font-semibold text-[#1763D6] underline disabled:opacity-50"
-            >
-              {resending ? "Enviando..." : "Reenviar e-mail de confirmação"}
-            </button>
-          ) : null}
-          {emailMessage ? (
-            <p role="status" className="mt-2 text-xs">
-              {emailMessage}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
 
       {!created ? (
         <PurchaseIntentCityField
