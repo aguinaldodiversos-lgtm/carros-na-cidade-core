@@ -45,9 +45,11 @@ function makeApp() {
   const app = express();
   app.use(express.json());
   app.use("/api/auth", authRouter);
-  app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({
-    error: error.message,
-  }));
+  app.use((error, _req, res, _next) =>
+    res.status(error.statusCode || 500).json({
+      error: error.message,
+    })
+  );
   return app;
 }
 
@@ -57,13 +59,17 @@ beforeEach(() => {
     .mockResolvedValueOnce({ rows: [] }) // Duplicate document check
     .mockResolvedValueOnce({
       rows: [
-        "document_type", "document_number", "document_verified",
-        "name", "address", "phone", "whatsapp", "updated_at",
+        "document_type",
+        "document_number",
+        "document_verified",
+        "name",
+        "address",
+        "phone",
+        "whatsapp",
+        "updated_at",
       ].map((column_name) => ({ column_name })),
     });
-  vi.mocked(withTransaction).mockImplementation(async (callback) =>
-    callback({ query: txQuery })
-  );
+  vi.mocked(withTransaction).mockImplementation(async (callback) => callback({ query: txQuery }));
   txQuery.mockReset();
   txQuery.mockResolvedValue({ rows: [], rowCount: 1 });
 });
@@ -88,6 +94,8 @@ describe("troca do documento e averiguação física da loja", () => {
     const response = await request(makeApp()).post("/api/auth/verify-document").send(validBody);
     expect(response.status).toBe(200);
     expect(txQuery).toHaveBeenCalledTimes(2);
-    expect(txQuery.mock.calls.some(([sql]) => String(sql).includes("verified = FALSE"))).toBe(false);
+    expect(txQuery.mock.calls.some(([sql]) => String(sql).includes("verified = FALSE"))).toBe(
+      false
+    );
   });
 });
