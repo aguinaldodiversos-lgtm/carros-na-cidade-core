@@ -12,6 +12,7 @@ import {
   updateOwnedAdStatus,
 } from "./account.service.js";
 import { getStoreProfile, updateStoreProfile } from "./store-profile.service.js";
+import { getPersonalProfile, updatePersonalProfile } from "./personal-profile.service.js";
 
 const router = express.Router();
 
@@ -129,6 +130,25 @@ router.delete(
   asyncHandler(async (req, res) => {
     const result = await deleteOwnedAd(req.user.id, req.params.id);
     res.json(result);
+  })
+);
+
+// Conta PF — dados privados do próprio usuário, nunca de um id fornecido pelo cliente.
+router.get(
+  "/personal",
+  asyncHandler(async (req, res) => {
+    const profile = await getPersonalProfile(req.user.id);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, profile });
+  })
+);
+
+router.put(
+  "/personal",
+  asyncHandler(async (req, res) => {
+    const profile = await updatePersonalProfile(req.user.id, req.body);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, profile });
   })
 );
 
