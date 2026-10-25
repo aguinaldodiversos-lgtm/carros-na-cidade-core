@@ -11,13 +11,8 @@ export async function validateUserForLogin(user) {
     throw new AppError("Credenciais inválidas", 401);
   }
 
-  /** Compatibilidade legado/atual: se uma das colunas marcar verdadeiro, o login não deve ser bloqueado. */
-  const verificationFlags = [user.email_verified, user.is_email_verified].filter(
-    (value) => value === true || value === false
-  );
-  if (verificationFlags.length > 0 && verificationFlags.every((value) => value === false)) {
-    throw new AppError("E-mail ainda não verificado", 403);
-  }
+  // Cadastro e publicação seguem liberados; confirmação de e-mail é
+  // informação de confiança, não uma barreira para fazer login.
 
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
     throw new AppError("Conta temporariamente bloqueada. Tente novamente mais tarde.", 403);
