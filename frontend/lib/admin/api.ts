@@ -409,7 +409,8 @@ export const adminApi = {
         ) as Record<string, string>,
       }),
     adMetrics: (id: string | number) => adminFetch<ApiOne<AdAnalytics>>(`analytics/ads/${id}`),
-    postMetrics: (id: string | number) => adminFetch<ApiOne<PostAnalytics>>(`analytics/posts/${id}`),
+    postMetrics: (id: string | number) =>
+      adminFetch<ApiOne<PostAnalytics>>(`analytics/posts/${id}`),
   },
   moderation: {
     list: (p: Record<string, string | number | boolean> = {}) =>
@@ -446,8 +447,7 @@ export const adminApi = {
         ),
       }),
     /** Chamado + thread + dados do autor. */
-    get: (id: string | number) =>
-      adminFetch<ApiOne<SupportTicketDetail>>(`support/tickets/${id}`),
+    get: (id: string | number) => adminFetch<ApiOne<SupportTicketDetail>>(`support/tickets/${id}`),
     /** Resposta do admin (move para em_andamento + e-mail ao usuário). */
     reply: (id: string | number, body: string) =>
       adminFetch<ApiOne<{ ticket: SupportTicketAdminRow; message: SupportMessageRow }>>(
