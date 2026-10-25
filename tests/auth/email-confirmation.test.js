@@ -63,12 +63,14 @@ describe("confirmação efetiva de e-mail", () => {
 
   it("impede reenvio dentro de dois minutos", async () => {
     vi.mocked(pool.query).mockResolvedValueOnce({
-      rows: [{
-        id: "u-11",
-        email: "loja@exemplo.com",
-        email_verified_at: null,
-        email_verification_last_sent_at: new Date(),
-      }],
+      rows: [
+        {
+          id: "u-11",
+          email: "loja@exemplo.com",
+          email_verified_at: null,
+          email_verification_last_sent_at: new Date(),
+        },
+      ],
     });
     await expect(sendVerificationEmailForUser("u-11")).rejects.toMatchObject({
       statusCode: 429,
@@ -78,11 +80,13 @@ describe("confirmação efetiva de e-mail", () => {
 
   it("não reenvia para conta confirmada", async () => {
     vi.mocked(pool.query).mockResolvedValueOnce({
-      rows: [{
-        id: "u-11",
-        email: "loja@exemplo.com",
-        email_verified_at: new Date(),
-      }],
+      rows: [
+        {
+          id: "u-11",
+          email: "loja@exemplo.com",
+          email_verified_at: new Date(),
+        },
+      ],
     });
     await expect(sendVerificationEmailForUser("u-11")).resolves.toEqual({
       ok: true,
