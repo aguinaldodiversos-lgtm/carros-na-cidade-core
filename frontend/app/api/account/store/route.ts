@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       email: String(raw?.email ?? ""),
       whatsapp: String(raw?.whatsapp ?? ""),
       address: String(raw?.address ?? ""),
-      city_id: raw?.city_id,
+      city_id: Number(raw?.city_id),
     };
     const created = await createStoreProfile(auth.ctx.session, payload);
     return applyBffCookies(NextResponse.json(created, { status: 201 }), auth.ctx);
