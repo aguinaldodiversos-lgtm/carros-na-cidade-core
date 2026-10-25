@@ -11,7 +11,11 @@ import {
   resolvePublishEligibility,
   updateOwnedAdStatus,
 } from "./account.service.js";
-import { createStoreProfile, getStoreProfile, updateStoreProfile } from "./store-profile.service.js";
+import {
+  createStoreProfile,
+  getStoreProfile,
+  updateStoreProfile,
+} from "./store-profile.service.js";
 import { getPersonalProfile, updatePersonalProfile } from "./personal-profile.service.js";
 
 const router = express.Router();
