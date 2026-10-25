@@ -30,7 +30,10 @@ export default async function ContaPfPage() {
     return (
       <section className="mx-auto max-w-5xl space-y-4">
         <h1 className="text-2xl font-extrabold text-[#0f172a]">Dados pessoais</h1>
-        <div role="alert" className="rounded-2xl border border-[#F0D3D3] bg-white p-6 text-sm text-[#A13333]">
+        <div
+          role="alert"
+          className="rounded-2xl border border-[#F0D3D3] bg-white p-6 text-sm text-[#A13333]"
+        >
           Não foi possível carregar seus dados cadastrais agora. Atualize a página ou tente
           novamente mais tarde.
         </div>
