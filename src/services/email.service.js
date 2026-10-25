@@ -76,7 +76,11 @@ export async function sendEmailVerificationEmail(to, token) {
   try {
     const resend = getResend();
     const baseUrl = frontendBaseUrl() || String(process.env.SITE_URL || "").trim();
-    if (!resend || !baseUrl || (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))) {
+    if (
+      !resend ||
+      !baseUrl ||
+      (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))
+    ) {
       console.warn("[email] confirmação não enviada: serviço ou URL indisponível");
       return false;
     }
