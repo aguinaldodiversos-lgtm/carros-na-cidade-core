@@ -121,6 +121,7 @@ export async function findById(id) {
     `SELECT
        adv.*,
        u.role AS user_role, u.document_type, u.document_number, u.email AS user_email,
+        u.email_verified_at AS user_email_verified_at,
        u.name AS user_name, u.plan AS user_plan,
        c.name AS city_name, c.state AS city_state
      FROM advertisers adv
