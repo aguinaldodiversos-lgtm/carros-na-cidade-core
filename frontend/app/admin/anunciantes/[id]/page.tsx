@@ -81,6 +81,11 @@ export default function AdminAnuncianteDetalhe() {
   const [flash, setFlash] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   // Estado do formulário de concessão de plano.
+  const [verificationReason, setVerificationReason] = useState("");
+  const [checkedReceita, setCheckedReceita] = useState(false);
+  const [checkedPhysical, setCheckedPhysical] = useState(false);
+  const [savingVerification, setSavingVerification] = useState(false);
+
   const [grantPlanId, setGrantPlanId] = useState("");
   const [durationPreset, setDurationPreset] = useState("30");
   const [customDays, setCustomDays] = useState(30);
@@ -136,6 +141,35 @@ export default function AdminAnuncianteDetalhe() {
     adv.reload();
   }
 
+  async function saveVerification(verified: boolean) {
+    if (verificationReason.trim().length < 15) {
+      showFlash("error", "Informe os dados da averiguação (mínimo 15 caracteres).");
+      return;
+    }
+    if (verified && (!checkedReceita || !checkedPhysical)) {
+      showFlash("error", "Confirme a consulta à Receita Federal e a existência física da loja.");
+      return;
+    }
+    setSavingVerification(true);
+    try {
+      await adminApi.advertisers.setVerification(d!.id, {
+        verified,
+        checked_receita: checkedReceita,
+        checked_physical_store: checkedPhysical,
+        reason: verificationReason.trim(),
+      });
+      showFlash("success", verified ? "Loja verificada pelo administrador." : "Verificação da loja revogada.");
+      setVerificationReason("");
+      setCheckedReceita(false);
+      setCheckedPhysical(false);
+      adv.reload();
+    } catch (error) {
+      showFlash("error", error instanceof Error ? error.message : "Falha ao atualizar verificação.");
+    } finally {
+      setSavingVerification(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -181,6 +215,10 @@ export default function AdminAnuncianteDetalhe() {
             <InfoRow label="Plano atual" value={d.effective_plan_name || d.plan || "—"} />
             <InfoRow label="Origem do plano" value={d.plan_origin_label || "—"} />
             <InfoRow label="Documento" value={d.document_type?.toUpperCase() || "—"} />
+            <InfoRow label="CNPJ cadastrado" value={d.document_number || "Não informado"} />
+            <InfoRow label="Endereço declarado" value={d.address || "Não informado"} />
+            <InfoRow label="Cidade da loja" value={d.city_name ? `${d.city_name} - ${d.city_state || ""}` : "Não informada"} />
+            <InfoRow label="Loja física averiguada" value={d.verified ? "Sim — verificada" : "Não — pendente"} />
             <InfoRow label="Cadastro" value={fmtDate(d.created_at)} />
             <InfoRow label="Atualização" value={fmtDate(d.updated_at)} />
             {d.status_reason && <InfoRow label="Motivo do status" value={d.status_reason} />}
@@ -272,6 +310,53 @@ export default function AdminAnuncianteDetalhe() {
             </div>
           </div>
 
+          {accountType === "CNPJ" && (
+            <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-3" aria-label="Averiguação do estabelecimento">
+              <h2 className="text-sm font-bold text-cnc-text">Averiguação da loja</h2>
+              <p className="text-xs leading-relaxed text-cnc-muted">
+                Verifique a situação cadastral na Receita e confirme que a loja possui endereço
+                comercial e portas abertas. A simples validação dos dígitos do CNPJ não comprova isso.
+              </p>
+              <a
+                href="https://solucoes.receita.fazenda.gov.br/Servicos/cnpjreva/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block text-xs font-semibold text-primary underline"
+              >
+                Consultar CNPJ na Receita Federal
+              </a>
+              {!d.verified && (
+                <>
+                  <label className="flex items-start gap-2 text-xs text-cnc-text">
+                    <input type="checkbox" checked={checkedReceita} onChange={(e) => setCheckedReceita(e.target.checked)} />
+                    Consultei o CNPJ na Receita e confirmei a situação cadastral.
+                  </label>
+                  <label className="flex items-start gap-2 text-xs text-cnc-text">
+                    <input type="checkbox" checked={checkedPhysical} onChange={(e) => setCheckedPhysical(e.target.checked)} />
+                    Confirmei a existência de estabelecimento físico no endereço declarado.
+                  </label>
+                </>
+              )}
+              <label className="block text-xs font-semibold text-cnc-text">
+                Justificativa e evidências da checagem
+                <textarea
+                  value={verificationReason}
+                  onChange={(e) => setVerificationReason(e.target.value)}
+                  maxLength={800}
+                  placeholder="Data, situação na Receita, endereço conferido e método da verificação"
+                  className="mt-1.5 min-h-24 w-full rounded-lg border border-cnc-line p-3 text-xs text-cnc-text"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void saveVerification(!d.verified)}
+                disabled={savingVerification || verificationReason.trim().length < 15 || (!d.verified && (!checkedReceita || !checkedPhysical))}
+                className="w-full rounded-lg bg-primary px-3 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingVerification ? "Salvando..." : d.verified ? "Revogar verificação" : "Confirmar loja física"}
+              </button>
+            </section>
+          )}
           <div className="rounded-xl border border-cnc-line bg-white p-5 shadow-card">
             <h2 className="text-sm font-bold text-cnc-text mb-2">Resumo</h2>
             <div className="grid grid-cols-2 gap-3">
