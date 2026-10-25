@@ -204,11 +204,11 @@ export async function register(
   appendInsertField(insertColumns, insertValues, insertPlaceholders, passwordColumn, passwordHash);
 
   if (hasColumn(usersColumns, "email_verified")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "email_verified", true);
+    appendInsertField(insertColumns, insertValues, insertPlaceholders, "email_verified", false);
   }
 
   if (hasColumn(usersColumns, "is_email_verified")) {
-    appendInsertField(insertColumns, insertValues, insertPlaceholders, "is_email_verified", true);
+    appendInsertField(insertColumns, insertValues, insertPlaceholders, "is_email_verified", false);
   }
 
   if (normalizedPhone && hasColumn(usersColumns, "phone")) {
