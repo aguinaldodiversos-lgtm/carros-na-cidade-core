@@ -51,12 +51,17 @@ export default function PersonalProfileForm({ initial }: { initial: PersonalProf
   const [phone, setPhone] = useState(initial.phone);
   const [whatsapp, setWhatsapp] = useState(initial.whatsapp);
   const [address, setAddress] = useState(initial.address);
+  const [saved, setSaved] = useState({
+    phone: initial.phone,
+    whatsapp: initial.whatsapp,
+    address: initial.address,
+  });
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
   const valid = phoneIsValid(phone) && phoneIsValid(whatsapp) && address.trim().length <= 300;
   const changed =
-    phone !== initial.phone || whatsapp !== initial.whatsapp || address !== initial.address;
+    phone !== saved.phone || whatsapp !== saved.whatsapp || address !== saved.address;
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,9 +85,11 @@ export default function PersonalProfileForm({ initial }: { initial: PersonalProf
       if (!response.ok || body.success !== true || !body.profile) {
         throw new Error(body.message || body.error || "Não foi possível salvar seus dados.");
       }
-      initial.phone = body.profile.phone;
-      initial.whatsapp = body.profile.whatsapp;
-      initial.address = body.profile.address;
+      setSaved({
+        phone: body.profile.phone,
+        whatsapp: body.profile.whatsapp,
+        address: body.profile.address,
+      });
       setPhone(body.profile.phone);
       setWhatsapp(body.profile.whatsapp);
       setAddress(body.profile.address);
