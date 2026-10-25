@@ -145,6 +145,19 @@ export const adminApi = {
         method: "PATCH",
         body: { status, reason },
       }),
+    setVerification: (
+      id: string | number,
+      payload: {
+        verified: boolean;
+        checked_receita: boolean;
+        checked_physical_store: boolean;
+        reason: string;
+      }
+    ) =>
+      adminFetch<ApiOne<{ id: number; verified: boolean }>>(`advertisers/${id}/verification`, {
+        method: "PATCH",
+        body: payload,
+      }),
     ads: (id: string | number) => adminFetch<ApiOne<AdRow[]>>(`advertisers/${id}/ads`),
     // Concessão MANUAL de plano (cortesia / teste / brinde). Não gera cobrança.
     grantPlan: (id: string | number, payload: PlanGrantPayload) =>
@@ -1048,6 +1061,12 @@ export type AdvertiserPlanGrant = {
 };
 
 export type AdvDetail = AdvRow & {
+  document_number?: string | null;
+  address?: string | null;
+  whatsapp?: string | null;
+  city_name?: string | null;
+  city_state?: string | null;
+  verified?: boolean;
   user_email?: string;
   user_name?: string;
   user_plan?: string;
