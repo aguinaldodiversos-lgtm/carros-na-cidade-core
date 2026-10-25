@@ -33,7 +33,12 @@ function makePayload(
   return {
     ok: true,
     user: { id: "127", name: "Teste", email: "t@x.com", type: "CNPJ", cnpj_verified: true },
-    current_plan: { id: "cnpj-store-start", name: planName, ad_limit: 20, billing_model: billingModel },
+    current_plan: {
+      id: "cnpj-store-start",
+      name: planName,
+      ad_limit: 20,
+      billing_model: billingModel,
+    },
     stats: {
       active_ads: 1,
       paused_ads: 0,
@@ -88,7 +93,9 @@ describe("AccountPlanCard — ações condicionais por plano/variant", () => {
     expect(upgrade.tagName).toBe("BUTTON");
     expect(upgrade.getAttribute("href")).toBeNull();
     fireEvent.click(upgrade);
-    expect(screen.getByTestId("pf-upgrade-notice").textContent).toContain("somente para contas cadastradas com CNPJ");
+    expect(screen.getByTestId("pf-upgrade-notice").textContent).toContain(
+      "somente para contas cadastradas com CNPJ"
+    );
     expect(screen.queryByTestId("account-plan-cancel")).toBeNull();
     expect(screen.queryByText("Editar plano")).toBeNull();
   });
