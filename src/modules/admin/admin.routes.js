@@ -1170,7 +1170,11 @@ router.get(
 router.post(
   "/support/tickets/:id/messages",
   asyncHandler(async (req, res) => {
-    const data = await supportAdminService.replyToTicket(req.user.id, req.params.id, req.body || {});
+    const data = await supportAdminService.replyToTicket(
+      req.user.id,
+      req.params.id,
+      req.body || {}
+    );
     res.status(201).json({ ok: true, data });
   })
 );
