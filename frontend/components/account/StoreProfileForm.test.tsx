@@ -48,7 +48,9 @@ describe("Dados da loja — selo administrativo", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Loja cadastrada. A verificação do CNPJ e do endereço físico está pendente.")
+        screen.getByText(
+          "Loja cadastrada. A verificação do CNPJ e do endereço físico está pendente."
+        )
       ).toBeTruthy();
     });
     expect(screen.queryByText("Loja verificada pela equipe do portal.")).toBeNull();
