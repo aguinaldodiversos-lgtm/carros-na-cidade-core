@@ -106,7 +106,9 @@ export async function getStoreProfile(userId) {
     email: adv.email || "",
     whatsapp: adv.whatsapp || "",
     address: adv.address || "",
-    city: adv.city_id ? { id: Number(adv.city_id), name: adv.city_name || "", state: adv.city_state || "" } : null,
+    city: adv.city_id
+      ? { id: Number(adv.city_id), name: adv.city_name || "", state: adv.city_state || "" }
+      : null,
     verified: adv.verified === true,
     // O comprador consegue contato quando há QUALQUER número resolvido.
     has_contact_channel: Boolean(adv.contact_number),
@@ -138,10 +140,12 @@ export async function createStoreProfile(userId, input) {
   if (!Number.isSafeInteger(Number(input?.city_id)) || Number(input?.city_id) <= 0) {
     throw new AppError("Selecione a cidade da loja no catálogo.", 400);
   }
-  if (String(input?.name ?? "").trim().length < 2 ||
-      !EMAIL_RE.test(String(input?.email ?? "").trim()) ||
-      !normalizeBrPhoneOrNull(input?.whatsapp) ||
-      String(input?.address ?? "").trim().length < 10) {
+  if (
+    String(input?.name ?? "").trim().length < 2 ||
+    !EMAIL_RE.test(String(input?.email ?? "").trim()) ||
+    !normalizeBrPhoneOrNull(input?.whatsapp) ||
+    String(input?.address ?? "").trim().length < 10
+  ) {
     throw new AppError("Informe nome, e-mail, WhatsApp e endereço completo da loja.", 400);
   }
   await ensureAdvertiserForUser(userId, {
