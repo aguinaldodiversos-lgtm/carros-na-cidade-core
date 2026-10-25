@@ -271,12 +271,6 @@ export default function AdminAnuncianteDetalhe() {
               <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
                 <InfoRow label="Nome" value={d.user_name || "—"} />
                 <InfoRow label="Email" value={d.user_email || "—"} />
-                <InfoRow
-                  label="Confirmação do e-mail"
-                  value={
-                    d.user_email_verified_at ? "Confirmado por link" : "Sem confirmação comprovada"
-                  }
-                />
                 <InfoRow label="Plano" value={d.user_plan || "—"} />
                 <InfoRow label="Role" value={d.user_role || "—"} />
               </div>
