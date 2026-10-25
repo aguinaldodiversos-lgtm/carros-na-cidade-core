@@ -109,7 +109,10 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
   const showManage = variant === "lojista" && isPaid;
 
   return (
-    <div className="rounded-2xl border border-[#e8ecf4] bg-white p-4" data-testid="account-plan-card">
+    <div
+      className="rounded-2xl border border-[#e8ecf4] bg-white p-4"
+      data-testid="account-plan-card"
+    >
       <div className="flex items-center gap-3">
         <PlanIcon />
         <div className="min-w-0">
@@ -132,7 +135,14 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
             href={managePlanHref}
             className="flex items-center gap-2 text-sm font-semibold text-[#37425d] hover:text-[#0e62d8]"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden
+            >
               <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
             </svg>
             Editar plano
@@ -154,7 +164,14 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
             data-testid="account-plan-upgrade"
             className="flex h-9 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(120deg,#0f4db6_0%,#1381e3_100%)] text-sm font-bold text-white transition hover:brightness-110"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
               <path d="M12 19V5m0 0-6 6m6-6 6 6" />
             </svg>
             Fazer upgrade
@@ -168,7 +185,14 @@ export default function AccountPlanCard({ variant, basePath }: AccountPlanCardPr
             data-testid="account-plan-cancel"
             className="flex items-center gap-2 text-sm font-semibold text-[#b45309] hover:text-[#92400e]"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M9 9l6 6m0-6-6 6" />
             </svg>
