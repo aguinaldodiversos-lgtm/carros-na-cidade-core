@@ -184,8 +184,8 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
         <div className="rounded-[16px] border border-[#DFE7F1] bg-[#F8FAFD] px-4 py-3 text-sm text-[#21456F]">
           <p>
             E-mail da conta:{" "}
-            <strong>{emailConfirmed ? "Confirmado por link" : "Confirmação pendente"}</strong>.
-            Isso não impede a publicação de anúncios.
+            <strong>{emailConfirmed ? "Confirmado por link" : "Confirmação pendente"}</strong>. Isso
+            não impede a publicação de anúncios.
           </p>
           {!emailConfirmed ? (
             <button
@@ -197,7 +197,11 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
               {resending ? "Enviando..." : "Reenviar e-mail de confirmação"}
             </button>
           ) : null}
-          {emailMessage ? <p role="status" className="mt-2 text-xs">{emailMessage}</p> : null}
+          {emailMessage ? (
+            <p role="status" className="mt-2 text-xs">
+              {emailMessage}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
