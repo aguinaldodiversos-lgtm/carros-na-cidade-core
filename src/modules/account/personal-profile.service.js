@@ -32,7 +32,11 @@ export async function getPersonalProfile(userId) {
   );
   const user = rows[0];
   if (!user) throw new AppError("Conta não encontrada.", 404);
-  if (String(user.document_type ?? "").trim().toLowerCase() === "cnpj") {
+  if (
+    String(user.document_type ?? "")
+      .trim()
+      .toLowerCase() === "cnpj"
+  ) {
     throw new AppError("Esta página é exclusiva de pessoa física.", 403);
   }
   return {
