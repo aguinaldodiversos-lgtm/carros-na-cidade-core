@@ -37,23 +37,28 @@ describe("verificação manual da loja", () => {
       { checked_physical_store: false },
       { reason: "ok" },
     ]) {
-      await expect(updateAdvertiserVerification("admin-1", 44, { ...approved, ...patch }))
-        .rejects.toMatchObject({ statusCode: 400 });
+      await expect(
+        updateAdvertiserVerification("admin-1", 44, { ...approved, ...patch })
+      ).rejects.toMatchObject({ statusCode: 400 });
     }
     expect(repo.setVerification).not.toHaveBeenCalled();
   });
 
   it("não aceita CNPJ inválido ou conta CPF", async () => {
     vi.mocked(repo.findById).mockResolvedValueOnce({
-      ...shop, document_number: "11222333000182",
+      ...shop,
+      document_number: "11222333000182",
     });
-    await expect(updateAdvertiserVerification("admin-1", 44, approved))
-      .rejects.toMatchObject({ statusCode: 422 });
+    await expect(updateAdvertiserVerification("admin-1", 44, approved)).rejects.toMatchObject({
+      statusCode: 422,
+    });
     vi.mocked(repo.findById).mockResolvedValueOnce({
-      ...shop, document_type: "cpf",
+      ...shop,
+      document_type: "cpf",
     });
-    await expect(updateAdvertiserVerification("admin-1", 44, approved))
-      .rejects.toMatchObject({ statusCode: 403 });
+    await expect(updateAdvertiserVerification("admin-1", 44, approved)).rejects.toMatchObject({
+      statusCode: 403,
+    });
     expect(repo.setVerification).not.toHaveBeenCalled();
   });
 
@@ -61,17 +66,19 @@ describe("verificação manual da loja", () => {
     const result = await updateAdvertiserVerification("admin-1", 44, approved);
     expect(result.verified).toBe(true);
     expect(repo.setVerification).toHaveBeenCalledWith(44, true);
-    expect(recordAdminAction).toHaveBeenCalledWith(expect.objectContaining({
-      adminUserId: "admin-1",
-      action: "verify_physical_store",
-      targetType: "advertiser",
-      targetId: 44,
-      reason: approved.reason,
-      newValue: expect.objectContaining({
-        checked_receita: true,
-        checked_physical_store: true,
-      }),
-    }));
+    expect(recordAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminUserId: "admin-1",
+        action: "verify_physical_store",
+        targetType: "advertiser",
+        targetId: 44,
+        reason: approved.reason,
+        newValue: expect.objectContaining({
+          checked_receita: true,
+          checked_physical_store: true,
+        }),
+      })
+    );
   });
 
   it("permite revogar verificação com justificativa e registra auditoria", async () => {
@@ -83,8 +90,10 @@ describe("verificação manual da loja", () => {
     });
     expect(result.verified).toBe(false);
     expect(repo.setVerification).toHaveBeenCalledWith(44, false);
-    expect(recordAdminAction).toHaveBeenCalledWith(expect.objectContaining({
-      action: "revoke_physical_store_verification",
-    }));
+    expect(recordAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "revoke_physical_store_verification",
+      })
+    );
   });
 });
