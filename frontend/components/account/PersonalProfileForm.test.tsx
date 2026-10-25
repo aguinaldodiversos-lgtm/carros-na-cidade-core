@@ -30,7 +30,9 @@ describe("Dados pessoais de PF", () => {
     expect((screen.getByLabelText("CPF") as HTMLInputElement).readOnly).toBe(true);
     expect((screen.getByLabelText("CPF") as HTMLInputElement).value).toBe("123.456.789-09");
     expect((screen.getByLabelText("Cidade cadastrada") as HTMLInputElement).readOnly).toBe(true);
-    expect((screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement).disabled
+    ).toBe(true);
   });
 
   it("salva exclusivamente telefone, WhatsApp e endereço pelo BFF privado", async () => {
@@ -55,7 +57,9 @@ describe("Dados pessoais de PF", () => {
     await waitFor(() =>
       expect(screen.getByRole("status").textContent).toContain("atualizados com sucesso")
     );
-    expect((screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement).disabled
+    ).toBe(true);
   });
 
   it("bloqueia telefone inválido sem enviar a solicitação", () => {
@@ -64,7 +68,9 @@ describe("Dados pessoais de PF", () => {
     render(<PersonalProfileForm initial={{ ...profile }} />);
     fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "123" } });
     expect(screen.getByRole("alert").textContent).toContain("Verifique os telefones");
-    expect((screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement).disabled
+    ).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
