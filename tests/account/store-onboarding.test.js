@@ -11,7 +11,10 @@ vi.mock("../../src/modules/advertisers/advertiser.ensure.service.js", () => ({
 }));
 import { pool } from "../../src/infrastructure/database/db.js";
 import { ensureAdvertiserForUser } from "../../src/modules/advertisers/advertiser.ensure.service.js";
-import { createStoreProfile, getStoreProfile } from "../../src/modules/account/store-profile.service.js";
+import {
+  createStoreProfile,
+  getStoreProfile,
+} from "../../src/modules/account/store-profile.service.js";
 
 const validUser = { document_type: "cnpj", document_number: "11.222.333/0001-81" };
 
@@ -62,10 +65,14 @@ describe("cadastro de loja sem anúncio", () => {
 
   it("exige cidade real e dados básicos antes de criar", async () => {
     vi.mocked(pool.query).mockResolvedValue({ rows: [validUser] });
-    await expect(createStoreProfile("pj-1", { ...validPayload, city_id: 0 })).rejects.toMatchObject({
-      statusCode: 400,
-    });
-    await expect(createStoreProfile("pj-1", { ...validPayload, address: "" })).rejects.toMatchObject({
+    await expect(createStoreProfile("pj-1", { ...validPayload, city_id: 0 })).rejects.toMatchObject(
+      {
+        statusCode: 400,
+      }
+    );
+    await expect(
+      createStoreProfile("pj-1", { ...validPayload, address: "" })
+    ).rejects.toMatchObject({
       statusCode: 400,
     });
     expect(ensureAdvertiserForUser).not.toHaveBeenCalled();
@@ -74,13 +81,30 @@ describe("cadastro de loja sem anúncio", () => {
   it("usa ensure idempotente, cidade explícita e guarda verificação falsa", async () => {
     vi.mocked(pool.query)
       .mockResolvedValueOnce({ rows: [validUser] })
-      .mockResolvedValueOnce({ rows: [{ column_name: "name" }, { column_name: "email" },
-        { column_name: "whatsapp" }, { column_name: "address" }, { column_name: "verified" }] })
+      .mockResolvedValueOnce({
+        rows: [
+          { column_name: "name" },
+          { column_name: "email" },
+          { column_name: "whatsapp" },
+          { column_name: "address" },
+          { column_name: "verified" },
+        ],
+      })
       .mockResolvedValueOnce({ rows: [], rowCount: 1 })
       .mockResolvedValueOnce({
-        rows: [{ id: 8, name: validPayload.name, email: validPayload.email,
-          whatsapp: validPayload.whatsapp, address: validPayload.address,
-          city_id: 17, city_name: "Atibaia", city_state: "SP", verified: false }],
+        rows: [
+          {
+            id: 8,
+            name: validPayload.name,
+            email: validPayload.email,
+            whatsapp: validPayload.whatsapp,
+            address: validPayload.address,
+            city_id: 17,
+            city_name: "Atibaia",
+            city_state: "SP",
+            verified: false,
+          },
+        ],
       })
       .mockResolvedValueOnce({ rows: [validUser] });
     const store = await createStoreProfile("pj-1", validPayload);
@@ -97,8 +121,7 @@ describe("cadastro de loja sem anúncio", () => {
   });
 
   it("GET somente lê a loja do usuário autenticado", async () => {
-    vi.mocked(pool.query)
-      .mockResolvedValueOnce({ rows: [] });
+    vi.mocked(pool.query).mockResolvedValueOnce({ rows: [] });
     await expect(getStoreProfile("pj-2")).rejects.toMatchObject({ statusCode: 404 });
     expect(vi.mocked(pool.query).mock.calls[0][1]).toEqual(["pj-2"]);
   });
