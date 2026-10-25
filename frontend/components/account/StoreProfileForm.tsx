@@ -52,6 +52,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
   const [whatsapp, setWhatsapp] = useState(initial?.whatsapp ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [created, setCreated] = useState(Boolean(initial));
+  const [verified, setVerified] = useState(Boolean(initial?.verified));
   const [city, setCity] = useState<SelectedCity | null>(initial?.city ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(
@@ -110,6 +111,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
       }
       if (data.store) {
         setCreated(true);
+        setVerified(Boolean(data.store.verified));
         if (data.store.city) setCity(data.store.city);
         setName(data.store.name);
         setEmail(data.store.email);
@@ -141,7 +143,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
         role="status"
         className="rounded-[16px] border border-[#BFDAFB] bg-[#F0F6FF] px-4 py-3 text-sm text-[#21456F]"
       >
-        {initial?.verified
+        {verified
           ? "Loja verificada pela equipe do portal."
           : created
             ? "Loja cadastrada. A verificação do CNPJ e do endereço físico está pendente."
