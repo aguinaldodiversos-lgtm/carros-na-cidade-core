@@ -68,47 +68,6 @@ function frontendBaseUrl() {
 /* =====================================================
    EMAIL: RESET DE SENHA
 ===================================================== */
-/**
- * Confirma posse do e-mail cadastrado. Usa o Resend já integrado ao portal.
- * E-mail é notificação não bloqueante; não registra tokens em logs.
- */
-export async function sendEmailVerificationEmail(to, token) {
-  try {
-    const resend = getResend();
-    const baseUrl = frontendBaseUrl() || String(process.env.SITE_URL || "").trim();
-    if (
-      !resend ||
-      !baseUrl ||
-      (process.env.NODE_ENV === "production" && !baseUrl.startsWith("https://"))
-    ) {
-      console.warn("[email] confirmação não enviada: serviço ou URL indisponível");
-      return false;
-    }
-    const url = new URL("/confirmar-email", baseUrl);
-    url.searchParams.set("token", token);
-    const { error } = await resend.emails.send({
-      from: FROM,
-      to,
-      subject: "Confirme seu e-mail — Carros na Cidade",
-      html: `
-        <h2>Confirme seu e-mail</h2>
-        <p>Recebemos o cadastro deste endereço no portal Carros na Cidade.</p>
-        <p>Para confirmar que o endereço pertence a você, abra o link e pressione o botão de confirmação:</p>
-        <a href="${escapeHtml(url.toString())}">Confirmar meu e-mail</a>
-        <p>O link expira em 24 horas. Se você não solicitou, ignore esta mensagem.</p>
-      `,
-    });
-    if (error) {
-      console.error("[email] provedor recusou a confirmação");
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.error("[email] falha ao enviar confirmação", error?.message || String(error));
-    return false;
-  }
-}
-
 export async function sendResetPasswordEmail(to, token) {
   try {
     const resend = getResend();
