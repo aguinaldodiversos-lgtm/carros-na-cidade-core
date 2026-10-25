@@ -24,9 +24,9 @@ vi.mock("../../src/shared/middlewares/rateLimit.middleware.js", () => {
   };
 });
 vi.mock("../../src/services/email.service.js", () => ({ sendResetPasswordEmail: vi.fn() }));
-vi.mock("../../src/modules/auth/auth.service.js", () => ({}));
-vi.mock("../../src/modules/auth/password.service.js", () => ({}));
-vi.mock("../../src/modules/auth/emailVerification.service.js", () => ({}));
+vi.mock("../../src/modules/auth/auth.service.js", () => ({ default: {} }));
+vi.mock("../../src/modules/auth/password.service.js", () => ({ default: {} }));
+vi.mock("../../src/modules/auth/emailVerification.service.js", () => ({ default: {} }));
 
 import { pool, withTransaction } from "../../src/infrastructure/database/db.js";
 import authRouter from "../../src/modules/auth/auth.routes.js";
