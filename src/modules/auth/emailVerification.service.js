@@ -25,10 +25,7 @@ export async function sendVerificationEmailForUser(userId) {
   if (account.email_verified_at) return { ok: true, already_verified: true };
 
   const recent = account.email_verification_last_sent_at;
-  if (
-    recent &&
-    Date.now() - new Date(recent).getTime() < RESEND_COOLDOWN_MINUTES * 60 * 1000
-  ) {
+  if (recent && Date.now() - new Date(recent).getTime() < RESEND_COOLDOWN_MINUTES * 60 * 1000) {
     throw new AppError("Aguarde dois minutos antes de solicitar outro e-mail.", 429);
   }
 
