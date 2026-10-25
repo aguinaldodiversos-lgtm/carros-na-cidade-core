@@ -1,0 +1,20 @@
+name: PF Profile Prettier Preview
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  format-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Preview canonical formatting
+        run: |
+          npx prettier --write frontend/app/dashboard/conta/page.tsx frontend/components/account/AccountPlanCard.test.tsx frontend/components/account/AccountPlanCard.tsx frontend/components/account/PersonalProfileForm.test.tsx frontend/components/account/PersonalProfileForm.tsx src/modules/account/personal-profile.service.js
+          git diff --unified=3 -- frontend/app/dashboard/conta/page.tsx frontend/components/account/AccountPlanCard.test.tsx frontend/components/account/AccountPlanCard.tsx frontend/components/account/PersonalProfileForm.test.tsx frontend/components/account/PersonalProfileForm.tsx src/modules/account/personal-profile.service.js
