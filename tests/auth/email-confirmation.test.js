@@ -9,6 +9,7 @@ vi.mock("../../src/services/email.service.js", () => ({
 
 import { pool } from "../../src/infrastructure/database/db.js";
 import { sendEmailVerificationEmail } from "../../src/services/email.service.js";
+import { validateUserForLogin } from "../../src/modules/auth/auth.security.service.js";
 import {
   sendVerificationEmailForUser,
   verifyEmail,
@@ -94,4 +95,15 @@ describe("confirmação efetiva de e-mail", () => {
     });
     expect(sendEmailVerificationEmail).not.toHaveBeenCalled();
   });
+  it("permite login enquanto o e-mail aguarda confirmação", async () => {
+    await expect(
+      validateUserForLogin({
+        id: "u-11",
+        email_verified: false,
+        is_email_verified: false,
+        locked_until: null,
+      })
+    ).resolves.toBeUndefined();
+  });
+
 });
