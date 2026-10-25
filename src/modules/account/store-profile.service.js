@@ -1,5 +1,7 @@
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
+import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
+import { isValidCnpj } from "./cnpj-validation.js";
 
 /**
  * "Dados da loja" — leitura/edição do cadastro do lojista (tabela `advertisers`),
@@ -66,18 +68,23 @@ async function getAdvertisersColumnSet() {
 export async function getStoreProfile(userId) {
   const advResult = await pool.query(
     `SELECT
-       id,
-       name,
-       email,
-       NULLIF(TRIM(whatsapp), '') AS whatsapp,
+       adv.id,
+       adv.name,
+       adv.email,
+       NULLIF(TRIM(adv.whatsapp), '') AS whatsapp,
        COALESCE(
-         NULLIF(TRIM(whatsapp), ''),
-         NULLIF(TRIM(mobile_phone), ''),
-         NULLIF(TRIM(phone), '')
+         NULLIF(TRIM(adv.whatsapp), ''),
+         NULLIF(TRIM(adv.mobile_phone), ''),
+         NULLIF(TRIM(adv.phone), '')
        ) AS contact_number,
-       address
-     FROM advertisers
-     WHERE user_id = $1
+       adv.address,
+       adv.city_id,
+       adv.verified,
+       cities.name AS city_name,
+       cities.state AS city_state
+     FROM advertisers adv
+     LEFT JOIN cities ON cities.id = adv.city_id
+     WHERE adv.user_id = $1
      LIMIT 1`,
     [userId]
   );
@@ -99,6 +106,8 @@ export async function getStoreProfile(userId) {
     email: adv.email || "",
     whatsapp: adv.whatsapp || "",
     address: adv.address || "",
+    city: adv.city_id ? { id: Number(adv.city_id), name: adv.city_name || "", state: adv.city_state || "" } : null,
+    verified: adv.verified === true,
     // O comprador consegue contato quando há QUALQUER número resolvido.
     has_contact_channel: Boolean(adv.contact_number),
     document: {
@@ -106,6 +115,40 @@ export async function getStoreProfile(userId) {
       number: user.document_number || "",
     },
   };
+}
+
+/**
+ * Cadastro independente da publicação de anúncios. A cidade precisa vir do
+ * catálogo (city_id explícito), e o ensure idempotente usa advisory lock
+ * para evitar duplicidade entre cadastro e publicação simultâneos.
+ * Apenas conta CNPJ. Conferência oficial/presencial continua manual.
+ */
+export async function createStoreProfile(userId, input) {
+  const user = await pool.query(
+    "SELECT document_type, document_number FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
+  const account = user.rows[0];
+  if (!account || normalizeDocType(account.document_type) !== "CNPJ") {
+    throw new AppError("Cadastro de loja disponível somente para contas CNPJ.", 403);
+  }
+  if (!isValidCnpj(account.document_number)) {
+    throw new AppError("CNPJ cadastrado inválido. Solicite a correção pelo suporte.", 422);
+  }
+  if (!Number.isSafeInteger(Number(input?.city_id)) || Number(input?.city_id) <= 0) {
+    throw new AppError("Selecione a cidade da loja no catálogo.", 400);
+  }
+  if (String(input?.name ?? "").trim().length < 2 ||
+      !EMAIL_RE.test(String(input?.email ?? "").trim()) ||
+      !normalizeBrPhoneOrNull(input?.whatsapp) ||
+      String(input?.address ?? "").trim().length < 10) {
+    throw new AppError("Informe nome, e-mail, WhatsApp e endereço completo da loja.", 400);
+  }
+  await ensureAdvertiserForUser(userId, {
+    cityId: Number(input.city_id),
+    source: "account.store.onboarding",
+  });
+  return updateStoreProfile(userId, input);
 }
 
 /**
@@ -151,6 +194,16 @@ export async function updateStoreProfile(userId, input) {
   setIfColumnExists("email", email || null);
   setIfColumnExists("whatsapp", whatsapp || null);
   setIfColumnExists("address", address || null);
+  // Cadastro verificado perde o selo se razão/nome ou endereço for alterado.
+  // Alterar apenas contato não desfaz a vistoria administrativa.
+  if (columns.has("verified") && (columns.has("name") || columns.has("address"))) {
+    values.push(name, address || null);
+    const nameParam = "$" + (values.length - 1);
+    const addressParam = "$" + values.length;
+    assignments.push(
+      `verified = CASE WHEN name IS DISTINCT FROM ${nameParam} OR address IS DISTINCT FROM ${addressParam} THEN FALSE ELSE verified END`
+    );
+  }
   if (columns.has("updated_at")) {
     assignments.push("updated_at = NOW()");
   }
