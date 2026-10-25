@@ -1062,7 +1062,6 @@ export type AdvertiserPlanGrant = {
 
 export type AdvDetail = AdvRow & {
   document_number?: string | null;
-  user_email_verified_at?: string | null;
   address?: string | null;
   whatsapp?: string | null;
   city_name?: string | null;
