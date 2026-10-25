@@ -9,10 +9,13 @@ export async function POST(request: NextRequest) {
   const payload = (await request.json().catch(() => ({}))) as { token?: unknown };
   const token = typeof payload.token === "string" ? payload.token.trim() : "";
   if (!/^[a-f0-9]{64}$/i.test(token)) {
-    return NextResponse.json({ ok: false, message: "Link de confirmação inválido." }, {
-      status: 400,
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return NextResponse.json(
+      { ok: false, message: "Link de confirmação inválido." },
+      {
+        status: 400,
+        headers: { "Cache-Control": "private, no-store" },
+      }
+    );
   }
   try {
     const upstream = await fetch(resolveInternalBackendApiUrl("/api/auth/verify-email"), {
