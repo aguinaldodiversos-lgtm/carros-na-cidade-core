@@ -181,7 +181,10 @@ router.post(
     );
 
     // Envio auxiliar: indisponibilidade do provedor não bloqueia o cadastro.
-    if (result?.user?.id && typeof EmailVerificationService.sendVerificationEmailForUser === "function") {
+    if (
+      result?.user?.id &&
+      typeof EmailVerificationService.sendVerificationEmailForUser === "function"
+    ) {
       try {
         await EmailVerificationService.sendVerificationEmailForUser(result.user.id);
       } catch (error) {
