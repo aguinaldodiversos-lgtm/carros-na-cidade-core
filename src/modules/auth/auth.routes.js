@@ -9,7 +9,7 @@ import {
 } from "../../shared/middlewares/rateLimit.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
-import { pool } from "../../infrastructure/database/db.js";
+import { pool, withTransaction } from "../../infrastructure/database/db.js";
 import { sendResetPasswordEmail } from "../../services/email.service.js";
 import { logger } from "../../shared/logger.js";
 
@@ -264,14 +264,34 @@ router.post(
     }
 
     values.push(req.user.id);
-    await pool.query(
-      `
-      UPDATE users
-      SET ${assignments.join(", ")}
-      WHERE id = $${values.length}
-      `,
-      values
-    );
+    await withTransaction(async (tx) => {
+      const { rows } = await tx.query(
+        "SELECT document_type, document_number FROM users WHERE id = $1 FOR UPDATE",
+        [req.user.id]
+      );
+      const previous = rows[0];
+      if (!previous) throw new AppError("Conta não encontrada.", 404);
+
+      const changed =
+        String(previous.document_type ?? "")
+          .trim()
+          .toLowerCase() !== document_type ||
+        onlyDigits(previous.document_number) !== document_number;
+
+      await tx.query(
+        `UPDATE users SET ${assignments.join(", ")} WHERE id = ${values.length}`,
+        values
+      );
+
+      // A confirmação física pertence à identidade jurídica anterior. Nunca
+      // transportar advertisers.verified para outro CPF/CNPJ.
+      if (changed) {
+        await tx.query(
+          "UPDATE advertisers SET verified = FALSE, updated_at = NOW() WHERE user_id = $1 AND verified IS TRUE",
+          [req.user.id]
+        );
+      }
+    });
 
     return res.status(200).json({
       success: true,

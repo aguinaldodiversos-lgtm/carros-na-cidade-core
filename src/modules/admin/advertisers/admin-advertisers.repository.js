@@ -120,13 +120,23 @@ export async function findById(id) {
   const result = await query(
     `SELECT
        adv.*,
-       u.role AS user_role, u.document_type, u.email AS user_email,
-       u.name AS user_name, u.plan AS user_plan
+       u.role AS user_role, u.document_type, u.document_number, u.email AS user_email,
+       u.name AS user_name, u.plan AS user_plan,
+       c.name AS city_name, c.state AS city_state
      FROM advertisers adv
      LEFT JOIN users u ON u.id = adv.user_id
+     LEFT JOIN cities c ON c.id = adv.city_id
      WHERE adv.id = $1
      LIMIT 1`,
     [id]
+  );
+  return result.rows[0] || null;
+}
+
+export async function setVerification(id, verified) {
+  const result = await query(
+    "UPDATE advertisers SET verified = $2, updated_at = NOW() WHERE id = $1 RETURNING id, verified",
+    [id, verified]
   );
   return result.rows[0] || null;
 }
@@ -423,9 +433,7 @@ export async function expireDueGrants({ userId = null } = {}) {
 
     const affectedUsers = [...new Set(due.rows.map((r) => r.user_id))];
     for (const uid of affectedUsers) {
-      const expiredPlans = due.rows
-        .filter((r) => r.user_id === uid)
-        .map((r) => r.plan_id);
+      const expiredPlans = due.rows.filter((r) => r.user_id === uid).map((r) => r.plan_id);
       const cur = await client.query(`SELECT plan_id FROM users WHERE id = $1`, [uid]);
       const currentPlan = cur.rows[0]?.plan_id || null;
       if (currentPlan && expiredPlans.includes(currentPlan)) {

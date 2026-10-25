@@ -1,6 +1,7 @@
 import { AppError } from "../../../shared/middlewares/error.middleware.js";
 import { ADVERTISER_STATUS, isValidAdvertiserStatus } from "../../../shared/constants/status.js";
 import { recordAdminAction } from "../admin.audit.js";
+import { isValidCnpj } from "../../account/cnpj-validation.js";
 import * as repo from "./admin-advertisers.repository.js";
 import {
   grantAdvertiserPlan,
@@ -53,6 +54,57 @@ export async function changeAdvertiserStatus(adminUserId, advertiserId, newStatu
     reason,
   });
 
+  return updated;
+}
+
+/**
+ * A verificação é feita somente pelo administrador, com evidência registrada.
+ * CNPJ com dígitos verificadores válidos não equivale a consulta à Receita ou
+ * confirmação da loja física. O backend exige as duas declarações explícitas.
+ */
+export async function updateAdvertiserVerification(adminUserId, advertiserId, input) {
+  const advertiser = await repo.findById(advertiserId);
+  if (!advertiser) throw new AppError("Anunciante não encontrado", 404);
+  if (String(advertiser.document_type ?? "").toLowerCase() !== "cnpj") {
+    throw new AppError("Verificação de loja disponível apenas para CNPJ.", 403);
+  }
+  const verified = input?.verified === true;
+  if (input?.verified !== true && input?.verified !== false) {
+    throw new AppError("Informe verified como booleano.", 400);
+  }
+  const reason = String(input?.reason ?? "").trim();
+  if (reason.length < 15 || reason.length > 800) {
+    throw new AppError("Registre uma justificativa de 15 a 800 caracteres.", 400);
+  }
+  if (verified) {
+    if (!isValidCnpj(advertiser.document_number)) {
+      throw new AppError("CNPJ inválido. Não é possível verificar a loja.", 422);
+    }
+    if (!advertiser.address?.trim() || !advertiser.city_id || !advertiser.name?.trim()) {
+      throw new AppError("Loja sem endereço e cidade suficientes para averiguação.", 422);
+    }
+    if (input?.checked_receita !== true || input?.checked_physical_store !== true) {
+      throw new AppError(
+        "Confirme a consulta oficial do CNPJ e a existência do estabelecimento físico.",
+        400
+      );
+    }
+  }
+  const updated = await repo.setVerification(advertiserId, verified);
+  if (!updated) throw new AppError("Anunciante não encontrado", 404);
+  await recordAdminAction({
+    adminUserId,
+    action: verified ? "verify_physical_store" : "revoke_physical_store_verification",
+    targetType: "advertiser",
+    targetId: advertiserId,
+    oldValue: { verified: Boolean(advertiser.verified) },
+    newValue: {
+      verified,
+      checked_receita: verified,
+      checked_physical_store: verified,
+    },
+    reason,
+  });
   return updated;
 }
 

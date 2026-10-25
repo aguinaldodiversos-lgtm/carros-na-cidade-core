@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 
 import type { StoreProfile } from "@/lib/account/backend-account";
+import PurchaseIntentCityField, {
+  type SelectedCity,
+} from "@/components/account/PurchaseIntentCityField";
 
 /**
  * Formulário "Dados da loja" (lojista). Edita advertisers.{name,email,whatsapp,
@@ -43,11 +46,14 @@ const INPUT_CLASS =
   "h-[52px] w-full rounded-[14px] border border-[#E5E9F2] bg-white px-4 text-[16px] text-[#1D2440] outline-none transition focus:border-[#1F66E5]";
 const LABEL_CLASS = "mb-2 block text-sm font-semibold text-[#33405A]";
 
-export default function StoreProfileForm({ initial }: { initial: StoreProfile }) {
-  const [name, setName] = useState(initial.name);
-  const [email, setEmail] = useState(initial.email);
-  const [whatsapp, setWhatsapp] = useState(initial.whatsapp);
-  const [address, setAddress] = useState(initial.address);
+export default function StoreProfileForm({ initial }: { initial: StoreProfile | null }) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
+  const [whatsapp, setWhatsapp] = useState(initial?.whatsapp ?? "");
+  const [address, setAddress] = useState(initial?.address ?? "");
+  const [created, setCreated] = useState(Boolean(initial));
+  const [verified, setVerified] = useState(Boolean(initial?.verified));
+  const [city, setCity] = useState<SelectedCity | null>(initial?.city ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(
     null
@@ -58,12 +64,21 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile })
   const whatsappTrimmed = whatsapp.trim();
   const whatsappOk = whatsappTrimmed === "" || normalizeBrPhoneOrNull(whatsappTrimmed) !== null;
   const whatsappEmpty = whatsappTrimmed === "";
-  const canSubmit = nameOk && emailOk && whatsappOk && !submitting;
+  const canSubmit =
+    nameOk &&
+    emailOk &&
+    whatsappOk &&
+    !submitting &&
+    (created ||
+      (city !== null &&
+        whatsappTrimmed !== "" &&
+        email.trim() !== "" &&
+        address.trim().length >= 10));
 
-  const documentDisplay = initial.document.number
-    ? formatDocument(initial.document.type, initial.document.number)
+  const documentDisplay = initial?.document.number
+    ? formatDocument(initial?.document.type ?? null, initial?.document.number ?? "")
     : "";
-  const documentLabel = initial.document.type ? `${initial.document.type} (CPF/CNPJ)` : "CPF/CNPJ";
+  const documentLabel = "CNPJ da conta";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,7 +87,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile })
     setFeedback(null);
     try {
       const res = await fetch("/api/account/store", {
-        method: "PUT",
+        method: created ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
@@ -80,6 +95,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile })
           email: email.trim(),
           whatsapp: whatsappTrimmed,
           address: address.trim(),
+          ...(!created ? { city_id: city?.id } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -94,12 +110,20 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile })
         );
       }
       if (data.store) {
+        setCreated(true);
+        setVerified(Boolean(data.store.verified));
+        if (data.store.city) setCity(data.store.city);
         setName(data.store.name);
         setEmail(data.store.email);
         setWhatsapp(data.store.whatsapp);
         setAddress(data.store.address);
       }
-      setFeedback({ tone: "success", text: "Dados da loja salvos com sucesso." });
+      setFeedback({
+        tone: "success",
+        text: created
+          ? "Dados da loja salvos com sucesso."
+          : "Cadastro da loja concluído. A verificação será feita pela equipe do portal.",
+      });
     } catch (err) {
       setFeedback({
         tone: "error",
@@ -115,6 +139,32 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile })
       onSubmit={handleSubmit}
       className="space-y-5 rounded-[28px] border border-[#E5E9F2] bg-white p-6 shadow-[0_16px_36px_rgba(16,28,58,0.06)] md:p-8"
     >
+      <div
+        role="status"
+        className="rounded-[16px] border border-[#BFDAFB] bg-[#F0F6FF] px-4 py-3 text-sm text-[#21456F]"
+      >
+        {verified
+          ? "Loja verificada pela equipe do portal."
+          : created
+            ? "Loja cadastrada. A verificação do CNPJ e do endereço físico está pendente."
+            : "Cadastre sua loja agora, mesmo sem publicar anúncios. O cadastro não exige a contratação de planos nem a criação de anúncios. A equipe fará a verificação do CNPJ e do endereço."}
+      </div>
+
+      {!created ? (
+        <PurchaseIntentCityField
+          value={city}
+          onChange={setCity}
+          helpText="Selecione a cidade do endereço físico da loja. A escolha é obrigatória e não cria anúncios."
+        />
+      ) : city ? (
+        <p className="text-sm text-[#475569]">
+          Cidade da loja:{" "}
+          <strong>
+            {city.name} - {city.state}
+          </strong>
+        </p>
+      ) : null}
+
       {/* Aviso forte quando não há WhatsApp — o comprador fica sem canal de contato. */}
       {whatsappEmpty ? (
         <div className="rounded-[16px] border border-[#F5C878] bg-[#FFF8EC] px-4 py-3 text-[14px] font-medium text-[#8A5A00]">
@@ -201,7 +251,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile })
         <span className={LABEL_CLASS}>{documentLabel}</span>
         <input
           type="text"
-          value={documentDisplay || "Não informado"}
+          value={documentDisplay || "CNPJ vinculado à conta (somente leitura)"}
           readOnly
           disabled
           aria-label="CPF ou CNPJ (somente leitura)"
