@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   BackendApiError,
+  createStoreProfile,
   fetchStoreProfile,
   updateStoreProfile,
 } from "@/lib/account/backend-account";
@@ -28,6 +29,26 @@ export async function GET(request: NextRequest) {
     return applyBffCookies(NextResponse.json(payload), auth.ctx);
   } catch (error) {
     return errorResponse(error, "[GET /api/account/store]");
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await authenticateBffRequest(request);
+    if (!auth.ok) return auth.response;
+    const raw = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    // Lista fechada: nunca aceitar user_id, documento ou status do cliente.
+    const payload = {
+      name: String(raw?.name ?? ""),
+      email: String(raw?.email ?? ""),
+      whatsapp: String(raw?.whatsapp ?? ""),
+      address: String(raw?.address ?? ""),
+      city_id: raw?.city_id,
+    };
+    const created = await createStoreProfile(auth.ctx.session, payload);
+    return applyBffCookies(NextResponse.json(created, { status: 201 }), auth.ctx);
+  } catch (error) {
+    return errorResponse(error, "[POST /api/account/store]");
   }
 }
 
