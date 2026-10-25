@@ -444,7 +444,6 @@ export type StoreProfile = {
   address: string;
   city?: { id: number; name: string; state: string } | null;
   verified?: boolean;
-  email_confirmed?: boolean;
   /** Comprador consegue contato? (COALESCE whatsapp/mobile_phone/phone não vazio) */
   has_contact_channel: boolean;
   document: { type: "CPF" | "CNPJ" | null; number: string };
