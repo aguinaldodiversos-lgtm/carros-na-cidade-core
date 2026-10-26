@@ -178,7 +178,7 @@ export function buildCmsPostMetadata(post: CmsBlogPost, canonicalPath: string): 
   const image = resolveCmsPostImage(post);
 
   return {
-    title: `${title} | Blog Carros na Cidade`,
+    title: `${title} | Blog`,
     description,
     alternates: { canonical },
     robots: post.is_indexable ? { index: true, follow: true } : { index: false, follow: true },
