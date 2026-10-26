@@ -39,7 +39,11 @@ test.describe("SEO institucional — PR93", () => {
   }) => {
     const response = await request.get("/lgpd", { maxRedirects: 0 });
     expect(response.status()).toBe(308);
-    expect(response.headers().location).toBe("/politica-de-privacidade");
+    const location = response.headers().location;
+    expect(location).toBeTruthy();
+    expect(new URL(location!, "http://127.0.0.1:3000").pathname).toBe(
+      "/politica-de-privacidade"
+    );
   });
 
   test("blog não promete veículos verificados ou vendedores confiáveis", async ({ page }) => {
