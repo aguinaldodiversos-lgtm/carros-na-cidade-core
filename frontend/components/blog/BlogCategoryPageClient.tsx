@@ -431,7 +431,8 @@ export function BlogCategoryPageClient({ content }: BlogCategoryPageClientProps)
                   Encontre o carro ideal na sua região
                 </h2>
                 <p className="mt-1 text-[14px] leading-6 text-[#4D5670] md:text-[15px]">
-                  Encontre anúncios de veículos na sua região e negocie diretamente com o anunciante.
+                  Encontre anúncios de veículos na sua região e negocie diretamente com o
+                  anunciante.
                 </p>
               </div>
             </div>
