@@ -442,10 +442,12 @@ export function BlogPageClient({ content }: BlogPageClientProps) {
     content.bottomBanner?.title,
     "Encontre o carro ideal na sua região"
   );
-  const bottomBannerSubtitle = toText(
-    content.bottomBanner?.subtitle,
-    `Veículos verificados, vendedores confiáveis e as melhores oportunidades em ${cityName} e região.`
-  );
+  const rawBottomBannerSubtitle = toText(content.bottomBanner?.subtitle, "Encontre anúncios de veículos na sua região e negocie diretamente com o anunciante.");
+  const bottomBannerSubtitle = rawBottomBannerSubtitle.includes(
+    "Veículos verificados, vendedores confiáveis"
+  )
+    ? "Encontre anúncios de veículos na sua região e negocie diretamente com o anunciante."
+    : rawBottomBannerSubtitle;
   const bottomBannerHref = normalizeHref(
     content.bottomBanner?.ctaHref,
     buildCanonicalCityHref(citySlug, "/comprar")
