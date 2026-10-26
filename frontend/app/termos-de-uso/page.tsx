@@ -4,7 +4,7 @@ import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 import { SITE_CONTACT } from "@/lib/site/site-navigation";
 
 export const metadata: Metadata = {
-  title: "Termos de Uso | Carros na Cidade",
+  title: "Termos de Uso",
   description:
     "Termos de uso do Carros na Cidade: regras para anúncios, contato entre compradores e vendedores, responsabilidades, segurança e uso da plataforma.",
   alternates: {
