@@ -4,7 +4,7 @@ import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 import { SITE_CONTACT } from "@/lib/site/site-navigation";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidade | Carros na Cidade",
+  title: "Política de Privacidade",
   description:
     "Saiba como o Carros na Cidade coleta, utiliza, protege, armazena e compartilha dados pessoais e conheça seus direitos conforme a LGPD.",
   alternates: {
