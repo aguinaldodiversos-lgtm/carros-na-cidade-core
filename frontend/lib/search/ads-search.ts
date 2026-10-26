@@ -85,6 +85,7 @@ export interface AdsSearchFilters {
 
 export interface AdItem {
   id: number;
+  advertiser_id?: number | null;
   slug?: string;
   title?: string;
   brand?: string;
@@ -327,6 +328,7 @@ function normalizeAdItem(raw: unknown, index: number): AdItem | null {
 
   return {
     id,
+    advertiser_id: toOptionalNumber(item.advertiser_id) ?? null,
     slug: toText(item.slug) || undefined,
     title: toText(item.title) || undefined,
     brand: toText(item.brand) || undefined,
