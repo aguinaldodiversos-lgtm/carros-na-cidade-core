@@ -250,24 +250,21 @@ export default function AjudaPage() {
 
             <div className="mt-3 space-y-3">
               <p>
-                O Carros na Cidade conecta compradores e anunciantes. Não somos
-                proprietários dos veículos anunciados, não compramos ou vendemos
-                os veículos em nome dos usuários, não recebemos comissão sobre o
-                valor da venda e não recebemos o pagamento da compra.
+                O Carros na Cidade conecta compradores e anunciantes. Não somos proprietários dos
+                veículos anunciados, não compramos ou vendemos os veículos em nome dos usuários, não
+                recebemos comissão sobre o valor da venda e não recebemos o pagamento da compra.
               </p>
 
               <p>
-                Os anúncios são publicados por terceiros, que são responsáveis
-                pelas informações fornecidas e pelos veículos oferecidos. A
-                publicação de um anúncio no portal não representa certificação,
-                vistoria, garantia, recomendação de compra ou declaração de
+                Os anúncios são publicados por terceiros, que são responsáveis pelas informações
+                fornecidas e pelos veículos oferecidos. A publicação de um anúncio no portal não
+                representa certificação, vistoria, garantia, recomendação de compra ou declaração de
                 procedência emitida pelo Carros na Cidade.
               </p>
 
               <p>
-                Antes de concluir qualquer negócio, verifique pessoalmente o
-                veículo, a documentação, a identidade do vendedor e todas as
-                condições da negociação.
+                Antes de concluir qualquer negócio, verifique pessoalmente o veículo, a
+                documentação, a identidade do vendedor e todas as condições da negociação.
               </p>
             </div>
           </div>
@@ -278,30 +275,21 @@ export default function AjudaPage() {
             </h2>
 
             <p className="mt-2">
-              Veja o veículo pessoalmente, confirme os dados do anunciante,
-              confira a documentação, considere realizar uma vistoria cautelar e
-              avaliação mecânica e tenha cuidado com pedidos de pagamento
-              antecipado e não transfira valores para terceiros.
+              Veja o veículo pessoalmente, confirme os dados do anunciante, confira a documentação,
+              considere realizar uma vistoria cautelar e avaliação mecânica e tenha cuidado com
+              pedidos de pagamento antecipado e não transfira valores para terceiros.
             </p>
           </div>
 
           <div>
-            <p className="font-semibold text-[#1d2538]">
-              Informações e documentos importantes
-            </p>
+            <p className="font-semibold text-[#1d2538]">Informações e documentos importantes</p>
 
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              <Link
-                href="/seguranca"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/seguranca" className="font-semibold text-[#0e62d8] hover:underline">
                 Segurança e dicas de negociação
               </Link>
 
-              <Link
-                href="/termos"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/termos" className="font-semibold text-[#0e62d8] hover:underline">
                 Termos de Uso
               </Link>
 
@@ -312,10 +300,7 @@ export default function AjudaPage() {
                 Política de Privacidade
               </Link>
 
-              <Link
-                href="/contato"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/contato" className="font-semibold text-[#0e62d8] hover:underline">
                 Falar com o time
               </Link>
             </div>
