@@ -51,13 +51,6 @@ jobs:
       - name: Prettier (format check — arquivos alterados)
         run: npm run format:check:changed
 
-      # Diagnóstico temporário para remover dívida de formatação dos arquivos tocados.
-      - name: Debug Prettier 2
-        if: failure()
-        run: |
-          npm run format:changed
-          git --no-pager diff -- frontend/app/politica-de-privacidade/page.tsx frontend/app/termos-de-uso/page.tsx frontend/lib/blog/blog-hub.test.ts
-
       - name: ESLint (backend)
         run: npm run lint
 
