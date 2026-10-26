@@ -41,9 +41,7 @@ test.describe("SEO institucional — PR93", () => {
     expect(response.status()).toBe(308);
     const location = response.headers().location;
     expect(location).toBeTruthy();
-    expect(new URL(location!, "http://127.0.0.1:3000").pathname).toBe(
-      "/politica-de-privacidade"
-    );
+    expect(new URL(location!, "http://127.0.0.1:3000").pathname).toBe("/politica-de-privacidade");
   });
 
   test("blog não promete veículos verificados ou vendedores confiáveis", async ({ page }) => {
