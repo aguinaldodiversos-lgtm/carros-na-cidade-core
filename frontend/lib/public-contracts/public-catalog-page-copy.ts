@@ -57,7 +57,7 @@ export function publicCatalogPageCopy(
         subtitle: "Marketplace automotivo regional — comprar, vender e financiar.",
         metaTitle: "Carros na Cidade | Marketplace automotivo regional",
         metaDescription:
-          "Encontre carros usados na sua cidade e região. Anúncios verificados, ofertas locais, FIPE e simulador de financiamento.",
+          "Encontre carros usados na sua cidade e região. Compare anúncios de lojistas e particulares com referência FIPE e simulador de financiamento.",
       };
 
     case "state":
