@@ -293,23 +293,21 @@ export default function TermosDeUsoPage() {
 
             <div className="mt-3 space-y-3">
               <p>
-                Ao utilizar WhatsApp, telefone ou qualquer outro canal para falar
-                com um anunciante, você declara ciência de que o Carros na Cidade
-                não é o vendedor, não é proprietário do veículo, não recebe o
-                pagamento da compra e não participa da conclusão da negociação.
+                Ao utilizar WhatsApp, telefone ou qualquer outro canal para falar com um anunciante,
+                você declara ciência de que o Carros na Cidade não é o vendedor, não é proprietário
+                do veículo, não recebe o pagamento da compra e não participa da conclusão da
+                negociação.
               </p>
 
               <p>
-                É responsabilidade do comprador confirmar a identidade do
-                vendedor, verificar o veículo, conferir documentos, histórico,
-                condições, preço e demais informações antes de realizar qualquer
-                pagamento ou concluir o negócio.
+                É responsabilidade do comprador confirmar a identidade do vendedor, verificar o
+                veículo, conferir documentos, histórico, condições, preço e demais informações antes
+                de realizar qualquer pagamento ou concluir o negócio.
               </p>
 
               <p>
-                O anunciante é responsável pela veracidade e atualização das
-                informações publicadas. Anúncios que violem nossas regras poderão
-                ser suspensos, bloqueados ou removidos.
+                O anunciante é responsável pela veracidade e atualização das informações publicadas.
+                Anúncios que violem nossas regras poderão ser suspensos, bloqueados ou removidos.
               </p>
             </div>
           </div>
@@ -324,10 +322,9 @@ export default function TermosDeUsoPage() {
             </h2>
 
             <p className="mt-2">
-              O Carros na Cidade não recebe percentual sobre o preço negociado
-              entre comprador e vendedor e não recebe o valor da compra do
-              veículo. Valores eventualmente pagos ao portal correspondem aos
-              serviços da própria plataforma, como planos, assinaturas ou
+              O Carros na Cidade não recebe percentual sobre o preço negociado entre comprador e
+              vendedor e não recebe o valor da compra do veículo. Valores eventualmente pagos ao
+              portal correspondem aos serviços da própria plataforma, como planos, assinaturas ou
               destaques.
             </p>
           </div>
@@ -338,37 +335,26 @@ export default function TermosDeUsoPage() {
             </h2>
 
             <p className="mt-2">
-              Veja o veículo pessoalmente, confirme a identidade de quem está
-              vendendo, confira a documentação e considere realizar vistoria
-              cautelar e avaliação mecânica independente. Não faça pagamentos
-              antecipados sem compreender e verificar completamente a negociação.
+              Veja o veículo pessoalmente, confirme a identidade de quem está vendendo, confira a
+              documentação e considere realizar vistoria cautelar e avaliação mecânica independente.
+              Não faça pagamentos antecipados sem compreender e verificar completamente a
+              negociação.
             </p>
           </div>
 
           <div>
-            <p className="font-semibold text-[#1d2538]">
-              Documentos e informações relacionadas
-            </p>
+            <p className="font-semibold text-[#1d2538]">Documentos e informações relacionadas</p>
 
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              <Link
-                href="/seguranca"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/seguranca" className="font-semibold text-[#0e62d8] hover:underline">
                 Segurança na negociação
               </Link>
 
-              <Link
-                href="/ajuda"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/ajuda" className="font-semibold text-[#0e62d8] hover:underline">
                 Central de ajuda
               </Link>
 
-              <Link
-                href="/como-funciona"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/como-funciona" className="font-semibold text-[#0e62d8] hover:underline">
                 Como funciona
               </Link>
 
@@ -379,10 +365,7 @@ export default function TermosDeUsoPage() {
                 Política de Privacidade
               </Link>
 
-              <Link
-                href="/contato"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/contato" className="font-semibold text-[#0e62d8] hover:underline">
                 Contato
               </Link>
             </div>
