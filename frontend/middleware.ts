@@ -170,6 +170,18 @@ export async function middleware(request: NextRequest) {
     return respond(request, startedAt, NextResponse.redirect(hostDecision.target, 301));
   }
 
+  // URL institucional legada: no Server Component o Next 14 pode responder 200
+  // com meta refresh. Responder 308 AQUI antes do flush do HTML garante que
+  // buscadores consolidem /lgpd em /politica-de-privacidade.
+  if (pathname === "/lgpd" || pathname === "/lgpd/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/politica-de-privacidade";
+    url.search = "";
+    const moved = NextResponse.redirect(url, 308);
+    moved.headers.set("X-Middleware-Canonical", "lgpd-privacidade");
+    return respond(request, startedAt, moved);
+  }
+
   // ── 0b. Bot guard: 429 para UA vazio em rotas SSR pesadas.
   const botDecision = decideBotGuard(request.headers.get("user-agent"), pathname);
   if (botDecision.kind === "block-429") {
