@@ -89,6 +89,21 @@ describe("applyCmsPostsToHubContent", () => {
     expect(result.trendingPosts[0].title).toBe("CMS Post 1");
   });
 
+  it("não destaca IPVA de ano anterior sem excluir o artigo histórico", () => {
+    const cards = makeCmsCards(8);
+    cards[0] = {
+      ...cards[0],
+      title: "IPVA 2025: entenda tudo",
+      slug: "ipva-2025-entenda-tudo",
+    };
+    const result = applyCmsPostsToHubContent(makeContent(), cards, "atibaia-sp");
+
+    expect(result.featuredPosts.some((post) => post.slug === "ipva-2025-entenda-tudo")).toBe(false);
+    expect(result.trendingPosts.some((post) => post.title === "IPVA 2025: entenda tudo")).toBe(false);
+    expect(result.popularPosts.some((post) => post.slug === "ipva-2025-entenda-tudo")).toBe(true);
+    expect(result.featuredPosts.length + result.popularPosts.length).toBe(8);
+  });
+
   it("não muta o objeto content original", () => {
     const content = makeContent();
     const snapshot = JSON.stringify(content);
