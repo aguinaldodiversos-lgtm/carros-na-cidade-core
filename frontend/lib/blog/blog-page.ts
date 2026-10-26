@@ -163,7 +163,8 @@ function buildFallbackContent(citySlug: string): BlogPageContent {
     },
     bottomBanner: {
       title: `Encontre o carro ideal na sua região`,
-      subtitle: "Encontre anúncios de veículos na sua região e negocie diretamente com o anunciante.",
+      subtitle:
+        "Encontre anúncios de veículos na sua região e negocie diretamente com o anunciante.",
       ctaLabel: `Ver carros em ${city.name}`,
       ctaHref: buildCanonicalCityHref(citySlug, "/comprar"),
       image: "/images/imagem_banner_blog.png",
@@ -361,7 +362,9 @@ export async function fetchBlogPageContent(citySlug: string): Promise<BlogPageCo
     bottomBanner: {
       ...fallback.bottomBanner,
       ...(remote.bottomBanner || {}),
-      subtitle: remote.bottomBanner?.subtitle?.includes("Veículos verificados, vendedores confiáveis")
+      subtitle: remote.bottomBanner?.subtitle?.includes(
+        "Veículos verificados, vendedores confiáveis"
+      )
         ? fallback.bottomBanner.subtitle
         : (remote.bottomBanner?.subtitle ?? fallback.bottomBanner.subtitle),
     },
