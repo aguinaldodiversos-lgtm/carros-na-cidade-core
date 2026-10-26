@@ -99,7 +99,9 @@ describe("applyCmsPostsToHubContent", () => {
     const result = applyCmsPostsToHubContent(makeContent(), cards, "atibaia-sp");
 
     expect(result.featuredPosts.some((post) => post.slug === "ipva-2025-entenda-tudo")).toBe(false);
-    expect(result.trendingPosts.some((post) => post.title === "IPVA 2025: entenda tudo")).toBe(false);
+    expect(result.trendingPosts.some((post) => post.title === "IPVA 2025: entenda tudo")).toBe(
+      false
+    );
     expect(result.popularPosts.some((post) => post.slug === "ipva-2025-entenda-tudo")).toBe(true);
     expect(result.featuredPosts.length + result.popularPosts.length).toBe(8);
   });
