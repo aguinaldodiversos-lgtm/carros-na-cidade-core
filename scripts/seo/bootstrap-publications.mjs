@@ -154,7 +154,9 @@ function describeIntro(cluster, city, state) {
 function describeSupply(cluster, { liveAds, belowFipe, advertisers }) {
   const parts = [];
   if (liveAds > 0) {
-    parts.push(`Atualmente há ${liveAds} anúncio${liveAds === 1 ? "" : "s"} ativo${liveAds === 1 ? "" : "s"} cadastrado${liveAds === 1 ? "" : "s"} nesta cidade.`);
+    parts.push(
+      `Atualmente há ${liveAds} anúncio${liveAds === 1 ? "" : "s"} ativo${liveAds === 1 ? "" : "s"} cadastrado${liveAds === 1 ? "" : "s"} nesta cidade.`
+    );
   } else {
     parts.push(
       "Os anúncios disponíveis são atualizados diariamente conforme novas ofertas são publicadas."
@@ -278,7 +280,10 @@ export async function runBootstrapPublications({
 
   const cols = await detectColumns();
   const detectedSorted = [...cols].sort();
-  log("info", "colunas detectadas em seo_publications", { count: cols.size, columns: detectedSorted });
+  log("info", "colunas detectadas em seo_publications", {
+    count: cols.size,
+    columns: detectedSorted,
+  });
 
   const missingEssentials = ESSENTIAL_COLUMNS.filter((c) => !cols.has(c));
   if (missingEssentials.length > 0) {
@@ -309,7 +314,9 @@ export async function runBootstrapPublications({
       });
       continue;
     }
-    const snapshot = cluster.city_slug ? await getCitySnapshot(cluster.city_id, cluster.city_slug) : null;
+    const snapshot = cluster.city_slug
+      ? await getCitySnapshot(cluster.city_id, cluster.city_slug)
+      : null;
     const built = buildPublicationRow({ cluster, citySnapshot: snapshot, detectedColumns: cols });
     if (!built.meetsMinContent) {
       log("info", "cluster com conteúdo factual abaixo do mínimo — vai entrar como noindex", {
