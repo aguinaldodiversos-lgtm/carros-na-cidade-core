@@ -186,22 +186,19 @@ export default function ComoFuncionaPage() {
 
             <div className="mt-3 space-y-3">
               <p>
-                O Carros na Cidade conecta compradores e anunciantes. Não somos
-                proprietários dos veículos anunciados, não compramos ou vendemos
-                veículos em nome dos usuários e não recebemos comissão sobre o
-                valor da venda.
+                O Carros na Cidade conecta compradores e anunciantes. Não somos proprietários dos
+                veículos anunciados, não compramos ou vendemos veículos em nome dos usuários e não
+                recebemos comissão sobre o valor da venda.
               </p>
 
               <p>
-                Também não recebemos o pagamento da compra do veículo e não
-                mantemos valores em custódia. A negociação ocorre diretamente
-                entre comprador e vendedor.
+                Também não recebemos o pagamento da compra do veículo e não mantemos valores em
+                custódia. A negociação ocorre diretamente entre comprador e vendedor.
               </p>
 
               <p>
-                A publicação de um anúncio no portal não representa certificação,
-                vistoria, garantia de procedência ou recomendação de compra
-                emitida pelo Carros na Cidade.
+                A publicação de um anúncio no portal não representa certificação, vistoria, garantia
+                de procedência ou recomendação de compra emitida pelo Carros na Cidade.
               </p>
             </div>
           </div>
@@ -212,30 +209,21 @@ export default function ComoFuncionaPage() {
             </h2>
 
             <p className="mt-2">
-              Veja o veículo pessoalmente, confirme a identidade do vendedor,
-              confira a documentação, considere uma vistoria cautelar e avaliação
-              mecânica e tenha atenção especial com pedidos de pagamento
-              antecipado ou transferências para terceiros.
+              Veja o veículo pessoalmente, confirme a identidade do vendedor, confira a
+              documentação, considere uma vistoria cautelar e avaliação mecânica e tenha atenção
+              especial com pedidos de pagamento antecipado ou transferências para terceiros.
             </p>
           </div>
 
           <div>
-            <p className="font-semibold text-[#1d2538]">
-              Saiba mais sobre o Carros na Cidade
-            </p>
+            <p className="font-semibold text-[#1d2538]">Saiba mais sobre o Carros na Cidade</p>
 
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              <Link
-                href="/ajuda"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/ajuda" className="font-semibold text-[#0e62d8] hover:underline">
                 Central de ajuda
               </Link>
 
-              <Link
-                href="/seguranca"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/seguranca" className="font-semibold text-[#0e62d8] hover:underline">
                 Segurança na negociação
               </Link>
 
@@ -246,17 +234,11 @@ export default function ComoFuncionaPage() {
                 Política de Privacidade
               </Link>
 
-              <Link
-                href="/termos-de-uso"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/termos-de-uso" className="font-semibold text-[#0e62d8] hover:underline">
                 Termos de Uso
               </Link>
 
-              <Link
-                href="/contato"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/contato" className="font-semibold text-[#0e62d8] hover:underline">
                 Fale conosco
               </Link>
             </div>
