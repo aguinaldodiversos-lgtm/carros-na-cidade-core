@@ -46,7 +46,7 @@ async function resolveCitySlug(): Promise<string | null> {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = "Blog automotivo — guias, dicas e notícias | Carros na Cidade";
+  const title = "Blog automotivo — guias, dicas e notícias";
   const description =
     "Blog automotivo do Carros na Cidade: guias para comprar e vender, dicas de manutenção, mercado, financiamento e cuidados com o seu carro. Conteúdo atualizado.";
 
