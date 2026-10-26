@@ -3,7 +3,8 @@ import Link from "next/link";
 import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 
 export const metadata: Metadata = {
-  title: "Central de ajuda | Carros na Cidade",
+  title: "Central de ajuda",
+  alternates: { canonical: "/ajuda" },
   description:
     "Tire suas dúvidas sobre anúncios, negociação, segurança, publicação de veículos, pagamentos e funcionamento do portal Carros na Cidade.",
 };
