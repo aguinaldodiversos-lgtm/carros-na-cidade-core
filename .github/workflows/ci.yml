@@ -51,13 +51,6 @@ jobs:
       - name: Prettier (format check — arquivos alterados)
         run: npm run format:check:changed
 
-      # Diagnóstico temporário do último arquivo de SEO legado.
-      - name: Debug Prettier bootstrap SEO
-        if: failure()
-        run: |
-          npm run format:changed
-          git --no-pager diff -- scripts/seo/bootstrap-publications.mjs
-
       - name: ESLint (backend)
         run: npm run lint
 
