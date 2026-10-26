@@ -306,22 +306,20 @@ export default function PoliticaDePrivacidadePage() {
 
             <div className="mt-3 space-y-3">
               <p>
-                O Carros na Cidade utiliza dados pessoais de acordo com as
-                funcionalidades utilizadas pelo usuário e para finalidades
-                relacionadas à operação, segurança, atendimento, publicação de
-                anúncios, contratação de serviços e cumprimento de obrigações
-                aplicáveis.
+                O Carros na Cidade utiliza dados pessoais de acordo com as funcionalidades
+                utilizadas pelo usuário e para finalidades relacionadas à operação, segurança,
+                atendimento, publicação de anúncios, contratação de serviços e cumprimento de
+                obrigações aplicáveis.
               </p>
 
               <p>
-                Não solicitamos que usuários publiquem documentos, dados
-                bancários, senhas ou informações pessoais desnecessárias em
-                campos públicos de anúncios.
+                Não solicitamos que usuários publiquem documentos, dados bancários, senhas ou
+                informações pessoais desnecessárias em campos públicos de anúncios.
               </p>
 
               <p>
-                Você pode exercer seus direitos relacionados a dados pessoais
-                pelos canais oficiais indicados nesta Política.
+                Você pode exercer seus direitos relacionados a dados pessoais pelos canais oficiais
+                indicados nesta Política.
               </p>
             </div>
           </div>
@@ -332,53 +330,37 @@ export default function PoliticaDePrivacidadePage() {
             </h2>
 
             <p className="mt-2">
-              Ao utilizar WhatsApp, telefone ou outro serviço externo para
-              entrar em contato com um vendedor, informações compartilhadas
-              durante essa conversa poderão ser tratadas diretamente pelo
-              anunciante e pelo serviço utilizado. Evite fornecer documentos,
-              dados bancários ou outras informações pessoais antes de confirmar
-              com quem está falando e por que aquele dado é necessário.
+              Ao utilizar WhatsApp, telefone ou outro serviço externo para entrar em contato com um
+              vendedor, informações compartilhadas durante essa conversa poderão ser tratadas
+              diretamente pelo anunciante e pelo serviço utilizado. Evite fornecer documentos, dados
+              bancários ou outras informações pessoais antes de confirmar com quem está falando e
+              por que aquele dado é necessário.
             </p>
           </div>
 
           <div>
-            <p className="font-semibold text-[#1d2538]">
-              Documentos e informações relacionadas
-            </p>
+            <p className="font-semibold text-[#1d2538]">Documentos e informações relacionadas</p>
 
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-              <Link
-                href="/termos-de-uso"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/termos-de-uso" className="font-semibold text-[#0e62d8] hover:underline">
                 Termos de Uso
               </Link>
 
-              <Link
-                href="/seguranca"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/seguranca" className="font-semibold text-[#0e62d8] hover:underline">
                 Segurança na negociação
               </Link>
 
-              <Link
-                href="/ajuda"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/ajuda" className="font-semibold text-[#0e62d8] hover:underline">
                 Central de ajuda
               </Link>
 
-              <Link
-                href="/contato"
-                className="font-semibold text-[#0e62d8] hover:underline"
-              >
+              <Link href="/contato" className="font-semibold text-[#0e62d8] hover:underline">
                 Contato
               </Link>
             </div>
           </div>
 
-          <p className="text-[13px] leading-6 text-[#7a8499]">
-          </p>
+          <p className="text-[13px] leading-6 text-[#7a8499]"></p>
         </div>
       }
     />
