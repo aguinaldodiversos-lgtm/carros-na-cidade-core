@@ -102,6 +102,19 @@ function parseAdvertiserId(ad: PublicAdDetail, vehicle: VehicleDetail): number |
 }
 
 /**
+ * Confirma a propriedade do anúncio sugerido pelo identificador da loja.
+ * Se a API ignorar o filtro ou omitir o ID, nunca afirmar que o anúncio
+ * pertence ao mesmo vendedor; a interface cairá nas sugestões da cidade.
+ */
+export function matchesRelatedAdvertiser(
+  item: Pick<AdItem, "advertiser_id" | "dealership_id">,
+  advertiserId: number
+): boolean {
+  if (!Number.isSafeInteger(advertiserId) || advertiserId <= 0) return false;
+  return (item.advertiser_id ?? item.dealership_id) === advertiserId;
+}
+
+/**
  * Carrega carrosséis para a página do anúncio: loja + pago → mesma conta; caso contrário (ou vazio) → cidade.
  *
  * Retorna `BaseAdData[]` (price numérico) — o `<AdCard />` formata uma
@@ -132,7 +145,11 @@ export async function fetchRelatedListingsForAdPage(
     });
 
     if (res.success && res.data?.length) {
-      seller = filterOtherAds(res.data, currentId, 8);
+      seller = filterOtherAds(
+        res.data.filter((item) => matchesRelatedAdvertiser(item, advertiserId)),
+        currentId,
+        8
+      );
     }
   }
 
