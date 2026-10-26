@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!looksLikeCitySlug(params.cidade)) notFound();
 
   const city = prettifyCitySlug(params.cidade);
-  const title = `Blog automotivo em ${city.name} — guias, dicas e notícias | Carros na Cidade`;
+  const title = `Blog automotivo em ${city.name} — guias, dicas e notícias`;
   const description = `Blog automotivo de ${city.name}: guias para comprar e vender, dicas de manutenção, mercado, financiamento e cuidados com seu carro. Conteúdo local e atualizado.`;
 
   return {
