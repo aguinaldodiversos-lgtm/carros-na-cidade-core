@@ -141,11 +141,11 @@ export function buildFactualContent({ cluster, citySnapshot }) {
 function describeIntro(cluster, city, state) {
   switch (cluster.cluster_type) {
     case "city_home":
-      return `O portal Carros na Cidade reúne anúncios de veículos usados em ${city}${state}. Aqui você encontra ofertas de lojistas e particulares verificados, com filtros por marca, modelo, ano e preço.`;
+      return `O portal Carros na Cidade reúne anúncios de veículos usados em ${city}${state}. Aqui você encontra anúncios de lojistas e particulares, com filtros por marca, modelo, ano e preço.`;
     case "city_below_fipe":
       return `Esta página lista carros usados em ${city}${state} com preço abaixo da tabela FIPE. Cada anúncio mostra a diferença em relação ao valor de referência, permitindo comparar oportunidades reais.`;
     case "city_opportunities":
-      return `Oportunidades de compra em ${city}${state}: anúncios em destaque, carros com desconto agressivo e ofertas verificadas pela equipe Carros na Cidade.`;
+      return `Oportunidades de compra em ${city}${state}: anúncios em destaque, comparação com a referência FIPE e contato direto com o anunciante.`;
     default:
       return `Veículos disponíveis em ${city}${state} no portal Carros na Cidade.`;
   }
