@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { keepRenderableRelated, mapAdItemToBaseAdData } from "./related-ads";
+import { keepRenderableRelated, mapAdItemToBaseAdData, matchesRelatedAdvertiser } from "./related-ads";
 import type { AdItem } from "@/lib/search/ads-search";
 
 describe("mapAdItemToBaseAdData — regressão de preço 2026-05-24", () => {
@@ -121,5 +121,24 @@ describe("keepRenderableRelated — briefing P2-C 2026-05-25", () => {
     it("slug='' + id=42 → true (href válido /veiculo/42)", () => {
       expect(keepRenderableRelated({ ...validAd, slug: "" })).toBe(true);
     });
+  });
+});
+
+
+describe("recomendações do mesmo anunciante — identidade obrigatória", () => {
+  it("confirma o anunciante apenas quando o ID é idêntico", () => {
+    expect(matchesRelatedAdvertiser({ advertiser_id: 7 }, 7)).toBe(true);
+    expect(matchesRelatedAdvertiser({ advertiser_id: 8 }, 7)).toBe(false);
+  });
+
+  it("aceita identificador equivalente legado, mas nunca mistura lojistas", () => {
+    expect(matchesRelatedAdvertiser({ dealership_id: 7 }, 7)).toBe(true);
+    expect(matchesRelatedAdvertiser({ dealership_id: 8 }, 7)).toBe(false);
+    expect(matchesRelatedAdvertiser({}, 7)).toBe(false);
+  });
+
+  it("o ID explícito do anunciante prevalece sobre outro ID legado", () => {
+    expect(matchesRelatedAdvertiser({ advertiser_id: 8, dealership_id: 7 }, 7)).toBe(false);
+    expect(matchesRelatedAdvertiser({ advertiser_id: 7 }, 0)).toBe(false);
   });
 });
