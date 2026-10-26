@@ -115,6 +115,7 @@ describe("buildRegionCollectionPageJsonLd", () => {
     expect(json.description).toContain("142 carros");
     expect(json.description).toContain("80 km");
     expect(json.description).toContain("SP");
+    expect(json.description).not.toMatch(/anúncios verificados/i);
   });
 
   it("description sem contagem quando totalAds === 0 (não inventar número)", () => {

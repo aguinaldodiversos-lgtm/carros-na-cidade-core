@@ -215,31 +215,6 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
     siteUrl: getSiteUrl(),
   });
 
-  const schemaFaq = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: [
-      {
-        "@type": "Question",
-        name: "Como simular financiamento deste veículo?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Use o botão Simular financiamento para abrir o simulador com os dados do anúncio.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Este anúncio está abaixo da FIPE?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: vehicle.isBelowFipe
-            ? "Sim. O valor anunciado está abaixo da referência FIPE atual."
-            : "O valor está alinhado com a referência FIPE para este modelo.",
-        },
-      },
-    ],
-  };
-
   // Inclui a cidade linkando /carros-em/[citySlug] — alimenta o breadcrumb
   // VISÍVEL e o BreadcrumbList do JSON-LD com o mesmo array. Ver
   // lib/vehicle/vehicle-breadcrumbs.ts para o porquê (link interno para a
@@ -266,7 +241,7 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
         O PublicHeader/PublicFooter GLOBAIS (layout.tsx) permanecem visíveis
         em todos os breakpoints (sem o hack antigo que os escondia no mobile).
         Toda a camada de SEO abaixo (JSON-LD Product+Car+Offer+AutoDealer,
-        BreadcrumbList, WebPage, FAQ, canonical/metas em generateMetadata)
+        BreadcrumbList, WebPage, canonical/metas em generateMetadata)
         é preservada intacta.
       */}
       <VehicleDetailView
@@ -291,10 +266,6 @@ export default async function VehicleDetailPage({ params, searchParams = {} }: P
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(schemaFaq) }}
       />
     </>
   );

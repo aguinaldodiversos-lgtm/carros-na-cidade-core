@@ -61,7 +61,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const found = await findPost(params.cidade, params.slug);
   if (!found) {
     return {
-      title: "Artigo não encontrado | Blog Carros na Cidade",
+      title: "Artigo não encontrado | Blog",
       robots: { index: false, follow: false },
     };
   }
@@ -72,7 +72,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     post.excerpt?.trim() || `Conteúdo automotivo em ${city.name} no Blog Carros na Cidade.`;
 
   return {
-    title: `${post.title} | Blog Carros na Cidade`,
+    title: `${post.title} | Blog`,
     description,
     alternates: {
       canonical: `/blog/${params.cidade}/${params.slug}`,

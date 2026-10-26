@@ -49,6 +49,11 @@ export function buildBlogPostHref(citySlug: string | null | undefined, slug: str
  *
  * Função pura: não muta `content`, devolve um novo objeto.
  */
+function isOutdatedIpvaArticle(post: BlogPost): boolean {
+  const year = post.title.match(/\bIPVA\s+(20\d{2})\b/i)?.[1];
+  return year !== undefined && Number(year) < new Date().getFullYear();
+}
+
 export function applyCmsPostsToHubContent(
   content: BlogPageContent,
   cmsCards: BlogPost[],
@@ -58,11 +63,16 @@ export function applyCmsPostsToHubContent(
     return content;
   }
 
-  const featuredPosts = cmsCards.slice(0, 6);
+  // Conteúdo histórico permanece acessível, mas não ganha destaque frente aos guias atuais.
+  const prioritizedCards = [
+    ...cmsCards.filter((post) => !isOutdatedIpvaArticle(post)),
+    ...cmsCards.filter(isOutdatedIpvaArticle),
+  ];
+  const featuredPosts = prioritizedCards.slice(0, 6);
   // Restante dos posts entra em "Mais lidos" — assim os 13 (ou N) adotados
   // aparecem todos no hub, não apenas os 9 do recorte antigo (slice(6, 9)).
-  const popularPosts = cmsCards.slice(6);
-  const trendingPosts: BlogTrendingItem[] = cmsCards.slice(0, 4).map((post) => ({
+  const popularPosts = prioritizedCards.slice(6);
+  const trendingPosts: BlogTrendingItem[] = prioritizedCards.slice(0, 4).map((post) => ({
     id: `trend-${post.id}`,
     title: post.title,
     image: post.coverImage,

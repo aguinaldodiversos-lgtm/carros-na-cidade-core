@@ -60,9 +60,9 @@ function buildPageTitle(name: string, uf: string) {
 
 function buildPageDescription(name: string, uf: string, totalAds: number, radiusKm: number) {
   if (totalAds > 0) {
-    return `Veja ${totalAds} carro${totalAds === 1 ? "" : "s"} usado${totalAds === 1 ? "" : "s"} em ${name} e cidades próximas, com alcance regional de até ${radiusKm} km. Anúncios verificados de lojistas e particulares em ${uf.toUpperCase()}.`;
+    return `Veja ${totalAds} carro${totalAds === 1 ? "" : "s"} usado${totalAds === 1 ? "" : "s"} em ${name} e cidades próximas, com alcance regional de até ${radiusKm} km. Anúncios de lojistas e particulares em ${uf.toUpperCase()}.`;
   }
-  return `Veja carros usados em ${name} e cidades próximas, com alcance regional de até ${radiusKm} km. Anúncios verificados em ${uf.toUpperCase()}.`;
+  return `Veja carros usados em ${name} e cidades próximas, com alcance regional de até ${radiusKm} km. Explore anúncios publicados em ${uf.toUpperCase()}.`;
 }
 
 /**

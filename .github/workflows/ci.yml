@@ -234,6 +234,11 @@ jobs:
         env:
           CI: "true"
 
+      - name: Run SEO regression checks (canonicals, LGPD and blog claims)
+        run: npx playwright test e2e/seo-audit-regressions.spec.ts --project=chromium
+        env:
+          CI: "true"
+
       # Suíte de layout/privacidade do feed. A sessão de teste é assinada
       # com segredo de desenvolvimento, sem qualquer credencial de produção.
       - name: Run E2E premium opportunities hub (desktop + mobile)

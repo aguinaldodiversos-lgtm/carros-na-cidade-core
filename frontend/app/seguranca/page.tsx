@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   // aqui duplicaria ("... | Carros na Cidade | Carros na Cidade"). Fragmento só
   // → sufixo aparece UMA vez.
   title: "Dicas de Segurança para Comprar e Vender Veículos",
+  alternates: { canonical: "/seguranca" },
   description:
     "Orientações de segurança para comprar e vender veículos com menos risco de golpe: responsabilidades das partes, pagamentos, dados pessoais, verificação do veículo e como denunciar.",
 };

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 
 export const metadata: Metadata = {
-  title: "Sobre | Carros na Cidade",
+  title: "Sobre",
+  alternates: { canonical: "/sobre" },
   description:
     "Conheça o Carros na Cidade: portal automotivo regional para quem compra, vende e anuncia veículos com foco em cidade e transparência.",
 };

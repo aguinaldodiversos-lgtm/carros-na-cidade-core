@@ -81,7 +81,7 @@ describe("blog-cms · buildCmsPostMetadata", () => {
       cmsPost({ meta_title: "Título SEO custom", meta_description: "Descrição SEO custom" }),
       "/blog/x"
     );
-    expect(meta.title).toBe("Título SEO custom | Blog Carros na Cidade");
+    expect(meta.title).toBe("Título SEO custom | Blog");
     expect(meta.description).toBe("Descrição SEO custom");
   });
 

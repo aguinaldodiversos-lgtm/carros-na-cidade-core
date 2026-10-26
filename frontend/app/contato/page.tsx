@@ -4,7 +4,8 @@ import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 import { SITE_CONTACT } from "@/lib/site/site-navigation";
 
 export const metadata: Metadata = {
-  title: "Contato | Carros na Cidade",
+  title: "Contato",
+  alternates: { canonical: "/contato" },
   description:
     "Fale com o Carros na Cidade: e-mail e telefone comercial para dúvidas sobre anúncios, conta e atendimento.",
 };
