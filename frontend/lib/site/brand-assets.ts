@@ -8,7 +8,7 @@
 export const SITE_LOGO_SRC = "/images/logo-carros-na-cidade.png?v=3";
 
 /** Ícone da aba / PWA — PNG oficial em `public/images`. */
-export const SITE_FAVICON_SRC = "/images/favicon.png";
+export const SITE_FAVICON_SRC = "/images/favicon.png?v=20261026";
 
 /**
  * Banner principal da Home (layout premium).
