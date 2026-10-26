@@ -51,6 +51,13 @@ jobs:
       - name: Prettier (format check — arquivos alterados)
         run: npm run format:check:changed
 
+      # Diagnóstico temporário de formatação. Remover após ajuste cirúrgico.
+      - name: Mostrar diffs exatos do Prettier se o gate falhar
+        if: failure()
+        run: |
+          npm run format:changed
+          git --no-pager diff -- frontend/app/ajuda/page.tsx frontend/app/como-funciona/page.tsx frontend/components/blog/BlogCategoryPageClient.tsx frontend/components/blog/BlogPageClient.tsx frontend/lib/blog/blog-page.ts frontend/lib/vehicle/related-ads.test.ts
+
       - name: ESLint (backend)
         run: npm run lint
 
