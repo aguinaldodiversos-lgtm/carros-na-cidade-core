@@ -3,7 +3,8 @@ import Link from "next/link";
 import { StaticPageLayout } from "@/components/institutional/StaticPageLayout";
 
 export const metadata: Metadata = {
-  title: "Como funciona | Carros na Cidade",
+  title: "Como funciona",
+  alternates: { canonical: "/como-funciona" },
   description:
     "Entenda como funciona o Carros na Cidade, um portal de anúncios automotivos que conecta compradores, vendedores e lojas com foco regional.",
 };
