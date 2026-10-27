@@ -41,7 +41,9 @@ describe("admin payments summary", () => {
   });
 
   it("mantém fallback somente para tabela de pagamentos ausente (42P01)", async () => {
-    vi.mocked(query).mockRejectedValueOnce(Object.assign(new Error("relation missing"), { code: "42P01" }));
+    vi.mocked(query).mockRejectedValueOnce(
+      Object.assign(new Error("relation missing"), { code: "42P01" })
+    );
     const result = await listPaymentIntents();
     expect(result).toEqual(
       expect.objectContaining({ data: [], total: 0, _warning: expect.any(String) })
