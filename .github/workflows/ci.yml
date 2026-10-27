@@ -51,13 +51,6 @@ jobs:
       - name: Prettier (format check — arquivos alterados)
         run: npm run format:check:changed
 
-      # Diagnóstico temporário para capturar saída exata do Prettier (remover antes da PR final).
-      - name: Diff exato do Prettier nos testes da PR95
-        if: failure()
-        run: |
-          npm run format:changed
-          git --no-pager diff -- tests/admin/admin-payments-summary.test.js tests/smoke/public-contract-forbidden-patterns.test.js
-
       - name: ESLint (backend)
         run: npm run lint
 
