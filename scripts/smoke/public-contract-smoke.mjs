@@ -35,7 +35,7 @@
  *     /anunciar
  *
  *   STRINGS PROIBIDAS no HTML público (qualquer rota 200):
- *     Teste, Test, DeployModel, Seed, Worker, Alerta, Fake, Dummy,
+ *     Teste, Test, DeployModel, Seed, Worker, "Alerta de teste", Fake, Dummy,
  *     "SÆo Paulo", "backend irá incorporar", "features[]", "has_photo",
  *     "R$ 0" fake, "Veículo não encontrado" com status 200,
  *     "plano Pro"/"plano Start" como mecânica de vitrine.
@@ -204,7 +204,9 @@ const FORBIDDEN_PATTERNS = [
   { id: "dirty-deploy-model", literal: "DeployModel" },
   { id: "dirty-seed", regex: /\bSeed\b/ },
   { id: "dirty-worker", regex: /\bWorker\b/ },
-  { id: "dirty-alerta", regex: /\bAlerta\b/ },
+  // A palavra "Alerta" também ocorre em equipamentos reais: "Alerta de colisão frontal".
+  // Detectar somente o marcador explícito de conteúdo de teste.
+  { id: "dirty-alerta", regex: /\bAlerta\s+de\s+teste\b/i },
   { id: "dirty-fake", regex: /\bFake\b/i },
   { id: "dirty-dummy", regex: /\bDummy\b/i },
   // Preço fake (R$ 0 isolado — não "R$ 0,99" mainstream)
