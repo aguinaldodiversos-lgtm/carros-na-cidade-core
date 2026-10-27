@@ -25,7 +25,9 @@ export async function listPaymentIntents({ limit = 50, offset = 0, status, conte
          pi.created_at, pi.updated_at,
          u.name AS user_name, u.email AS user_email
        FROM payment_intents pi
-       LEFT JOIN users u ON u.id = pi.user_id
+       -- users.id é integer; payment_intents.user_id é text.
+       -- Cast do ID inteiro evita o erro SQL sem arriscar conversão de IDs textuais.
+       LEFT JOIN users u ON u.id::text = pi.user_id
        ${where}
        ORDER BY pi.created_at DESC
        LIMIT $${idx++} OFFSET $${idx++}`,
@@ -43,7 +45,10 @@ export async function listPaymentIntents({ limit = 50, offset = 0, status, conte
       limit,
       offset,
     };
-  } catch {
+  } catch (error) {
+    // Retornar lista vazia somente quando a tabela não existe (Postgres 42P01).
+    // Erros SQL inesperados devem chegar ao middleware de erro e à interface.
+    if (error?.code !== "42P01") throw error;
     return {
       data: [],
       total: 0,
