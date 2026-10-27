@@ -21,7 +21,7 @@ function matches(html) {
 
 describe("smoke público — alertas legítimos de equipamentos", () => {
   it("não rejeita alerta de colisão frontal no anúncio real", () => {
-    const html = '<span>Alerta de colisão frontal</span>';
+    const html = "<span>Alerta de colisão frontal</span>";
     expect(matches(html)).not.toContain("dirty-alerta");
     expect(matches(html)).toEqual([]);
   });
