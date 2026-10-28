@@ -3,9 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import PlanosPage, { metadata } from "./page";
 import { fetchPlansFromAPI } from "@/lib/plans/plan-service";
+import { fetchVerifiedPublicBoost } from "@/lib/commercial/public-boost";
 
 vi.mock("@/lib/commercial/public-boost", () => ({
-  fetchPublicBoost: vi.fn(async () => ({
+  fetchVerifiedPublicBoost: vi.fn(async () => ({
     id: "boost-7d",
     name: "Destaque 7 dias",
     price_cents: 3990,
@@ -129,6 +130,13 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     const { container } = await page();
     expect(container.textContent).toMatch(/não foi possível confirmar os preços/i);
     expect(container.querySelectorAll("[data-plan-id]")).toHaveLength(0);
+  });
+
+  it("não exibe preço de destaque quando API comercial está indisponível", async () => {
+    vi.mocked(fetchVerifiedPublicBoost).mockResolvedValueOnce(null);
+    const { container } = await page();
+    expect(container.querySelector('[data-plan-id="destaque-7-dias"]')).toBeNull();
+    expect(container.querySelector('[data-plan-id="lojista-pro"]')).toBeTruthy();
   });
 
   it("plano não público ou inativo desaparece da vitrine", async () => {
