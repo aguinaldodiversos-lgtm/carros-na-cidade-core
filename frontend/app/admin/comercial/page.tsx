@@ -42,11 +42,10 @@ function fmtDate(d: string | undefined | null) {
   }
 }
 
-function commercialLayerLabel(priority_level: number, highlightActive: boolean) {
-  // espelha src/modules/ads/filters/ads-ranking.sql.js#commercialLayerExpr
+function commercialLayerLabel(weight: number, highlightActive: boolean) {
   if (highlightActive) return "4 — Destaque";
-  if (priority_level >= 80) return "3 — Pro";
-  if (priority_level >= 50) return "2 — Start";
+  if (weight >= 3) return "3 — Pro";
+  if (weight >= 2) return "2 — Start";
   return "1 — Grátis";
 }
 
@@ -212,7 +211,7 @@ function PlansTab() {
                     </td>
                     <td className="px-4 py-2.5 text-center font-mono text-cnc-muted">{p.weight}</td>
                     <td className="px-4 py-2.5 text-cnc-muted">
-                      {commercialLayerLabel(p.priority_level, false)}
+                      {commercialLayerLabel(p.weight, false)}
                     </td>
                     <td className="px-4 py-2.5">
                       <AdminStatusBadge status={p.is_active ? "active" : "deleted"} />
