@@ -216,7 +216,12 @@ export default function AdminPlanForm() {
         const patch = Object.fromEntries(
           Object.entries(values).filter(
             ([key, value]) =>
-              JSON.stringify(value) !== JSON.stringify(initialDraft.current?.[key as keyof Draft])
+              JSON.stringify(value) !==
+              JSON.stringify(
+                key === "benefits"
+                  ? parseBenefits(initialDraft.current?.benefitsText ?? "")
+                  : initialDraft.current?.[key as keyof Draft]
+              )
           )
         ) as PlanPatchPayload;
         if (!Object.keys(patch).length) {
