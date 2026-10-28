@@ -159,22 +159,22 @@ export default function AdminPlanForm() {
 
   const reasonRequired =
     mode === "create" ||
-    ([
-      "price",
-      "ad_limit",
-      "max_photos",
-      "priority_level",
-      "weight",
-      "billing_model",
-      "validity_days",
-      "is_active",
-      "public_visible",
-      "subscribable",
-      "is_featured_enabled",
-      "has_store_profile",
-    ] as const).some(
-      (key) => JSON.stringify(draft[key]) !== JSON.stringify(initialDraft.current?.[key])
-    );
+    (
+      [
+        "price",
+        "ad_limit",
+        "max_photos",
+        "priority_level",
+        "weight",
+        "billing_model",
+        "validity_days",
+        "is_active",
+        "public_visible",
+        "subscribable",
+        "is_featured_enabled",
+        "has_store_profile",
+      ] as const
+    ).some((key) => JSON.stringify(draft[key]) !== JSON.stringify(initialDraft.current?.[key]));
 
   async function handleSubmit() {
     if (busy) return;
