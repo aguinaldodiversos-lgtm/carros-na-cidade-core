@@ -83,7 +83,7 @@ test("vitrine /planos usa preços e hierarquia do catálogo real sem divulgar li
     const card = page.locator(`[data-plan-id="${id}"]`);
     return (async () => {
       await expect(card).toContainText(price);
-      await expect(card).not.toContainText(/\\d+ fotos? por anúncio/i);
+      await expect(card).not.toContainText(/\d+ fotos? por anúncio/i);
       if (weight != null) await expect(card).toContainText(`peso ${weight}`);
     })();
   };
@@ -93,7 +93,7 @@ test("vitrine /planos usa preços e hierarquia do catálogo real sem divulgar li
   const free = page.locator('[data-plan-id="gratis"]');
   await expect(free).toContainText(`${cpf.ad_limit} anúncios`);
   await expect(free).toContainText(`${cnpj.ad_limit} anúncios`);
-  await expect(free).not.toContainText(/\\d+ fotos? por anúncio/i);
+  await expect(free).not.toContainText(/\d+ fotos? por anúncio/i);
   const cardCopy = (await page.locator("[data-plan-id]").allTextContents()).join(" ");
   expect(normalized(cardCopy)).not.toMatch(/v[ií]deo 360|cr[eé]ditos mensais de destaque/i);
 });
@@ -120,8 +120,8 @@ test("a etapa final CNPJ apresenta os mesmos valores e preserva o anúncio", asy
   await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(
     priceText(Number(start.price))
   );
-  await expect(page.locator('[data-plan-key="lojista-pro"]')).not.toContainText(/\\d+ fotos? por anúncio/i);
-  await expect(page.locator('[data-plan-key="lojista-start"]')).not.toContainText(/\\d+ fotos? por anúncio/i);
+  await expect(page.locator('[data-plan-key="lojista-pro"]')).not.toContainText(/\d+ fotos? por anúncio/i);
+  await expect(page.locator('[data-plan-key="lojista-start"]')).not.toContainText(/\d+ fotos? por anúncio/i);
 
   const details = page.getByRole("link", { name: /Ver detalhes de todos os planos/i });
   await expect(details).toHaveAttribute("href", "/planos");
