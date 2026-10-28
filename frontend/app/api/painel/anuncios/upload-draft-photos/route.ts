@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const LOG_PREFIX = "[upload-draft-photos-route]";
-const MAX_WIZARD_FILES = 10;
+const MAX_WIZARD_FILES = 15;
 
 function extractPhotos(source: FormData): File[] {
   return source
