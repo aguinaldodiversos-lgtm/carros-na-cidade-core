@@ -108,9 +108,10 @@ export function buildMonetizationCards(input: {
       description: "Mais exposição para sua loja, com prioridade comercial superior ao Start.",
       benefits: [
         "Mais exposição da loja nas listagens",
-        "Mais anúncios ativos no lançamento, com limite operacional",
+        "Anúncios ilimitados (trava operacional)",
         "Prioridade comercial superior ao Start",
-        "Perfil de loja com identidade visual",
+        "Até 15 fotos por anúncio",
+        "Compradores procurando e Veículos para avaliação",
       ],
       buttonLabel: "Assinar Pro",
       style: "highlight",
@@ -128,8 +129,8 @@ export function buildMonetizationCards(input: {
         "Plano de entrada para lojas começarem a operação digital com presença consistente.",
       benefits: [
         "Até 20 anúncios ativos",
-        "Mais presença nas listagens",
-        "Ideal para lojas em início de operação digital",
+        "Até 12 fotos por anúncio",
+        "Veículos para avaliação",
         "Perfil de loja personalizado",
       ],
       buttonLabel: "Assinar Start",
