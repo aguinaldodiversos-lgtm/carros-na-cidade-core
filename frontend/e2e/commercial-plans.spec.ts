@@ -20,7 +20,9 @@ function priceText(value: number): string {
     .replace(/\u00a0/g, " ");
 }
 function normalized(value: string | null | undefined): string {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 test.beforeAll(async ({ request, baseURL }) => {
@@ -43,7 +45,8 @@ async function login(page: import("@playwright/test").Page, who: typeof dealer) 
 }
 
 test("vitrine /planos usa preços, fotos e hierarquia do catálogo real", async ({
-  page, request,
+  page,
+  request,
 }) => {
   const plans = await catalog(request);
   const find = (id: string) => {
@@ -65,13 +68,15 @@ test("vitrine /planos usa preços, fotos e hierarquia do catálogo real", async 
   expect(boost.duration_days).toBe(7);
 
   await page.goto("/planos", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", {
-    name: "Escolha o plano ideal para anunciar seu veículo",
-  })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Escolha o plano ideal para anunciar seu veículo",
+    })
+  ).toBeVisible();
 
-  const ids = await page.locator("[data-plan-id]").evaluateAll((elements) =>
-    elements.map((element) => element.getAttribute("data-plan-id"))
-  );
+  const ids = await page
+    .locator("[data-plan-id]")
+    .evaluateAll((elements) => elements.map((element) => element.getAttribute("data-plan-id")));
   expect(ids).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
 
   const check = (id: string, price: string, photos?: number, weight?: number) => {
@@ -84,16 +89,27 @@ test("vitrine /planos usa preços, fotos e hierarquia do catálogo real", async 
   };
   await check("destaque-7-dias", priceText(boost.price_cents / 100), undefined, 4);
   await check("lojista-pro", priceText(Number(pro.price)), pro.max_photos, Number(pro.weight));
-  await check("lojista-start", priceText(Number(start.price)), start.max_photos, Number(start.weight));
+  await check(
+    "lojista-start",
+    priceText(Number(start.price)),
+    start.max_photos,
+    Number(start.weight)
+  );
   const free = page.locator('[data-plan-id="gratis"]');
   await expect(free).toContainText(`${cpf.ad_limit} anúncios`);
   await expect(free).toContainText(`${cnpj.ad_limit} anúncios`);
-  await expect(free).toContainText(`${Math.min(cpf.max_photos, cnpj.max_photos)} fotos por anúncio`);
-  expect(normalized(await page.locator("main").textContent())).not.toMatch(/v[ií]deo 360|cr[eé]ditos mensais de destaque/i);
+  await expect(free).toContainText(
+    `${Math.min(cpf.max_photos, cnpj.max_photos)} fotos por anúncio`
+  );
+  expect(normalized(await page.locator("main").textContent())).not.toMatch(
+    /v[ií]deo 360|cr[eé]ditos mensais de destaque/i
+  );
 });
 
 test("a etapa final CNPJ apresenta os mesmos valores e preserva o anúncio", async ({
-  page, context, request,
+  page,
+  context,
+  request,
 }) => {
   const plans = await catalog(request);
   const pro = plans.find((p) => p.id === "cnpj-store-pro")!;
@@ -106,22 +122,36 @@ test("a etapa final CNPJ apresenta os mesmos valores e preserva o anúncio", asy
   await expect(page.locator('[data-plan-key="lojista-start"]')).toBeVisible();
   await expect(page.locator('[data-plan-key="boost-7d"]')).toBeVisible();
   await expect(page.locator('[data-plan-key="free"]')).toBeVisible();
-  await expect(page.locator('[data-plan-key="lojista-pro"]')).toContainText(priceText(Number(pro.price)));
-  await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(priceText(Number(start.price)));
-  await expect(page.locator('[data-plan-key="lojista-pro"]')).toContainText(`${pro.max_photos} fotos por anúncio`);
-  await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(`${start.max_photos} fotos por anúncio`);
+  await expect(page.locator('[data-plan-key="lojista-pro"]')).toContainText(
+    priceText(Number(pro.price))
+  );
+  await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(
+    priceText(Number(start.price))
+  );
+  await expect(page.locator('[data-plan-key="lojista-pro"]')).toContainText(
+    `${pro.max_photos} fotos por anúncio`
+  );
+  await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(
+    `${start.max_photos} fotos por anúncio`
+  );
 
   const details = page.getByRole("link", { name: /Ver detalhes de todos os planos/i });
   await expect(details).toHaveAttribute("href", "/planos");
   await expect(details).toHaveAttribute("target", "_blank");
 
   await page.locator('[data-plan-key="lojista-pro"]').click();
-  await expect(page.locator('[data-plan-key="lojista-pro"]')).toHaveAttribute("data-selected", "true");
-  await expect(page.getByText(/A assinatura não publica este anúncio automaticamente/)).toBeVisible();
+  await expect(page.locator('[data-plan-key="lojista-pro"]')).toHaveAttribute(
+    "data-selected",
+    "true"
+  );
+  await expect(
+    page.getByText(/A assinatura não publica este anúncio automaticamente/)
+  ).toBeVisible();
 });
 
 test("conta CPF não recebe oferta de assinatura CNPJ na última etapa", async ({
-  page, context,
+  page,
+  context,
 }) => {
   await prepareCleanBrowserState(page, context);
   await login(page, individual);
