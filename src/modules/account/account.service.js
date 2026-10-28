@@ -313,7 +313,7 @@ function mapPlanRow(row) {
     max_photos: toNumber(row.max_photos, 8),
     weight: toNumber(row.weight, 1),
     sort_order: toNumber(row.sort_order, 50),
-    public_visible: Boolean(row.public_visible),
+    public_visible: row.public_visible !== false,
     // Elegibilidade data-driven ao checkout de assinatura (migration 040).
     subscribable: Boolean(row.subscribable),
   };
