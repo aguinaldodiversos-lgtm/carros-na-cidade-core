@@ -34,7 +34,9 @@ describe("buildSimulationWhatsappNote", () => {
       "Anúncio: https://carrosnacidade.com/veiculo/chevrolet-onix-lt-2020-atibaia-sp"
     );
     // Aviso de estimativa.
-    expect(note).toContain("Valores estimados, sujeitos a análise de crédito, tarifas e demais custos do CET.");
+    expect(note).toContain(
+      "Valores estimados, sujeitos a análise de crédito, tarifas e demais custos do CET."
+    );
 
     // Ordem: condições → preço → URL → aviso.
     expect(note.indexOf("48x")).toBeLessThan(note.indexOf("Preço do anúncio"));
