@@ -1,5 +1,6 @@
 import { slugify } from "../../shared/utils/slugify.js";
 import { ensurePublishEligibility } from "./ads.publish.eligibility.service.js";
+import { resolveCurrentPlan } from "../account/account.service.js";
 import { executeAdInsert, prepareAdInsertPayload } from "./ads.persistence.service.js";
 import { validateCreateAdPayload } from "./ads.validators.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
