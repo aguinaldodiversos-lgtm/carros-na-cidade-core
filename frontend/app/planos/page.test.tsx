@@ -106,12 +106,12 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     const { container } = await page();
     expect(cardText(container, "destaque-7-dias")).toMatch(/R\$\s*39,90/);
     expect(cardText(container, "destaque-7-dias")).toContain("peso 4");
-    expect(cardText(container, "lojista-pro")).toContain("15 fotos por anúncio");
+    expect(cardText(container, "lojista-pro")).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(cardText(container, "lojista-pro")).toContain("peso 3");
     expect(cardText(container, "lojista-pro")).toContain("Compradores procurando");
-    expect(cardText(container, "lojista-start")).toContain("12 fotos por anúncio");
+    expect(cardText(container, "lojista-start")).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(cardText(container, "lojista-start")).toContain("peso 2");
-    expect(cardText(container, "gratis")).toContain("8 fotos por anúncio");
+    expect(cardText(container, "gratis")).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(container.textContent).not.toMatch(/vídeo 360|créditos mensais de destaque/i);
   });
 
