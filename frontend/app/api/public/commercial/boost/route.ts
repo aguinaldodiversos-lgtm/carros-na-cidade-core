@@ -19,9 +19,9 @@ import { NextResponse } from "next/server";
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { PUBLIC_BOOST_FALLBACK } from "@/lib/commercial/public-boost";
 
-export const revalidate = 900;
+export const revalidate = 60;
 
-const CACHE_HEADER = "public, s-maxage=900, stale-while-revalidate=86400";
+const CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=60";
 
 function boostResponse(boost: unknown) {
   return NextResponse.json(
@@ -38,7 +38,7 @@ export async function GET() {
     const response = await fetch(backendUrl, {
       method: "GET",
       headers: { Accept: "application/json" },
-      next: { revalidate: 900 },
+      next: { revalidate: 60 },
     });
     if (!response.ok) return boostResponse(PUBLIC_BOOST_FALLBACK);
 
