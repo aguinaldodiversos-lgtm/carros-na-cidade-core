@@ -30,7 +30,6 @@ export function subscriptionBenefits(plan: SubscriptionPlan, tier: "pro" | "star
   const ranking = Number(plan.weight ?? (pro ? 3 : 2));
   return [
     pro && plan.ad_limit >= 1000 ? "Anúncios ilimitados*" : `Até ${plan.ad_limit} anúncios ativos`,
-    `Até ${plan.max_photos ?? (pro ? 15 : 12)} fotos por anúncio`,
     `${pro ? "Maior prioridade nas listagens" : "Prioridade nas listagens"} (peso ${ranking})`,
     ...(plan.has_store_profile ? ["Perfil de loja personalizado"] : []),
     ...commercialAdditionalBenefits(plan),
@@ -38,12 +37,16 @@ export function subscriptionBenefits(plan: SubscriptionPlan, tier: "pro" | "star
 }
 
 export function subscriptionIntro(plan: SubscriptionPlan, tier: "pro" | "start"): string {
-  return (
-    plan.description ||
+  // Não anunciar vantagem de quantidade de fotos: o limite de upload
+  // é uma regra operacional, não um diferencial comercial dos cards.
+  const intro = plan.description
+    ?.replace(/,\s*mais fotos\s+e\s+/gi, " e ")
+    .replace(/\bmais fotos\b/gi, "")
+    .trim();
+  return intro ||
     (tier === "pro"
       ? "Mais visibilidade e oportunidades para sua loja."
-      : "Sua loja com mais presença nas buscas locais.")
-  );
+      : "Sua loja com mais presença nas buscas locais.");
 }
 
 export function freePlanBenefits(
@@ -51,13 +54,9 @@ export function freePlanBenefits(
   cnpj?: SubscriptionPlan,
   accountType?: "CPF" | "CNPJ"
 ): string[] {
-  const limit =
-    accountType === "CPF" ? cpf?.max_photos : accountType === "CNPJ" ? cnpj?.max_photos : undefined;
-  const pictures = limit ?? Math.min(cpf?.max_photos ?? 8, cnpj?.max_photos ?? 8);
   return [
     ...(accountType !== "CNPJ" ? [`Até ${cpf?.ad_limit ?? 3} anúncios (pessoa física)`] : []),
     ...(accountType !== "CPF" ? [`Até ${cnpj?.ad_limit ?? 10} anúncios (loja com CNPJ)`] : []),
-    `Até ${pictures} fotos por anúncio`,
     "Presença nas listagens locais e regionais",
     ...(accountType !== "CPF" && cnpj?.has_store_profile ? ["Perfil básico da loja"] : []),
   ];
