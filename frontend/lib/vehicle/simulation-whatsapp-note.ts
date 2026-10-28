@@ -35,6 +35,11 @@ export function buildSimulationWhatsappNote(input: {
         sim.downPayment
       )} de entrada (taxa ${formatRate(sim.monthlyRate)}% a.m.).`
     );
+    parts.push(
+      `Parcela estimada com provisão adicional de 3,373% (${formatBRL0(
+        sim.additionalProvision
+      )}) sobre o saldo financiado; não é IOF contratual exato.`
+    );
   }
   if (vehiclePriceNumeric != null && vehiclePriceNumeric > 0) {
     parts.push(`Preço do anúncio: ${formatBRL0(vehiclePriceNumeric)}.`);
@@ -42,7 +47,7 @@ export function buildSimulationWhatsappNote(input: {
   if (shareUrl && shareUrl.trim()) {
     parts.push(`Anúncio: ${shareUrl.trim()}`);
   }
-  parts.push("Valores estimados, sujeitos a análise de crédito.");
+  parts.push("Valores estimados, sujeitos a análise de crédito, tarifas e demais custos do CET.");
 
   return parts.join(" ");
 }
