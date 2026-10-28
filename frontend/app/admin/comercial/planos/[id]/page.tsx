@@ -157,9 +157,28 @@ export default function AdminPlanForm() {
       .filter(Boolean);
   }
 
+  const reasonRequired =
+    mode === "create" ||
+    ([
+      "price",
+      "ad_limit",
+      "max_photos",
+      "priority_level",
+      "weight",
+      "billing_model",
+      "validity_days",
+      "is_active",
+      "public_visible",
+      "subscribable",
+      "is_featured_enabled",
+      "has_store_profile",
+    ] as const).some(
+      (key) => JSON.stringify(draft[key]) !== JSON.stringify(initialDraft.current?.[key])
+    );
+
   async function handleSubmit() {
     if (busy) return;
-    if (!reason.trim()) {
+    if (reasonRequired && !reason.trim()) {
       setFlash({ kind: "error", text: "Motivo é obrigatório." });
       return;
     }
@@ -470,7 +489,11 @@ export default function AdminPlanForm() {
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Motivo (obrigatório — registrado em admin_actions)"
+          placeholder={
+            reasonRequired
+              ? "Motivo obrigatório para alterações comerciais"
+              : "Motivo opcional para alterações de texto"
+          }
           rows={3}
           maxLength={500}
           className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
@@ -487,7 +510,7 @@ export default function AdminPlanForm() {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={busy || !reason.trim() || !draft.id || !draft.name}
+            disabled={busy || (reasonRequired && !reason.trim()) || !draft.id || !draft.name}
             className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-strong disabled:opacity-50"
           >
             {busy ? "Salvando…" : mode === "create" ? "Criar plano" : "Salvar"}
