@@ -90,6 +90,18 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     ).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
   });
 
+  it("não usa fotos de veículos nos cards de planos", async () => {
+    const { container } = await page();
+    const cards = Array.from(container.querySelectorAll("[data-plan-id]"));
+    expect(cards).toHaveLength(4);
+    for (const card of cards) {
+      expect(card.querySelector("img, picture")).toBeNull();
+    }
+    expect(cardText(container, "lojista-pro")).toContain("Lojista Pro");
+    expect(cardText(container, "lojista-start")).toContain("Lojista Start");
+    expect(cardText(container, "gratis")).toContain("Grátis");
+  });
+
   it("exibe limites, pesos, oportunidades e ausência de recursos não entregues", async () => {
     const { container } = await page();
     expect(cardText(container, "destaque-7-dias")).toMatch(/R\$\s*39,90/);
