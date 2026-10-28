@@ -29,7 +29,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const type = req.query.type ? String(req.query.type) : undefined;
     const active = req.query.active !== "false";
-    const plans = await listPlans({ type, onlyActive: active });
+    const plans = await listPlans({ type, onlyActive: active, publicOnly: true });
 
     res.json({
       success: true,
