@@ -3,6 +3,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { fetchPlansFromAPI } from "@/lib/plans/plan-service";
 import type { SubscriptionPlan } from "@/lib/plans/plan-store";
+import {
+  subscriptionBenefits,
+  subscriptionIntro,
+  freePlanBenefits,
+  boostBenefits,
+  FREE_PLAN_INTRO,
+} from "@/lib/plans/commercial-benefits";
 import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-boost";
 
 /**
@@ -64,53 +71,16 @@ function priceBRL(price: number): string {
   }).format(price);
 }
 
-/** Conteúdo livre vem do Admin; quantidades e prioridade vêm dos campos operacionais. */
-function additionalBenefits(plan: SubscriptionPlan): string[] {
-  return (plan.benefits || [])
-    .filter((item) => typeof item === "string")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0)
-    .filter(
-      (item) =>
-        !/v[ií]deo|360|cr[eé]dito|destaque mensal|destaques mensais|dashboard de performance|banner regional/i.test(
-          item
-        )
-    )
-    .filter(
-      (item) =>
-        !/an[uú]ncios?|fotos?|prioridade|peso [1234]|perfil de loja|visibilidade|listagens/i.test(
-          item
-        )
-    )
-    .slice(0, 2);
-}
-
 function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): PlanCardData {
   const pro = tier === "pro";
-  const ranking = Number(plan.weight ?? (pro ? 3 : 2));
-  const benefits = [
-    pro && plan.ad_limit >= 1000
-      ? "Anúncios ilimitados*"
-      : "Até " + plan.ad_limit + " anúncios ativos",
-    "Até " + (plan.max_photos ?? (pro ? 15 : 12)) + " fotos por anúncio",
-    (pro ? "Maior prioridade nas listagens" : "Prioridade nas listagens") +
-      " (peso " +
-      ranking +
-      ")",
-    ...(plan.has_store_profile ? ["Perfil de loja personalizado"] : []),
-    ...additionalBenefits(plan),
-  ];
+  const benefits = subscriptionBenefits(plan, tier);
   return {
     id: pro ? "lojista-pro" : "lojista-start",
     name: pro ? "Lojista Pro" : "Lojista Start",
     badge: plan.recommended ? "MAIS COMPLETO" : undefined,
     priceLabel: priceBRL(Number(plan.price)),
     periodLabel: "/mês",
-    intro:
-      plan.description ||
-      (pro
-        ? "Mais visibilidade e oportunidades para sua loja."
-        : "Sua loja com mais presença nas buscas locais."),
+    intro: subscriptionIntro(plan, tier),
     benefits,
     illustration: pro ? "/images/dolphin.webp" : "/images/corolla.jpeg",
     cta: {
@@ -129,20 +99,13 @@ function buildFreeCard(
   cpf: SubscriptionPlan | undefined,
   cnpj: SubscriptionPlan | undefined
 ): PlanCardData {
-  const pictures = Math.min(cpf?.max_photos ?? 8, cnpj?.max_photos ?? 8);
   return {
     id: "gratis",
     name: "Grátis",
     priceLabel: "R$ 0",
     periodLabel: "para sempre",
-    intro: "Comece a anunciar sem custos, respeitando os limites de CPF ou CNPJ.",
-    benefits: [
-      "Até " + (cpf?.ad_limit ?? 3) + " anúncios (pessoa física)",
-      "Até " + (cnpj?.ad_limit ?? 10) + " anúncios (loja com CNPJ)",
-      "Até " + pictures + " fotos por anúncio",
-      "Presença nas listagens locais e regionais",
-      ...(cnpj?.has_store_profile ? ["Perfil básico da loja"] : []),
-    ],
+    intro: FREE_PLAN_INTRO,
+    benefits: freePlanBenefits(cpf, cnpj),
     illustration: "/images/civic.jpeg",
     cta: { label: "Começar grátis", href: "/login?next=/anunciar" },
     style: "neutral",
@@ -158,11 +121,7 @@ function buildDestaqueCard(boost: Awaited<ReturnType<typeof fetchPublicBoost>>):
     priceLabel: formatBoostPriceBRL(boost.price_cents),
     periodLabel: "por anúncio",
     intro: "Coloque seu anúncio no topo das listagens locais e regionais por " + days + " dias.",
-    benefits: [
-      "Topo das listagens por " + days + " dias (peso 4)",
-      "Disponível para CPF e CNPJ",
-      "Destaque avulso, sem mensalidade",
-    ],
+    benefits: boostBenefits(days),
     note: "Mantém os limites de anúncios e fotos do seu plano.",
     cta: { label: "Destacar agora", href: "/login?next=/anunciar?acao=destaque" },
     style: "accent",
