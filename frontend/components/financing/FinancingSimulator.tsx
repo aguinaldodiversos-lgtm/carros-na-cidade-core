@@ -414,9 +414,9 @@ export default function FinancingSimulator({
             <ShieldIcon />
           </span>
           <span>
-            Estimativa com provisão adicional de 3,373% sobre o saldo financiado, que não representa
-            o IOF exato do contrato. A taxa inicial de 1,80% a.m. é editável. Parcela sujeita à
-            análise de crédito; tarifas, seguros e outros custos do CET não estão incluídos.
+            Cálculo estimado. Valores sujeitos à análise de crédito e não incluem tarifas bancárias,
+            tributos e demais encargos da operação. A parcela já considera provisão adicional
+            estimada de 3,373%, que não representa o IOF exato do contrato.
           </span>
         </p>
       </section>
