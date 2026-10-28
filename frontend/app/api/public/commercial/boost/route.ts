@@ -17,6 +17,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 import { PUBLIC_BOOST_FALLBACK, isValidPublicBoost } from "@/lib/commercial/public-boost";
 
 export const revalidate = 60;
@@ -42,8 +43,8 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(backendUrl, {
       method: "GET",
-      headers: { Accept: "application/json" },
-      next: { revalidate: 60 },
+      headers: { ...buildInternalBackendHeaders(), Accept: "application/json" },
+      ...(verified ? { cache: "no-store" as const } : { next: { revalidate: 60 } }),
     });
     if (!response.ok) return fail();
 
