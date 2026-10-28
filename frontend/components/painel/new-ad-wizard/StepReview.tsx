@@ -401,7 +401,7 @@ export default function StepReview({
   // Preço/duração/ativação do Destaque: mesma API pública usada em /planos.
   useEffect(() => {
     let active = true;
-    fetch("/api/public/commercial/boost", { cache: "no-store" })
+    fetch("/api/public/commercial/boost?verified=1", { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error("Destaque indisponível");
         const payload = (await res.json()) as {
@@ -442,9 +442,8 @@ export default function StepReview({
   }, []);
 
   const boostOption = useMemo(
-    () =>
-      publicBoost.checked ? publicBoost.option : (boostOptions.find((b) => b.days === 7) ?? null),
-    [boostOptions, publicBoost]
+    () => (publicBoost.checked ? publicBoost.option : null),
+    [publicBoost]
   );
   const cards = useMemo(
     () =>
