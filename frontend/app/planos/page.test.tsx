@@ -124,6 +124,13 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     expect(container.querySelector('[data-plan-id="lojista-pro"]')).toBeNull();
   });
 
+  it("falha na API não anuncia valores de um fallback desatualizado", async () => {
+    vi.mocked(fetchPlansFromAPI).mockRejectedValueOnce(new Error("backend indisponível"));
+    const { container } = await page();
+    expect(container.textContent).toMatch(/não foi possível confirmar os preços/i);
+    expect(container.querySelectorAll("[data-plan-id]")).toHaveLength(0);
+  });
+
   it("plano não público ou inativo desaparece da vitrine", async () => {
     vi.mocked(fetchPlansFromAPI).mockResolvedValueOnce([
       {
