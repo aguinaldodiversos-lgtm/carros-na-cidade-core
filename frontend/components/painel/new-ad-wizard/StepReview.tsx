@@ -333,7 +333,9 @@ function PlanCard({
       </ul>
 
       {card.note ? (
-        <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-cnc-muted">{card.note}</p>
+        <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-cnc-muted">
+          {card.note}
+        </p>
       ) : null}
 
       <button
@@ -369,7 +371,8 @@ export default function StepReview({
   const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null);
   const [catalogError, setCatalogError] = useState(false);
   const [publicBoost, setPublicBoost] = useState<{ checked: boolean; option: BoostOption | null }>({
-    checked: false, option: null,
+    checked: false,
+    option: null,
   });
   const [selected, setSelected] = useState<MonetizationKey>("free");
   const [termsError, setTermsError] = useState(false);
@@ -390,7 +393,9 @@ export default function StepReview({
           setCatalogError(true);
         }
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Preço/duração/ativação do Destaque: mesma API pública usada em /planos.
@@ -400,11 +405,23 @@ export default function StepReview({
       .then(async (res) => {
         if (!res.ok) throw new Error("Destaque indisponível");
         const payload = (await res.json()) as {
-          boost?: { id?: string; name?: string; price_cents?: number; duration_days?: number; active?: boolean };
+          boost?: {
+            id?: string;
+            name?: string;
+            price_cents?: number;
+            duration_days?: number;
+            active?: boolean;
+          };
         };
         const boost = payload.boost;
-        if (!boost || !boost.active || boost.duration_days !== 7 ||
-            !Number.isFinite(boost.price_cents) || Number(boost.price_cents) <= 0) return null;
+        if (
+          !boost ||
+          !boost.active ||
+          boost.duration_days !== 7 ||
+          !Number.isFinite(boost.price_cents) ||
+          Number(boost.price_cents) <= 0
+        )
+          return null;
         return {
           id: boost.id || "boost-7d",
           days: boost.duration_days,
@@ -413,21 +430,29 @@ export default function StepReview({
           description: "",
         } satisfies BoostOption;
       })
-      .then((option) => { if (active) setPublicBoost({ checked: true, option }); })
-      .catch(() => { if (active) setPublicBoost({ checked: true, option: null }); });
-    return () => { active = false; };
+      .then((option) => {
+        if (active) setPublicBoost({ checked: true, option });
+      })
+      .catch(() => {
+        if (active) setPublicBoost({ checked: true, option: null });
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const boostOption = useMemo(
-    () => publicBoost.checked ? publicBoost.option : boostOptions.find((b) => b.days === 7) ?? null,
+    () =>
+      publicBoost.checked ? publicBoost.option : (boostOptions.find((b) => b.days === 7) ?? null),
     [boostOptions, publicBoost]
   );
   const cards = useMemo(
-    () => buildMonetizationCards({
-      plans: plans ?? undefined,
-      boostOption,
-      accountType: dashboard?.user?.type,
-    }),
+    () =>
+      buildMonetizationCards({
+        plans: plans ?? undefined,
+        boostOption,
+        accountType: dashboard?.user?.type,
+      }),
     [plans, boostOption, dashboard?.user?.type]
   );
   const selectedCard = cards.find((c) => c.key === selected) ?? cards[cards.length - 1];
@@ -710,8 +735,12 @@ export default function StepReview({
           <p className="text-sm text-cnc-muted">
             Compare os planos e escolha como publicar. Sem comissão sobre a venda.
           </p>
-          <Link href="/planos" target="_blank" rel="noopener noreferrer"
-            className="text-sm font-bold text-primary hover:underline">
+          <Link
+            href="/planos"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-bold text-primary hover:underline"
+          >
             Ver detalhes de todos os planos ↗
           </Link>
         </div>
@@ -719,8 +748,12 @@ export default function StepReview({
           Se você já tem um plano ativo, publicar sem destaque mantém os benefícios da assinatura.
         </p>
         {catalogError ? (
-          <div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Não foi possível confirmar os planos pagos. Você pode publicar sem destaque; tente novamente para contratar um plano.
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            Não foi possível confirmar os planos pagos. Você pode publicar sem destaque; tente
+            novamente para contratar um plano.
           </div>
         ) : null}
 
@@ -741,8 +774,8 @@ export default function StepReview({
 
         {selectedCard.action === "subscribe" ? (
           <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-xs leading-5 text-slate-600">
-            A assinatura não publica este anúncio automaticamente. Seu rascunho fica salvo neste navegador;
-            após a ativação do plano, retorne para concluir a publicação.
+            A assinatura não publica este anúncio automaticamente. Seu rascunho fica salvo neste
+            navegador; após a ativação do plano, retorne para concluir a publicação.
           </p>
         ) : selectedCard.action === "publish-boost" ? (
           <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs leading-5 text-slate-600">

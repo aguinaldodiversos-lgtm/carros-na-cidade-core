@@ -10,11 +10,17 @@ export function commercialAdditionalBenefits(plan: SubscriptionPlan): string[] {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean)
-    .filter((item) =>
-      !/v[ií]deo|360|cr[eé]dito|destaque mensal|destaques mensais|dashboard de performance|banner regional/i.test(item)
+    .filter(
+      (item) =>
+        !/v[ií]deo|360|cr[eé]dito|destaque mensal|destaques mensais|dashboard de performance|banner regional/i.test(
+          item
+        )
     )
-    .filter((item) =>
-      !/an[uú]ncios?|fotos?|prioridade|peso [1234]|perfil de loja|visibilidade|listagens/i.test(item)
+    .filter(
+      (item) =>
+        !/an[uú]ncios?|fotos?|prioridade|peso [1234]|perfil de loja|visibilidade|listagens/i.test(
+          item
+        )
     )
     .slice(0, 2);
 }
@@ -45,7 +51,8 @@ export function freePlanBenefits(
   cnpj?: SubscriptionPlan,
   accountType?: "CPF" | "CNPJ"
 ): string[] {
-  const limit = accountType === "CPF" ? cpf?.max_photos : accountType === "CNPJ" ? cnpj?.max_photos : undefined;
+  const limit =
+    accountType === "CPF" ? cpf?.max_photos : accountType === "CNPJ" ? cnpj?.max_photos : undefined;
   const pictures = limit ?? Math.min(cpf?.max_photos ?? 8, cnpj?.max_photos ?? 8);
   return [
     ...(accountType !== "CNPJ" ? [`Até ${cpf?.ad_limit ?? 3} anúncios (pessoa física)`] : []),
@@ -64,4 +71,5 @@ export function boostBenefits(days: number): string[] {
   ];
 }
 
-export const FREE_PLAN_INTRO = "Comece a anunciar sem custos, respeitando os limites de CPF ou CNPJ.";
+export const FREE_PLAN_INTRO =
+  "Comece a anunciar sem custos, respeitando os limites de CPF ou CNPJ.";

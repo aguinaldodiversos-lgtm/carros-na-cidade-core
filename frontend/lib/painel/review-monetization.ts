@@ -130,7 +130,15 @@ export function buildMonetizationCards(input: {
 
 export const TRUST_ITEMS = [
   { icon: "shield", title: "Contratação transparente", text: "Confira o valor antes de pagar." },
-  { icon: "zap", title: "Anúncio sujeito à revisão", text: "A publicação segue as regras do portal." },
-  { icon: "handshake", title: "Sem comissão", text: "Contato direto entre anunciante e comprador." },
+  {
+    icon: "zap",
+    title: "Anúncio sujeito à revisão",
+    text: "A publicação segue as regras do portal.",
+  },
+  {
+    icon: "handshake",
+    title: "Sem comissão",
+    text: "Contato direto entre anunciante e comprador.",
+  },
   { icon: "headset", title: "Suporte", text: "Ajuda disponível quando precisar." },
 ] as const;

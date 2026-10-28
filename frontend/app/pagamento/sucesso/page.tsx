@@ -129,8 +129,8 @@ export default function PagamentoSucessoPage() {
               Isso não confirma a aprovação desta compra. Consulte o comprovante no Mercado Pago.
             </p>
             <p className="mt-3 text-xs text-[#53607b]">
-              Se você começou a cadastrar um veículo antes de contratar, pode retomar o
-              rascunho salvo neste mesmo navegador e concluir a publicação.
+              Se você começou a cadastrar um veículo antes de contratar, pode retomar o rascunho
+              salvo neste mesmo navegador e concluir a publicação.
             </p>
             <div className="mt-5 flex flex-wrap justify-center gap-3">
               <Link

@@ -9,9 +9,7 @@ vi.mock("@/lib/account/backend-account", () => ({
   fetchPlans: vi.fn(),
 }));
 vi.mock("@/lib/plans/plan-store", () => ({
-  getPlans: vi.fn(() => [
-    { id: "cnpj-store-start", price: 79.9, is_active: true },
-  ]),
+  getPlans: vi.fn(() => [{ id: "cnpj-store-start", price: 79.9, is_active: true }]),
 }));
 
 const request = (query = "") =>
