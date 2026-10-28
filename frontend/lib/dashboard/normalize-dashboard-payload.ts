@@ -81,6 +81,7 @@ function normalizePlan(raw: unknown): DashboardPlanSummary | null {
     id,
     name,
     ad_limit: toNum(raw.ad_limit, 0),
+    max_photos: toNum(raw.max_photos, 8),
     billing_model,
   };
 }
