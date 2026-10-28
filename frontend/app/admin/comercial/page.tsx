@@ -605,21 +605,18 @@ function CommercialRulesTab() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-4">
-        <h2 className="text-sm font-bold text-cnc-text">Trava técnica</h2>
-        <Field
-          label="Pro ad_limit_guard"
-          hint={`Limite máximo efetivo de anúncios do plano Pro. Range: ${ranges.pro_ad_limit_guard.min}–${ranges.pro_ad_limit_guard.max}`}
+      <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-3">
+        <h2 className="text-sm font-bold text-cnc-text">Limite técnico do Pro</h2>
+        <p className="text-xs leading-5 text-cnc-muted">
+          O limite efetivo para publicar está em <code>subscription_plans.ad_limit</code>.
+          Para evitar divergência, ajuste o número diretamente no editor do plano Pro.
+        </p>
+        <Link
+          href="/admin/comercial/planos/cnpj-store-pro"
+          className="inline-block text-xs font-bold text-primary hover:underline"
         >
-          <input
-            type="number"
-            min={ranges.pro_ad_limit_guard.min}
-            max={ranges.pro_ad_limit_guard.max}
-            value={val("pro_ad_limit_guard")}
-            onChange={(e) => setField("pro_ad_limit_guard", Number(e.target.value))}
-            className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
-          />
-        </Field>
+          Editar limite no plano Pro
+        </Link>
       </section>
 
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-3">
