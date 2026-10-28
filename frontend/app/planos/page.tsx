@@ -10,7 +10,7 @@ import {
   boostBenefits,
   FREE_PLAN_INTRO,
 } from "@/lib/plans/commercial-benefits";
-import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-boost";
+import { fetchVerifiedPublicBoost, formatBoostPriceBRL, type PublicBoost } from "@/lib/commercial/public-boost";
 
 /**
  * /planos — landing pública de conversão (Fase 3A do alinhamento de planos).
@@ -24,8 +24,8 @@ import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-b
  *   - Cards de assinatura/grátis usam o catálogo comercial público.
  *   - O card "Destaque 7 dias" tem preço e duração dinâmicos, que vêm
  *     de platform_settings via o endpoint público GET
- *     /api/public/commercial/boost (mesma fonte do modal/checkout), com
- *     fallback centralizado e ISR — sem login, sem dado sensível, SEO-safe.
+ *     /api/public/commercial/boost (mesma fonte do modal/checkout), sem
+ *     fallback de preço quando a API não confirmar o valor.
  *
  * Travas de regressão em frontend/app/planos/page.test.tsx.
  */
@@ -112,7 +112,7 @@ function buildFreeCard(
   };
 }
 
-function buildDestaqueCard(boost: Awaited<ReturnType<typeof fetchPublicBoost>>): PlanCardData {
+function buildDestaqueCard(boost: PublicBoost): PlanCardData {
   const days = boost.duration_days;
   return {
     id: "destaque-7-dias",
@@ -329,7 +329,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 
 export default async function PlanosPage() {
   const [boost, catalog] = await Promise.all([
-    fetchPublicBoost(),
+    fetchVerifiedPublicBoost(),
     fetchPlansFromAPI({ activeOnly: true, fallbackOnError: false }).catch(() => null),
   ]);
   const publicPlans = (catalog ?? []).filter(
@@ -344,7 +344,7 @@ export default async function PlanosPage() {
     catalog === null
       ? []
       : [
-          buildDestaqueCard(boost),
+          ...(boost ? [buildDestaqueCard(boost)] : []),
           ...(pro ? [buildSubscriptionCard(pro, "pro")] : []),
           ...(start ? [buildSubscriptionCard(start, "start")] : []),
           ...(freeCpf || freeCnpj ? [buildFreeCard(freeCpf, freeCnpj)] : []),
