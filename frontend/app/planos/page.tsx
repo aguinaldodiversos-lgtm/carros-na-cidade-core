@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
+import { fetchPlansFromAPI } from "@/lib/plans/plan-service";
+import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-boost";
 
 /**
@@ -20,7 +23,7 @@ import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-b
  * Travas de regressão em frontend/app/planos/page.test.tsx.
  */
 
-export const revalidate = 900;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Planos para anunciar veículos",
@@ -38,6 +41,7 @@ export const metadata: Metadata = {
   },
 };
 
+
 type PlanCardData = {
   id: string;
   name: string;
@@ -45,118 +49,106 @@ type PlanCardData = {
   priceLabel: string;
   periodLabel: string;
   intro: string;
-  benefits: ReadonlyArray<string>;
-  cautions?: ReadonlyArray<string>;
+  benefits: readonly string[];
+  note?: string;
+  illustration?: string;
   cta: { label: string; href: string };
-  /**
-   * Estilo do card — não afeta design system global, é só uma chave para
-   * variantes locais visuais (cor da borda + cor do botão).
-   *   highlight: Pro recomendado (borda primary, badge azul, sombra)
-   *   accent:    Destaque 7 dias (borda warning, botão laranja forte)
-   *   neutral:   demais
-   */
   style: "highlight" | "accent" | "neutral";
-  /**
-   * Quando true, o card é renderizado desabilitado (CTA não-clicável) com
-   * uma mensagem. Usado pelo Destaque 7 dias quando o produto está inativo
-   * no admin (allow_boost_cpf e allow_boost_cnpj ambos false).
-   */
   disabled?: boolean;
   unavailableNote?: string;
 };
 
-/**
- * Cards estáticos de assinatura/grátis (copy de marketing).
- *
- * Ordem de exibição final: o card dinâmico "Destaque 7 dias" é montado em
- * runtime (buildDestaqueCard) e renderizado ANTES destes:
- *   1. Destaque 7 dias (dinâmico — platform_settings)
- *   2. Lojista Pro (recomendado)
- *   3. Lojista Start
- *   4. Grátis (entry point de aquisição)
- */
-const PLANS: ReadonlyArray<PlanCardData> = [
-  {
-    id: "lojista-pro",
-    name: "Lojista Pro",
-    badge: "RECOMENDADO",
-    priceLabel: "R$ 149,90",
+function priceBRL(price: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(price);
+}
+
+/** Conteúdo livre vem do Admin; quantidades e prioridade vêm dos campos operacionais. */
+function additionalBenefits(plan: SubscriptionPlan): string[] {
+  return (plan.benefits || [])
+    .filter((item) => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .filter((item) => !/v[ií]deo|360|cr[eé]dito|destaque mensal|destaques mensais|dashboard de performance|banner regional/i.test(item))
+    .filter((item) => !/an[uú]ncios?|fotos?|prioridade|peso [1234]|perfil de loja|visibilidade|listagens/i.test(item))
+    .slice(0, 2);
+}
+
+function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): PlanCardData {
+  const pro = tier === "pro";
+  const ranking = Number(plan.weight ?? (pro ? 3 : 2));
+  const benefits = [
+    pro && plan.ad_limit >= 1000 ? "Anúncios ilimitados*" : "Até " + plan.ad_limit + " anúncios ativos",
+    "Até " + (plan.max_photos ?? (pro ? 15 : 12)) + " fotos por anúncio",
+    (pro ? "Maior prioridade nas listagens" : "Prioridade nas listagens") + " (peso " + ranking + ")",
+    ...(plan.has_store_profile ? ["Perfil de loja personalizado"] : []),
+    ...additionalBenefits(plan),
+  ];
+  return {
+    id: pro ? "lojista-pro" : "lojista-start",
+    name: pro ? "Lojista Pro" : "Lojista Start",
+    badge: plan.recommended ? "MAIS COMPLETO" : undefined,
+    priceLabel: priceBRL(Number(plan.price)),
     periodLabel: "/mês",
-    intro: "Mais exposição para a loja, com prioridade comercial superior ao Start.",
-    benefits: [
-      "Mais exposição da loja nas listagens",
-      "Mais anúncios ativos no lançamento, com limite operacional",
-      "Prioridade comercial superior ao Start",
-      "Perfil de loja com identidade visual",
-    ],
-    cta: { label: "Assinar Pro", href: "/login?next=/anunciar?plano=pro" },
-    style: "highlight",
-  },
-  {
-    id: "lojista-start",
-    name: "Lojista Start",
-    priceLabel: "R$ 79,90",
-    periodLabel: "/mês",
-    intro: "Plano de entrada para lojas começarem a operação digital com presença consistente.",
-    benefits: [
-      "Até 20 anúncios ativos",
-      "Mais presença nas listagens",
-      "Ideal para lojas em início de operação digital",
-      "Perfil de loja personalizado",
-    ],
-    cta: { label: "Assinar Start", href: "/login?next=/anunciar?plano=start" },
-    style: "neutral",
-  },
-  {
+    intro: plan.description || (pro ? "Mais visibilidade e oportunidades para sua loja." : "Sua loja com mais presença nas buscas locais."),
+    benefits,
+    illustration: pro ? "/images/dolphin.webp" : "/images/corolla.jpeg",
+    cta: {
+      label: pro ? "Assinar Pro" : "Assinar Start",
+      href: pro ? "/login?next=/anunciar?plano=pro" : "/login?next=/anunciar?plano=start",
+    },
+    style: pro ? "highlight" : "neutral",
+    disabled: plan.subscribable === false,
+    unavailableNote: plan.subscribable === false ? "Contratações temporariamente indisponíveis." : undefined,
+    note: pro && plan.ad_limit >= 1000 ? "*Sujeito à trava técnica de segurança." : undefined,
+  };
+}
+
+function buildFreeCard(cpf: SubscriptionPlan | undefined, cnpj: SubscriptionPlan | undefined): PlanCardData {
+  const pictures = Math.min(cpf?.max_photos ?? 8, cnpj?.max_photos ?? 8);
+  return {
     id: "gratis",
     name: "Grátis",
     priceLabel: "R$ 0",
     periodLabel: "para sempre",
-    intro: "Comece a anunciar sem custos respeitando os limites de CPF ou CNPJ.",
+    intro: "Comece a anunciar sem custos, respeitando os limites de CPF ou CNPJ.",
     benefits: [
-      "Pessoa física: até 3 anúncios",
-      "Loja com CNPJ: até 10 anúncios",
-      "Até 8 fotos por anúncio",
-      "CPF ou CNPJ validado",
+      "Até " + (cpf?.ad_limit ?? 3) + " anúncios (pessoa física)",
+      "Até " + (cnpj?.ad_limit ?? 10) + " anúncios (loja com CNPJ)",
+      "Até " + pictures + " fotos por anúncio",
+      "Presença nas listagens locais e regionais",
+      ...(cnpj?.has_store_profile ? ["Perfil básico da loja"] : []),
     ],
+    illustration: "/images/civic.jpeg",
     cta: { label: "Começar grátis", href: "/login?next=/anunciar" },
     style: "neutral",
-  },
-];
+  };
+}
 
-/**
- * Monta o card "Destaque 7 dias" a partir da config pública viva
- * (platform_settings). Preço/duração nunca divergem do que o checkout cobra.
- */
 function buildDestaqueCard(boost: Awaited<ReturnType<typeof fetchPublicBoost>>): PlanCardData {
   const days = boost.duration_days;
   return {
     id: "destaque-7-dias",
     name: boost.name,
-    badge: `TOPO POR ${days} DIAS`,
+    badge: "TOPO POR " + days + " DIAS",
     priceLabel: formatBoostPriceBRL(boost.price_cents),
     periodLabel: "por anúncio",
-    intro: `Coloque um anúncio no topo das listagens da sua cidade por ${days} dias.`,
+    intro: "Coloque seu anúncio no topo das listagens locais e regionais por " + days + " dias.",
     benefits: [
-      `Posição de destaque no catálogo por ${days} dias`,
+      "Topo das listagens por " + days + " dias (peso 4)",
       "Disponível para CPF e CNPJ",
-      "Compras repetidas prorrogam o tempo no topo",
+      "Novas compras prolongam o destaque",
     ],
-    cautions: [
-      "Não libera vídeo 360",
-      "Não altera o limite de fotos",
-      "Não altera o limite de anúncios",
-    ],
-    // CTA leva à autenticação que retorna ao fluxo do anúncio. O Mercado Pago
-    // só inicia DEPOIS que o user tem ad_id (tela interna pós-revisão).
+    note: "Mantém os limites de anúncios e fotos do seu plano.",
     cta: { label: "Destacar agora", href: "/login?next=/anunciar?acao=destaque" },
     style: "accent",
     disabled: !boost.active,
-    unavailableNote: boost.active
-      ? undefined
-      : "Compra de destaque temporariamente indisponível. Tente novamente em breve.",
+    unavailableNote: boost.active ? undefined : "Compra de destaque temporariamente indisponível.",
   };
 }
+
 
 const HERO_CHIPS = ["Sem comissão", "Mais visibilidade", "Cadastro simples"] as const;
 
@@ -183,8 +175,8 @@ const KEY_BENEFITS = [
 
 const FAQ = [
   {
-    q: "O Destaque libera vídeo 360?",
-    a: "Não. O Destaque apenas coloca o anúncio no topo das listagens por 7 dias.",
+    q: "O Destaque altera a quantidade de anúncios ou fotos?",
+    a: "Não. O Destaque melhora a posição do anúncio sem alterar os limites contratados.",
   },
   {
     q: "Posso contratar o Destaque mais de uma vez?",
@@ -195,8 +187,8 @@ const FAQ = [
     a: "Sim, respeitando os limites de CPF (até 3 anúncios) ou CNPJ validado (até 10 anúncios).",
   },
   {
-    q: "Quando começam os planos pagos?",
-    a: "Os planos pagos serão liberados de forma gradual conforme validação do cadastro e disponibilidade de pagamento. Avisamos por e-mail quando estiver pronto para você.",
+    q: "Quais funcionalidades estão disponíveis durante o lançamento?",
+    a: "O acesso a oportunidades para lojas pode estar liberado durante a fase de lançamento. As condições de cada plano serão aplicadas quando essa fase terminar.",
   },
 ] as const;
 
@@ -213,104 +205,78 @@ function HeroChip({ children }: { children: React.ReactNode }) {
   );
 }
 
+
 function PlanCardView({ plan }: { plan: PlanCardData }) {
-  // Variantes locais — nada novo no design system. Usa tokens cnc-* existentes.
-  const styleByVariant: Record<
-    PlanCardData["style"],
-    { card: string; cta: string; badge: string }
-  > = {
+  const styleByVariant: Record<PlanCardData["style"], { card: string; cta: string; badge: string; check: string }> = {
     highlight: {
-      card: "border-primary/60 ring-2 ring-primary/30 shadow-premium bg-white",
-      cta: "bg-primary text-white hover:bg-primary/90",
-      badge: "bg-primary text-white",
+      card: "border-blue-500 bg-gradient-to-b from-blue-50/80 via-white to-white shadow-[0_14px_40px_rgba(29,78,216,0.08)]",
+      cta: "bg-blue-600 text-white hover:bg-blue-700",
+      badge: "bg-blue-600 text-white",
+      check: "bg-blue-500 text-white",
     },
     accent: {
-      card: "border-cnc-warning/60 ring-2 ring-cnc-warning/30 shadow-card bg-white",
-      cta: "bg-cnc-warning text-white hover:bg-cnc-warning/90",
-      badge: "bg-cnc-warning text-white",
+      card: "border-amber-400 bg-gradient-to-b from-amber-50/70 via-white to-white shadow-[0_14px_40px_rgba(217,119,6,0.07)]",
+      cta: "bg-amber-500 text-white hover:bg-amber-600",
+      badge: "bg-amber-500 text-white",
+      check: "bg-amber-500 text-white",
     },
     neutral: {
-      card: "border-cnc-line bg-white shadow-card",
-      cta: "bg-cnc-text-strong text-white hover:bg-cnc-text-strong/90",
-      badge: "bg-cnc-bg text-cnc-text-strong",
+      card: "border-slate-200 bg-white shadow-[0_8px_32px_rgba(15,23,42,0.04)]",
+      cta: "bg-slate-900 text-white hover:bg-slate-800",
+      badge: "bg-slate-900 text-white",
+      check: "bg-emerald-500 text-white",
     },
   };
-  const s = styleByVariant[plan.style];
-
+  const style = styleByVariant[plan.style];
   return (
     <article
       data-plan-id={plan.id}
-      className={`relative flex flex-col rounded-2xl border p-5 transition hover:-translate-y-0.5 ${s.card}`}
+      className={["relative flex h-full min-h-[540px] flex-col rounded-[22px] border p-5 transition hover:-translate-y-0.5 sm:p-6", style.card].join(" ")}
     >
       {plan.badge ? (
-        <span
-          className={`absolute -top-3 left-5 inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${s.badge}`}
-        >
+        <span className={["absolute -top-3 left-5 rounded-full px-3 py-1 text-[10px] font-extrabold tracking-wide", style.badge].join(" ")}>
           {plan.badge}
         </span>
       ) : null}
-
-      <header>
-        <h3 className="text-lg font-extrabold text-cnc-text-strong sm:text-xl">{plan.name}</h3>
-        <p className="mt-1 text-xs text-cnc-muted sm:text-sm">{plan.intro}</p>
+      {plan.illustration ? (
+        <div aria-hidden="true" className="absolute right-4 top-5 h-[68px] w-[100px] overflow-hidden rounded-[22px] bg-slate-100/80 opacity-90">
+          <Image src={plan.illustration} alt="" fill sizes="100px" className="object-cover" />
+        </div>
+      ) : plan.style === "accent" ? (
+        <div aria-hidden="true" className="absolute right-5 top-6 grid h-12 w-12 place-items-center rounded-2xl bg-amber-100 text-3xl text-amber-500">♛</div>
+      ) : null}
+      <header className="min-h-[125px] pr-16">
+        <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
+        <p className="mt-3 text-[13px] leading-6 text-slate-500">{plan.intro}</p>
       </header>
-
-      <p className="mt-4 flex items-baseline gap-1">
-        <strong className="text-3xl font-extrabold tracking-tight text-cnc-text-strong sm:text-4xl">
-          {plan.priceLabel}
-        </strong>
-        <span className="text-xs text-cnc-muted sm:text-sm">{plan.periodLabel}</span>
+      <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <strong className="text-[32px] font-extrabold tracking-tight text-slate-950">{plan.priceLabel}</strong>
+        <span className="text-[12px] text-slate-500">{plan.periodLabel}</span>
       </p>
-
-      <ul className="mt-4 flex-1 space-y-2 text-[13px] text-cnc-text-strong sm:text-sm">
-        {plan.benefits.map((b) => (
-          <li key={b} className="flex items-start gap-2">
-            <span
-              aria-hidden="true"
-              className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-cnc-success"
-            />
-            <span>{b}</span>
+      <ul className="mt-6 flex-1 space-y-3 text-[13px] leading-5 text-slate-900">
+        {plan.benefits.map((benefit) => (
+          <li key={benefit} className="flex items-start gap-2.5">
+            <span aria-hidden="true" className={["mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold", style.check].join(" ")}>✓</span>
+            <span>{benefit}</span>
           </li>
         ))}
       </ul>
-
-      {plan.cautions && plan.cautions.length > 0 ? (
-        <ul className="mt-3 space-y-1 text-[11px] text-cnc-muted sm:text-[12px]">
-          {plan.cautions.map((c) => (
-            <li key={c} className="flex items-start gap-2">
-              <span
-                aria-hidden="true"
-                className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-cnc-muted"
-              />
-              <span>{c}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
+      {plan.note ? <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">{plan.note}</p> : null}
       {plan.disabled ? (
-        <>
-          <span
-            aria-disabled="true"
-            className="mt-5 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-lg bg-cnc-line text-sm font-bold text-cnc-muted"
-          >
-            Indisponível no momento
-          </span>
-          {plan.unavailableNote ? (
-            <p className="mt-2 text-[11px] text-cnc-muted">{plan.unavailableNote}</p>
-          ) : null}
-        </>
+        <span aria-disabled="true" className="mt-5 flex h-12 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-500">Indisponível</span>
       ) : (
         <Link
           href={plan.cta.href}
-          className={`mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg text-sm font-bold transition ${s.cta}`}
+          className={["mt-5 flex h-12 items-center justify-center gap-3 rounded-xl text-sm font-bold transition", style.cta].join(" ")}
         >
-          {plan.cta.label}
+          {plan.cta.label} <span aria-hidden="true">→</span>
         </Link>
       )}
+      {plan.disabled && plan.unavailableNote ? <p className="mt-2 text-center text-xs text-slate-500">{plan.unavailableNote}</p> : null}
     </article>
   );
 }
+
 
 function BenefitCard({ title, description }: { title: string; description: string }) {
   return (
@@ -341,18 +307,30 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 // ---------------------------------------------------------------------------
 
 export default async function PlanosPage() {
-  // Única dependência dinâmica: o produto avulso "Destaque 7 dias".
-  // ISR (revalidate=900) + fallback centralizado mantêm SEO/robustez.
-  const boost = await fetchPublicBoost();
-  const plans: ReadonlyArray<PlanCardData> = [buildDestaqueCard(boost), ...PLANS];
+  const [boost, catalog] = await Promise.all([
+    fetchPublicBoost(),
+    fetchPlansFromAPI({ activeOnly: true }),
+  ]);
+  const publicPlans = catalog.filter((plan) => plan.is_active && plan.public_visible !== false);
+  const find = (id: string) => publicPlans.find((plan) => plan.id === id);
+  const pro = find("cnpj-store-pro");
+  const start = find("cnpj-store-start");
+  const freeCpf = find("cpf-free-essential");
+  const freeCnpj = find("cnpj-free-store");
+  const plans: PlanCardData[] = [
+    buildDestaqueCard(boost),
+    ...(pro ? [buildSubscriptionCard(pro, "pro")] : []),
+    ...(start ? [buildSubscriptionCard(start, "start")] : []),
+    ...(freeCpf || freeCnpj ? [buildFreeCard(freeCpf, freeCnpj)] : []),
+  ];
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+    <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-12">
       {/* Hero */}
       <section aria-labelledby="planos-hero-title" className="text-left">
         <h1
           id="planos-hero-title"
-          className="text-3xl font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-4xl lg:text-5xl"
+          className="text-3xl font-extrabold leading-tight tracking-tight text-cnc-text-strong sm:text-4xl lg:text-[54px]"
         >
           Escolha o plano ideal para anunciar seu veículo
         </h1>
@@ -370,7 +348,7 @@ export default async function PlanosPage() {
       {/* Cards */}
       <section
         aria-label="Planos disponíveis"
-        className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4"
+        className="mt-10 grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4"
       >
         {plans.map((plan) => (
           <PlanCardView key={plan.id} plan={plan} />
