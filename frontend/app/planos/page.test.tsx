@@ -60,7 +60,7 @@ vi.mock("@/lib/plans/plan-service", () => ({
       has_store_profile: true,
       recommended: true,
       benefits: ["Compradores procurando", "Veículos para avaliação"],
-      description: "Mais visibilidade para sua loja.",
+      description: "Mais visibilidade, mais fotos e acesso a oportunidades para sua loja.",
     },
   ]),
 }));
@@ -90,16 +90,32 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     ).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
   });
 
+  it("não usa fotos de veículos nos cards de planos", async () => {
+    const { container } = await page();
+    const cards = Array.from(container.querySelectorAll("[data-plan-id]"));
+    expect(cards).toHaveLength(4);
+    for (const card of cards) {
+      expect(card.querySelector("img, picture")).toBeNull();
+    }
+    expect(cardText(container, "lojista-pro")).toContain("Lojista Pro");
+    expect(cardText(container, "lojista-start")).toContain("Lojista Start");
+    expect(cardText(container, "gratis")).toContain("Grátis");
+  });
+
   it("exibe limites, pesos, oportunidades e ausência de recursos não entregues", async () => {
     const { container } = await page();
     expect(cardText(container, "destaque-7-dias")).toMatch(/R\$\s*39,90/);
     expect(cardText(container, "destaque-7-dias")).toContain("peso 4");
-    expect(cardText(container, "lojista-pro")).toContain("15 fotos por anúncio");
+    expect(cardText(container, "lojista-pro")).not.toMatch(/\d+ fotos? por anúncio/i);
+    expect(cardText(container, "lojista-pro")).toContain(
+      "Mais visibilidade e acesso a oportunidades para sua loja."
+    );
+    expect(cardText(container, "lojista-pro")).not.toMatch(/mais fotos/i);
     expect(cardText(container, "lojista-pro")).toContain("peso 3");
     expect(cardText(container, "lojista-pro")).toContain("Compradores procurando");
-    expect(cardText(container, "lojista-start")).toContain("12 fotos por anúncio");
+    expect(cardText(container, "lojista-start")).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(cardText(container, "lojista-start")).toContain("peso 2");
-    expect(cardText(container, "gratis")).toContain("8 fotos por anúncio");
+    expect(cardText(container, "gratis")).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(container.textContent).not.toMatch(/vídeo 360|créditos mensais de destaque/i);
   });
 

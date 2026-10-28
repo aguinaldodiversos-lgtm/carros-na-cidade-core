@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
 import { fetchPlansFromAPI } from "@/lib/plans/plan-service";
 import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import {
@@ -61,7 +60,6 @@ type PlanCardData = {
   intro: string;
   benefits: readonly string[];
   note?: string;
-  illustration?: string;
   cta: { label: string; href: string };
   style: "highlight" | "accent" | "neutral";
   disabled?: boolean;
@@ -86,7 +84,6 @@ function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): P
     periodLabel: "/mês",
     intro: subscriptionIntro(plan, tier),
     benefits,
-    illustration: pro ? "/images/dolphin.webp" : "/images/corolla.jpeg",
     cta: {
       label: pro ? "Assinar Pro" : "Assinar Start",
       href: pro ? "/login?next=/anunciar?plano=pro" : "/login?next=/anunciar?plano=start",
@@ -110,7 +107,6 @@ function buildFreeCard(
     periodLabel: "para sempre",
     intro: FREE_PLAN_INTRO,
     benefits: freePlanBenefits(cpf, cnpj),
-    illustration: "/images/civic.jpeg",
     cta: { label: "Começar grátis", href: "/login?next=/anunciar" },
     style: "neutral",
   };
@@ -238,14 +234,7 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
           {plan.badge}
         </span>
       ) : null}
-      {plan.illustration ? (
-        <div
-          aria-hidden="true"
-          className="absolute right-4 top-5 h-[68px] w-[100px] overflow-hidden rounded-[22px] bg-slate-100/80 opacity-90"
-        >
-          <Image src={plan.illustration} alt="" fill sizes="100px" className="object-cover" />
-        </div>
-      ) : plan.style === "accent" ? (
+      {plan.style === "accent" ? (
         <div
           aria-hidden="true"
           className="absolute right-5 top-6 grid h-12 w-12 place-items-center rounded-2xl bg-amber-100 text-3xl text-amber-500"
@@ -253,7 +242,7 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
           ♛
         </div>
       ) : null}
-      <header className="min-h-[125px] pr-24">
+      <header className={plan.style === "accent" ? "min-h-[125px] pr-14" : "min-h-[125px]"}>
         <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
         <p className="mt-3 text-[13px] leading-6 text-slate-500">{plan.intro}</p>
       </header>

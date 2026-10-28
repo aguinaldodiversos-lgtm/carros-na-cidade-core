@@ -44,7 +44,7 @@ async function login(page: import("@playwright/test").Page, who: typeof dealer) 
   expect(result.ok(), "O login do fixture deve funcionar, sem pular o teste").toBeTruthy();
 }
 
-test("vitrine /planos usa preços, fotos e hierarquia do catálogo real", async ({
+test("vitrine /planos usa preços e hierarquia do catálogo real sem divulgar limites de fotos", async ({
   page,
   request,
 }) => {
@@ -79,28 +79,21 @@ test("vitrine /planos usa preços, fotos e hierarquia do catálogo real", async 
     .evaluateAll((elements) => elements.map((element) => element.getAttribute("data-plan-id")));
   expect(ids).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
 
-  const check = (id: string, price: string, photos?: number, weight?: number) => {
+  const check = (id: string, price: string, weight?: number) => {
     const card = page.locator(`[data-plan-id="${id}"]`);
     return (async () => {
       await expect(card).toContainText(price);
-      if (photos != null) await expect(card).toContainText(`${photos} fotos por anúncio`);
+      await expect(card).not.toContainText(/\d+ fotos? por anúncio/i);
       if (weight != null) await expect(card).toContainText(`peso ${weight}`);
     })();
   };
-  await check("destaque-7-dias", priceText(boost.price_cents / 100), undefined, 4);
-  await check("lojista-pro", priceText(Number(pro.price)), pro.max_photos, Number(pro.weight));
-  await check(
-    "lojista-start",
-    priceText(Number(start.price)),
-    start.max_photos,
-    Number(start.weight)
-  );
+  await check("destaque-7-dias", priceText(boost.price_cents / 100), 4);
+  await check("lojista-pro", priceText(Number(pro.price)), Number(pro.weight));
+  await check("lojista-start", priceText(Number(start.price)), Number(start.weight));
   const free = page.locator('[data-plan-id="gratis"]');
   await expect(free).toContainText(`${cpf.ad_limit} anúncios`);
   await expect(free).toContainText(`${cnpj.ad_limit} anúncios`);
-  await expect(free).toContainText(
-    `${Math.min(cpf.max_photos, cnpj.max_photos)} fotos por anúncio`
-  );
+  await expect(free).not.toContainText(/\d+ fotos? por anúncio/i);
   const cardCopy = (await page.locator("[data-plan-id]").allTextContents()).join(" ");
   expect(normalized(cardCopy)).not.toMatch(/v[ií]deo 360|cr[eé]ditos mensais de destaque/i);
 });
@@ -127,11 +120,11 @@ test("a etapa final CNPJ apresenta os mesmos valores e preserva o anúncio", asy
   await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(
     priceText(Number(start.price))
   );
-  await expect(page.locator('[data-plan-key="lojista-pro"]')).toContainText(
-    `${pro.max_photos} fotos por anúncio`
+  await expect(page.locator('[data-plan-key="lojista-pro"]')).not.toContainText(
+    /\d+ fotos? por anúncio/i
   );
-  await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(
-    `${start.max_photos} fotos por anúncio`
+  await expect(page.locator('[data-plan-key="lojista-start"]')).not.toContainText(
+    /\d+ fotos? por anúncio/i
   );
 
   const details = page.getByRole("link", { name: /Ver detalhes de todos os planos/i });

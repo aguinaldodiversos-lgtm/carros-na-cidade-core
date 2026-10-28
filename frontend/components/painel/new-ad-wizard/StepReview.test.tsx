@@ -203,8 +203,7 @@ describe("revisão do anúncio — ofertas integradas a /planos", () => {
     expect(screen.getByText("R$ 149,90")).toBeTruthy();
     expect(screen.getByText("R$ 79,90")).toBeTruthy();
     expect(screen.getAllByText("R$ 0").length).toBeGreaterThan(0);
-    expect(container.textContent).toContain("15 fotos por anúncio");
-    expect(container.textContent).toContain("12 fotos por anúncio");
+    expect(container.textContent).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(container.textContent).toContain("peso 4");
     expect(container.textContent).toContain("peso 3");
     expect(container.textContent).toContain("peso 2");
@@ -230,7 +229,7 @@ describe("revisão do anúncio — ofertas integradas a /planos", () => {
     const { container } = render(<Harness />);
     await waitFor(() => expect(container.textContent).toMatch(/R\$\s*89,90/));
     expect(container.textContent).toContain("Até 25 anúncios ativos");
-    expect(container.textContent).toContain("13 fotos por anúncio");
+    expect(container.textContent).not.toMatch(/\d+ fotos? por anúncio/i);
     expect(container.textContent).toContain("peso 2.5");
   });
 
