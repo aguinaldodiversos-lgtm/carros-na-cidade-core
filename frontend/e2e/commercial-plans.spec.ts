@@ -120,8 +120,12 @@ test("a etapa final CNPJ apresenta os mesmos valores e preserva o anúncio", asy
   await expect(page.locator('[data-plan-key="lojista-start"]')).toContainText(
     priceText(Number(start.price))
   );
-  await expect(page.locator('[data-plan-key="lojista-pro"]')).not.toContainText(/\d+ fotos? por anúncio/i);
-  await expect(page.locator('[data-plan-key="lojista-start"]')).not.toContainText(/\d+ fotos? por anúncio/i);
+  await expect(page.locator('[data-plan-key="lojista-pro"]')).not.toContainText(
+    /\d+ fotos? por anúncio/i
+  );
+  await expect(page.locator('[data-plan-key="lojista-start"]')).not.toContainText(
+    /\d+ fotos? por anúncio/i
+  );
 
   const details = page.getByRole("link", { name: /Ver detalhes de todos os planos/i });
   await expect(details).toHaveAttribute("href", "/planos");

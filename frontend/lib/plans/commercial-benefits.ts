@@ -43,10 +43,12 @@ export function subscriptionIntro(plan: SubscriptionPlan, tier: "pro" | "start")
     ?.replace(/,\s*mais fotos\s+e\s+/gi, " e ")
     .replace(/\bmais fotos\b/gi, "")
     .trim();
-  return intro ||
+  return (
+    intro ||
     (tier === "pro"
       ? "Mais visibilidade e oportunidades para sua loja."
-      : "Sua loja com mais presença nas buscas locais.");
+      : "Sua loja com mais presença nas buscas locais.")
+  );
 }
 
 export function freePlanBenefits(
