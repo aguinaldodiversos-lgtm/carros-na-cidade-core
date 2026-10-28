@@ -14,6 +14,7 @@ export async function fetchPlansFromAPI(options: GetPlansOptions = {}) {
     const query = new URLSearchParams();
     if (options.type) query.set("type", options.type);
     if (options.activeOnly !== undefined) query.set("active", String(options.activeOnly));
+    if (options.fallbackOnError === false) query.set("verified", "1");
     const endpoint = `/api/plans${query.toString() ? `?${query.toString()}` : ""}`;
     const response = await fetch(endpoint, { method: "GET", cache: "no-store" });
     if (!response.ok) {
@@ -35,6 +36,6 @@ export async function fetchPlansFromAPI(options: GetPlansOptions = {}) {
 }
 
 export async function getPlansByType(type: PlanType) {
-  const plans = await fetchPlansFromAPI({ type, activeOnly: true });
+  const plans = await fetchPlansFromAPI({ type, activeOnly: true, fallbackOnError: false });
   return plans.sort((a, b) => a.priority_level - b.priority_level);
 }
