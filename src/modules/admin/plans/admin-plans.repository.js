@@ -45,6 +45,7 @@ export async function list({ includeInactive = true } = {}) {
        p.monthly_highlight_credits,
        p.sort_order,
        p.public_visible,
+       p.subscribable,
        p.created_at,
        p.updated_at,
        (SELECT COUNT(*)::int FROM user_subscriptions us
@@ -65,7 +66,7 @@ export async function findById(id) {
        p.is_active, p.validity_days, p.billing_model, p.description,
        p.benefits, p.recommended, p.max_photos, p.weight,
        p.video_360_enabled, p.monthly_highlight_credits,
-       p.sort_order, p.public_visible,
+       p.sort_order, p.public_visible, p.subscribable,
        p.created_at, p.updated_at,
        (SELECT COUNT(*)::int FROM user_subscriptions us
          WHERE us.plan_id = p.id AND us.status IN ('active','pending')
@@ -105,6 +106,7 @@ export async function insert(plan) {
     monthly_highlight_credits,
     sort_order,
     public_visible,
+    subscribable,
   } = plan;
 
   const { rows } = await query(
@@ -114,7 +116,7 @@ export async function insert(plan) {
        is_active, validity_days, billing_model, description,
        benefits, recommended, max_photos, weight,
        video_360_enabled, monthly_highlight_credits,
-       sort_order, public_visible
+       sort_order, public_visible, subscribable
      )
      VALUES (
        $1, $2, $3, $4, $5,
@@ -122,7 +124,7 @@ export async function insert(plan) {
        $9, $10, $11, $12,
        $13::jsonb, $14, $15, $16,
        $17, $18,
-       $19, $20
+       $19, $20, $21
      )
      ON CONFLICT (id) DO NOTHING
      RETURNING *`,
@@ -147,6 +149,7 @@ export async function insert(plan) {
       monthly_highlight_credits,
       sort_order,
       public_visible,
+      subscribable,
     ]
   );
   return rows[0] ? coercePlanRow(rows[0]) : null;
@@ -182,6 +185,7 @@ export async function updatePartial(id, patch) {
     "monthly_highlight_credits",
     "sort_order",
     "public_visible",
+    "subscribable",
   ];
 
   for (const field of fields) {
