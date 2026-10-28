@@ -8,6 +8,9 @@ const SIM: SimulationResult = {
   monthlyRate: 1.29,
   term: 48,
   installment: 890,
+  financedBase: 45000,
+  additionalProvision: 1517.85,
+  financedWithProvision: 46517.85,
 };
 
 describe("buildSimulationWhatsappNote", () => {
@@ -22,6 +25,8 @@ describe("buildSimulationWhatsappNote", () => {
     expect(note).toContain("48x");
     expect(note).toContain("de entrada");
     expect(note).toContain("taxa 1,29% a.m.");
+    expect(note).toContain("provisão adicional de 3,373%");
+    expect(note).toContain("não é IOF contratual exato");
     // Preço do anúncio.
     expect(note).toMatch(/Preço do anúncio: R\$\s?65\.000/);
     // URL do anúncio.
@@ -29,7 +34,7 @@ describe("buildSimulationWhatsappNote", () => {
       "Anúncio: https://carrosnacidade.com/veiculo/chevrolet-onix-lt-2020-atibaia-sp"
     );
     // Aviso de estimativa.
-    expect(note).toContain("Valores estimados, sujeitos a análise de crédito.");
+    expect(note).toContain("Valores estimados, sujeitos a análise de crédito, tarifas e demais custos do CET.");
 
     // Ordem: condições → preço → URL → aviso.
     expect(note.indexOf("48x")).toBeLessThan(note.indexOf("Preço do anúncio"));
