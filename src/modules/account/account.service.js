@@ -174,13 +174,13 @@ const DEFAULT_PLANS = [
     benefits: [
       "Ate 20 anuncios ativos",
       "Ate 12 fotos por anuncio",
-      "1 destaque mensal incluido",
+      "Veiculos para avaliacao",
       "Perfil de loja personalizado",
     ],
     max_photos: 12,
     weight: 2,
     video_360_enabled: false,
-    monthly_highlight_credits: 1,
+    monthly_highlight_credits: 0,
     recommended: false,
   },
   {
@@ -196,18 +196,18 @@ const DEFAULT_PLANS = [
     is_active: true,
     validity_days: 30,
     billing_model: "monthly",
-    description: "Anuncios sem limite pratico, destaques mensais inclusos e video 360.",
+    description: "Mais visibilidade, mais fotos e acesso a oportunidades para sua loja.",
     benefits: [
       "Anuncios ilimitados (trava tecnica configuravel pelo admin)",
       "Ate 15 fotos por anuncio",
-      "3 destaques mensais inclusos",
-      "Video 360 habilitado",
-      "Dashboard de performance por cidade",
+      "Maior prioridade nas listagens (peso 3)",
+      "Compradores procurando",
+      "Veiculos para avaliacao",
     ],
     max_photos: 15,
     weight: 3,
-    video_360_enabled: true,
-    monthly_highlight_credits: 3,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
     recommended: true,
   },
   {
@@ -310,6 +310,10 @@ function mapPlanRow(row) {
     description: String(row.description || ""),
     benefits: safeJsonArray(row.benefits),
     recommended: Boolean(row.recommended),
+    max_photos: toNumber(row.max_photos, 8),
+    weight: toNumber(row.weight, 1),
+    sort_order: toNumber(row.sort_order, 50),
+    public_visible: row.public_visible !== false,
     // Elegibilidade data-driven ao checkout de assinatura (migration 040).
     subscribable: Boolean(row.subscribable),
   };
@@ -427,6 +431,10 @@ async function queryPlansFromDatabase() {
         description,
         benefits,
         recommended,
+        max_photos,
+        weight,
+        sort_order,
+        public_visible,
         subscribable
       FROM subscription_plans
       ORDER BY priority_level ASC, price ASC, name ASC
@@ -596,7 +604,7 @@ export async function countNonDeletedAdsForUser(userId) {
   }
 }
 
-export async function listPlans({ type, onlyActive = true } = {}) {
+export async function listPlans({ type, onlyActive = true, publicOnly = false } = {}) {
   const plans = await queryPlansFromDatabase();
 
   // Filtro de produto Evento (dormente) — quando EVENTS_PUBLIC_ENABLED
@@ -609,6 +617,7 @@ export async function listPlans({ type, onlyActive = true } = {}) {
   return plans
     .filter((plan) => (type ? plan.type === normalizeAccountType(type) : true))
     .filter((plan) => (onlyActive ? plan.is_active : true))
+    .filter((plan) => (publicOnly ? plan.public_visible !== false : true))
     .filter((plan) => (eventsPublic ? true : !isEventPlanId(plan.id)));
 }
 
@@ -653,7 +662,7 @@ export async function resolveCurrentPlan(user) {
 
 function getFreeLimit(accountType, cnpjVerified) {
   if (accountType === "pending" || accountType === "CPF") return 3;
-  return cnpjVerified ? 20 : 0;
+  return cnpjVerified ? 10 : 0;
 }
 
 function primaryImageUrlFromAdRow(row) {
@@ -1050,6 +1059,7 @@ export async function getDashboardPayload(userId, options = {}) {
             id: currentPlan.id,
             name: currentPlan.name,
             ad_limit: currentPlan.ad_limit,
+            max_photos: currentPlan.max_photos,
             billing_model: currentPlan.billing_model,
           }
         : null,
@@ -1058,6 +1068,7 @@ export async function getDashboardPayload(userId, options = {}) {
             id: currentPlan.id,
             name: currentPlan.name,
             ad_limit: currentPlan.ad_limit,
+            max_photos: currentPlan.max_photos,
             billing_model: currentPlan.billing_model,
           }
         : null,

@@ -22,6 +22,8 @@ export type SubscriptionPlan = {
   recommended?: boolean;
   /** Elegibilidade data-driven ao checkout de assinatura (migration 040). */
   subscribable?: boolean;
+  public_visible?: boolean;
+  sort_order?: number;
   /**
    * Campos opcionais alinhados à oferta oficial de lançamento. Backend
    * ainda não tem colunas dedicadas; são preenchidos no fallback e
@@ -203,13 +205,14 @@ const planSeed: SubscriptionPlan[] = [
     benefits: [
       "Ate 20 anuncios ativos",
       "Ate 12 fotos por anuncio",
-      "1 destaque mensal incluido",
+      "Prioridade nas listagens (peso 2)",
       "Perfil de loja personalizado",
+      "Veiculos para avaliacao",
     ],
     max_photos: 12,
     weight: 2,
     video_360_enabled: false,
-    monthly_highlight_credits: 1,
+    monthly_highlight_credits: 0,
   },
   {
     id: "cnpj-store-pro",
@@ -225,18 +228,19 @@ const planSeed: SubscriptionPlan[] = [
     created_at: nowIso(),
     updated_at: nowIso(),
     billing_model: "monthly",
-    description: "Anuncios sem limite pratico, destaques mensais inclusos e video 360.",
+    description: "Maxima visibilidade para lojas, com mais fotos e acesso a oportunidades.",
     benefits: [
-      "Anuncios ilimitados (trava tecnica configuravel pelo admin)",
+      "Anuncios ilimitados (trava operacional)",
       "Ate 15 fotos por anuncio",
-      "3 destaques mensais inclusos",
-      "Video 360 habilitado",
-      "Dashboard de performance por cidade",
+      "Maior prioridade nas listagens (peso 3)",
+      "Perfil de loja personalizado",
+      "Compradores procurando",
+      "Veiculos para avaliacao",
     ],
     max_photos: 15,
     weight: 3,
-    video_360_enabled: true,
-    monthly_highlight_credits: 3,
+    video_360_enabled: false,
+    monthly_highlight_credits: 0,
     recommended: true,
   },
   {

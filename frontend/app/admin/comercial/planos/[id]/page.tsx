@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   adminApi,
@@ -18,10 +18,10 @@ const BILLING_MODELS: PlanBillingModel[] = ["free", "one_time", "monthly"];
 
 type Mode = "create" | "edit";
 
-function commercialLayerLabel(priority_level: number) {
-  if (priority_level >= 80) return "3 — Pro";
-  if (priority_level >= 50) return "2 — Start";
-  return "1 — Grátis (ou abaixo de Start)";
+function commercialLayerLabel(weight: number) {
+  if (weight >= 3) return "Pro";
+  if (weight >= 2) return "Start";
+  return "Grátis";
 }
 
 type Draft = {
@@ -45,6 +45,7 @@ type Draft = {
   recommended: boolean;
   video_360_enabled: boolean;
   public_visible: boolean;
+  subscribable: boolean;
 };
 
 const EMPTY_DRAFT: Draft = {
@@ -68,6 +69,7 @@ const EMPTY_DRAFT: Draft = {
   recommended: false,
   video_360_enabled: false,
   public_visible: true,
+  subscribable: false,
 };
 
 function planToDraft(p: PlanRow): Draft {
@@ -103,6 +105,7 @@ function planToDraft(p: PlanRow): Draft {
     recommended: p.recommended,
     video_360_enabled: p.video_360_enabled,
     public_visible: p.public_visible,
+    subscribable: p.subscribable ?? false,
   };
 }
 
@@ -112,6 +115,7 @@ export default function AdminPlanForm() {
   const mode: Mode = id === "novo" ? "create" : "edit";
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const initialDraft = useRef<Draft | null>(null);
   const [loaded, setLoaded] = useState(mode === "create");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -125,7 +129,9 @@ export default function AdminPlanForm() {
       try {
         const r = await adminApi.plans.get(id);
         if (cancelled) return;
-        setDraft(planToDraft(r.data));
+        const loadedDraft = planToDraft(r.data);
+        initialDraft.current = loadedDraft;
+        setDraft(loadedDraft);
         setLoaded(true);
       } catch (err) {
         if (cancelled) return;
@@ -151,9 +157,28 @@ export default function AdminPlanForm() {
       .filter(Boolean);
   }
 
+  const reasonRequired =
+    mode === "create" ||
+    (
+      [
+        "price",
+        "ad_limit",
+        "max_photos",
+        "priority_level",
+        "weight",
+        "billing_model",
+        "validity_days",
+        "is_active",
+        "public_visible",
+        "subscribable",
+        "is_featured_enabled",
+        "has_store_profile",
+      ] as const
+    ).some((key) => JSON.stringify(draft[key]) !== JSON.stringify(initialDraft.current?.[key]));
+
   async function handleSubmit() {
     if (busy) return;
-    if (!reason.trim()) {
+    if (reasonRequired && !reason.trim()) {
       setFlash({ kind: "error", text: "Motivo é obrigatório." });
       return;
     }
@@ -172,7 +197,7 @@ export default function AdminPlanForm() {
           billing_model: draft.billing_model,
           validity_days: draft.validity_days,
           max_photos: draft.max_photos,
-          monthly_highlight_credits: draft.monthly_highlight_credits,
+          monthly_highlight_credits: 0,
           description: draft.description,
           benefits,
           sort_order: draft.sort_order,
@@ -180,13 +205,14 @@ export default function AdminPlanForm() {
           is_featured_enabled: draft.is_featured_enabled,
           has_store_profile: draft.has_store_profile,
           recommended: draft.recommended,
-          video_360_enabled: draft.video_360_enabled,
+          video_360_enabled: false,
           public_visible: draft.public_visible,
+          subscribable: draft.subscribable,
         };
         await adminApi.plans.create(payload, reason.trim());
         router.push("/admin/comercial");
       } else {
-        const patch: PlanPatchPayload = {
+        const values: PlanPatchPayload = {
           name: draft.name,
           type: draft.type,
           price: draft.price,
@@ -196,7 +222,6 @@ export default function AdminPlanForm() {
           billing_model: draft.billing_model,
           validity_days: draft.validity_days,
           max_photos: draft.max_photos,
-          monthly_highlight_credits: draft.monthly_highlight_credits,
           description: draft.description,
           benefits,
           sort_order: draft.sort_order,
@@ -204,11 +229,30 @@ export default function AdminPlanForm() {
           is_featured_enabled: draft.is_featured_enabled,
           has_store_profile: draft.has_store_profile,
           recommended: draft.recommended,
-          video_360_enabled: draft.video_360_enabled,
           public_visible: draft.public_visible,
+          subscribable: draft.subscribable,
         };
+        const patch = Object.fromEntries(
+          Object.entries(values).filter(
+            ([key, value]) =>
+              JSON.stringify(value) !==
+              JSON.stringify(
+                key === "benefits"
+                  ? parseBenefits(initialDraft.current?.benefitsText ?? "")
+                  : initialDraft.current?.[key as keyof Draft]
+              )
+          )
+        ) as PlanPatchPayload;
+        if (!Object.keys(patch).length) {
+          setFlash({ kind: "success", text: "Nenhuma alteração para salvar." });
+          return;
+        }
         await adminApi.plans.update(id, patch, reason.trim());
-        setFlash({ kind: "success", text: "Plano atualizado." });
+        const saved = await adminApi.plans.get(id);
+        const savedDraft = planToDraft(saved.data);
+        initialDraft.current = savedDraft;
+        setDraft(savedDraft);
+        setFlash({ kind: "success", text: "Plano atualizado e confirmado no servidor." });
         setReason("");
       }
     } catch (err) {
@@ -316,6 +360,10 @@ export default function AdminPlanForm() {
 
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-4">
         <h2 className="text-sm font-bold text-cnc-text">Preço e limites</h2>
+        <p className="text-xs text-cnc-muted">
+          Somente fotografias convencionais; vídeo 360 e créditos mensais de destaque não são
+          oferecidos.
+        </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="Preço (R$)">
             <input
@@ -327,7 +375,7 @@ export default function AdminPlanForm() {
               className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
             />
           </Field>
-          <Field label="Limite de anúncios" hint="0 = sem limite explícito">
+          <Field label="Limite de anúncios" hint="Pro utiliza trava técnica; zero impede publicar.">
             <input
               type="number"
               min={0}
@@ -359,16 +407,6 @@ export default function AdminPlanForm() {
               className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
             />
           </Field>
-          <Field label="Créditos mensais de destaque" hint="0..100">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={draft.monthly_highlight_credits}
-              onChange={(e) => set("monthly_highlight_credits", Number(e.target.value))}
-              className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
-            />
-          </Field>
           <Field label="Sort order" hint="Menor primeiro na UI">
             <input
               type="number"
@@ -385,10 +423,7 @@ export default function AdminPlanForm() {
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-4">
         <h2 className="text-sm font-bold text-cnc-text">Ranking e exposição</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Field
-            label="Priority level (0..200)"
-            hint={`Camada comercial efetiva: ${commercialLayerLabel(draft.priority_level)}`}
-          >
+          <Field label="Priority level (0..200)" hint="Desempate fino dentro da camada">
             <input
               type="number"
               min={0}
@@ -398,11 +433,15 @@ export default function AdminPlanForm() {
               className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
             />
           </Field>
-          <Field label="Weight (1..10)" hint="Peso do produto (UI/comprador)">
+          <Field
+            label={`Peso comercial — ${commercialLayerLabel(draft.weight)}`}
+            hint="Grátis 1 · Start 2 · Pro 3 · Destaque reservado 4"
+          >
             <input
               type="number"
-              min={1}
-              max={10}
+              min={0.01}
+              max={3.99}
+              step={0.01}
               value={draft.weight}
               onChange={(e) => set("weight", Number(e.target.value))}
               className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
@@ -411,10 +450,8 @@ export default function AdminPlanForm() {
         </div>
 
         <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
-          ⚠️ <strong>priority_level</strong> é o que o ranking público usa em runtime (
-          <code>commercialLayerExpr</code>): &gt;=80 vira camada 3 (Pro), &gt;=50 vira camada 2
-          (Start), abaixo disso é camada 1. Mudar este valor move o plano de camada
-          imediatamente em todas as buscas.
+          A camada principal das listagens utiliza o <strong>peso comercial</strong>. A prioridade é
+          apenas um desempate dentro da camada. Peso 4 é exclusivo do Destaque.
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -440,9 +477,9 @@ export default function AdminPlanForm() {
             onChange={(v) => set("recommended", v)}
           />
           <Toggle
-            label="Vídeo 360"
-            value={draft.video_360_enabled}
-            onChange={(v) => set("video_360_enabled", v)}
+            label="Pode ser assinado"
+            value={draft.subscribable}
+            onChange={(v) => set("subscribable", v)}
           />
         </div>
       </section>
@@ -452,7 +489,11 @@ export default function AdminPlanForm() {
         <textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Motivo (obrigatório — registrado em admin_actions)"
+          placeholder={
+            reasonRequired
+              ? "Motivo obrigatório para alterações comerciais"
+              : "Motivo opcional para alterações de texto"
+          }
           rows={3}
           maxLength={500}
           className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
@@ -469,7 +510,7 @@ export default function AdminPlanForm() {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={busy || !reason.trim() || !draft.id || !draft.name}
+            disabled={busy || (reasonRequired && !reason.trim()) || !draft.id || !draft.name}
             className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary-strong disabled:opacity-50"
           >
             {busy ? "Salvando…" : mode === "create" ? "Criar plano" : "Salvar"}

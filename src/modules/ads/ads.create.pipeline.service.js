@@ -1,5 +1,7 @@
 import { slugify } from "../../shared/utils/slugify.js";
 import { ensurePublishEligibility } from "./ads.publish.eligibility.service.js";
+import { resolveCurrentPlan } from "../account/account.service.js";
+import { assertPhotoAllowance } from "./ads.photo-allowance.js";
 import { executeAdInsert, prepareAdInsertPayload } from "./ads.persistence.service.js";
 import { validateCreateAdPayload } from "./ads.validators.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
@@ -71,6 +73,11 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
       requestId,
     });
     advertiserId = advertiser.id;
+
+    // A capacidade estrutural de upload não substitui o limite comercial.
+    // Revalidar no servidor impede contornar o wizard por chamadas diretas.
+    const currentPlan = await resolveCurrentPlan(account);
+    assertPhotoAllowance(validated.images, currentPlan?.max_photos ?? 8);
 
     // ──────────────────────────────────────────────────────────────────
     // FIPE — snapshot SERVER-SIDE.

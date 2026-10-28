@@ -343,11 +343,12 @@ export default function NewAdWizardClient({ initialType }: Props) {
   }, [step, dashboardReload, router, pathname, searchParams]);
 
   const boostOptions = dashboard?.boost_options ?? [];
+  const maxPhotos = dashboard?.current_plan?.max_photos ?? 8;
 
   const title = useMemo(() => buildTitle(form), [form]);
 
   async function handleAddPhotos(files: File[]) {
-    const maxNew = 10 - form.draftPhotoUrls.length - uploadingPreviews.length;
+    const maxNew = maxPhotos - form.draftPhotoUrls.length - uploadingPreviews.length;
     const toUpload = files.filter((f) => f.type.startsWith("image/")).slice(0, Math.max(0, maxNew));
     if (!toUpload.length) return;
 
@@ -788,6 +789,7 @@ export default function NewAdWizardClient({ initialType }: Props) {
       {step === 1 ? <StepListingInfo state={form} patch={patch} /> : null}
       {step === 2 ? (
         <StepPhotos
+          maxPhotos={maxPhotos}
           uploadedUrls={form.draftPhotoUrls}
           uploadingPreviews={uploadingPreviews}
           uploading={photoUploading}

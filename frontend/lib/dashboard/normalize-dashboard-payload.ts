@@ -81,6 +81,7 @@ function normalizePlan(raw: unknown): DashboardPlanSummary | null {
     id,
     name,
     ad_limit: toNum(raw.ad_limit, 0),
+    max_photos: toNum(raw.max_photos, 8),
     billing_model,
   };
 }
@@ -195,9 +196,7 @@ function normalizeModeration(raw: unknown): DashboardAd["moderation"] {
   return {
     rejection_reason: typeof raw.rejection_reason === "string" ? raw.rejection_reason : null,
     correction_requested_reason:
-      typeof raw.correction_requested_reason === "string"
-        ? raw.correction_requested_reason
-        : null,
+      typeof raw.correction_requested_reason === "string" ? raw.correction_requested_reason : null,
     blocked_reason_code:
       typeof raw.blocked_reason_code === "string" ? raw.blocked_reason_code : null,
     blocked_at: typeof raw.blocked_at === "string" ? raw.blocked_at : null,

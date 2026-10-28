@@ -12,6 +12,11 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// O guard de fotos consulta o usuário autenticado e seu plano antes de editar.
+vi.mock("../../src/modules/account/account.user.read.js", () => ({
+  getAccountUser: vi.fn(async (id) => ({ id, type: "CPF", raw_plan: "free" })),
+}));
+
 vi.mock("../../src/modules/ads/ads.repository.js", () => ({
   findOwnerContextById: vi.fn(),
   findById: vi.fn(),

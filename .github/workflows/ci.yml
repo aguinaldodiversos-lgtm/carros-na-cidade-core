@@ -234,6 +234,31 @@ jobs:
         env:
           CI: "true"
 
+      - name: Run E2E commercial plans and publication selection
+        run: |
+          # Banco já migrado e semeado nos passos anteriores.
+          # A API real só fica ativa durante esta suíte; nenhum serviço de
+          # produção ou pagamento externo é utilizado.
+          RUN_MIGRATIONS=false RUN_WORKERS=false PORT=4000 node ../src/index.js > /tmp/cnc-commercial-api.log 2>&1 &
+          API_PID=$!
+          trap 'kill "$API_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 45); do
+            if curl --silent --fail http://127.0.0.1:4000/api/public/commercial/boost >/dev/null; then break; fi
+            if ! kill -0 "$API_PID" 2>/dev/null; then
+              cat /tmp/cnc-commercial-api.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if ! curl --silent --fail http://127.0.0.1:4000/api/public/commercial/boost >/dev/null; then
+            cat /tmp/cnc-commercial-api.log
+            echo "API Express de E2E indisponível."
+            exit 1
+          fi
+          npx playwright test e2e/commercial-plans.spec.ts --project=chromium
+        env:
+          CI: "true"
+
       - name: Run SEO regression checks (canonicals, LGPD and blog claims)
         run: npx playwright test e2e/seo-audit-regressions.spec.ts --project=chromium
         env:

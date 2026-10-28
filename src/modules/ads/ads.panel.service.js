@@ -5,7 +5,9 @@ import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flo
 import * as dbModule from "../../infrastructure/database/db.js";
 import { removeVehicleImages } from "../../infrastructure/storage/r2.service.js";
 import { AD_STATUS } from "./ads.canonical.constants.js";
-import { assertAdOwner, assertCanEditAd } from "./ad-ownership.js";
+import { assertAdOwner, assertCanEditAd, isAdminUser } from "./ad-ownership.js";
+import { getAccountUser, resolveCurrentPlan } from "../account/account.service.js";
+import { assertPhotoAllowance } from "./ads.photo-allowance.js";
 import { recordModerationEvent } from "./risk/ad-risk.repository.js";
 import { MODERATION_EVENT } from "./risk/ad-risk.thresholds.js";
 
@@ -240,6 +242,16 @@ export async function updateAd(id, data, user, ctx = {}) {
     //   - terceiro: 403; inexistente/sem dono: 404
     //   - status sold/expired/archived/blocked/deleted: 409 (não editável)
     assertCanEditAd(user, ownerContext);
+
+    // O limite de fotos também vale ao editar. Um PATCH que não muda
+    // as fotos continua permitido (inclusive para anúncios antigos).
+    // Admin mantém sua autorização especial para correções de moderação.
+    if (Array.isArray(data?.images) && !isAdminUser(user)) {
+      stage = "validatePhotoAllowance";
+      const account = await getAccountUser(user.id);
+      const currentPlan = await resolveCurrentPlan(account);
+      assertPhotoAllowance(data.images, currentPlan?.max_photos ?? 8);
+    }
 
     if (attemptedStructural.length > 0) {
       const protectedStatuses = [

@@ -128,10 +128,20 @@ export default function PagamentoSucessoPage() {
               {planLabel ? `Plano ativo: ${planLabel}. ` : "Identificamos um plano ativo. "}
               Isso não confirma a aprovação desta compra. Consulte o comprovante no Mercado Pago.
             </p>
-            <div className="mt-5 flex justify-center gap-3">
+            <p className="mt-3 text-xs text-[#53607b]">
+              Se você começou a cadastrar um veículo antes de contratar, pode retomar o rascunho
+              salvo neste mesmo navegador e concluir a publicação.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <Link
+                href="/anunciar/novo?step=5"
+                className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white"
+              >
+                Retomar meu anúncio
+              </Link>
               <Link
                 href="/planos"
-                className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white"
+                className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]"
               >
                 Voltar para planos
               </Link>

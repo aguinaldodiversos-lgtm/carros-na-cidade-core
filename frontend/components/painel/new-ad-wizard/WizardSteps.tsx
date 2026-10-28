@@ -553,6 +553,7 @@ export function StepListingInfo({ state, patch }: { state: WizardFormState; patc
 }
 
 type PhotoProps = {
+  maxPhotos: number;
   uploadedUrls: string[];
   uploadingPreviews: string[];
   uploading: boolean;
@@ -563,6 +564,7 @@ type PhotoProps = {
 };
 
 export function StepPhotos({
+  maxPhotos,
   uploadedUrls,
   uploadingPreviews,
   uploading,
@@ -574,7 +576,7 @@ export function StepPhotos({
   const [dragOver, setDragOver] = useState(false);
 
   const totalCount = uploadedUrls.length + uploadingPreviews.length;
-  const canAdd = totalCount < 10;
+  const canAdd = totalCount < maxPhotos;
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -611,8 +613,8 @@ export function StepPhotos({
           </span>
           <span className="mt-2 max-w-md text-sm text-[#6E748A]">
             {uploadedUrls.length > 0
-              ? `${uploadedUrls.length}/10 fotos adicionadas. Adicione mais ou continue.`
-              : "Até 10 imagens. Formatos JPG, PNG ou WebP."}
+              ? `${uploadedUrls.length}/${maxPhotos} fotos adicionadas. Adicione mais ou continue.`
+              : `Até ${maxPhotos} imagens. Formatos JPG, PNG ou WebP.`}
           </span>
           {uploading ? (
             <span className="mt-3 inline-block h-5 w-5 animate-spin rounded-full border-2 border-[#2F67F6] border-t-transparent" />
@@ -639,7 +641,7 @@ export function StepPhotos({
       ) : (
         <div className="rounded-[24px] border border-[#DCE6F7] bg-[#F2F7FF] px-6 py-6 text-center">
           <span className="text-sm font-bold text-[#2F67F6]">
-            Limite de 10 fotos atingido. Remova uma foto para adicionar outra.
+            Limite de {maxPhotos} fotos atingido. Remova uma foto para adicionar outra.
           </span>
         </div>
       )}

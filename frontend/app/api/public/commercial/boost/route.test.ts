@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+const request = (verified = false) =>
+  new NextRequest(`http://localhost/api/public/commercial/boost${verified ? "?verified=1" : ""}`);
 
 /**
  * BFF público GET /api/public/commercial/boost.
@@ -41,7 +44,7 @@ describe("BFF /api/public/commercial/boost", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const { GET } = await import("./route");
-    const res = await GET();
+    const res = await GET(request());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.boost).toMatchObject({
@@ -63,13 +66,20 @@ describe("BFF /api/public/commercial/boost", () => {
         ok: true,
         status: 200,
         json: async () => ({
-          boost: { id: "boost-7d", price_cents: 4990, duration_days: 14, active: true },
+          boost: {
+            id: "boost-7d",
+            name: "Destaque",
+            description: "Topo do catálogo",
+            price_cents: 4990,
+            duration_days: 14,
+            active: true,
+          },
         }),
       } as Response)
     );
 
     const { GET } = await import("./route");
-    const body = await (await GET()).json();
+    const body = await (await GET(request())).json();
     expect(body.boost.price_cents).toBe(4990);
     expect(body.boost.duration_days).toBe(14);
   });
@@ -84,7 +94,7 @@ describe("BFF /api/public/commercial/boost", () => {
     );
 
     const { GET } = await import("./route");
-    const res = await GET();
+    const res = await GET(request());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.boost.id).toBe("boost-7d");
@@ -99,10 +109,47 @@ describe("BFF /api/public/commercial/boost", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const { GET } = await import("./route");
-    const res = await GET();
+    const res = await GET(request());
     expect(res.status).toBe(200);
     expect(fetchSpy).not.toHaveBeenCalled();
     const body = await res.json();
     expect(body.boost.id).toBe("boost-7d");
+  });
+  it("modo verificado retorna 503 sem preço de fallback quando o backend falha", async () => {
+    vi.doMock("@/lib/env/backend-api", () => ({
+      resolveInternalBackendApiUrl: () => "http://backend.local/api/public/commercial/boost",
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 } as Response));
+    const { GET } = await import("./route");
+    const res = await GET(request(true));
+    expect(res.status).toBe(503);
+    expect((await res.json()).boost).toBeUndefined();
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("modo verificado retorna valor vigente quando a API confirma os dados", async () => {
+    vi.doMock("@/lib/env/backend-api", () => ({
+      resolveInternalBackendApiUrl: () => "http://backend.local/api/public/commercial/boost",
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          boost: {
+            id: "boost-7d",
+            name: "Destaque 7 dias",
+            description: "Destaque",
+            price_cents: 4590,
+            duration_days: 7,
+            active: true,
+          },
+        }),
+      } as Response)
+    );
+    const { GET } = await import("./route");
+    const res = await GET(request(true));
+    expect(res.status).toBe(200);
+    expect((await res.json()).boost.price_cents).toBe(4590);
   });
 });

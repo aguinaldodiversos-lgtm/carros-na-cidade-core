@@ -685,6 +685,7 @@ export type PlanRow = {
   monthly_highlight_credits: number;
   sort_order: number;
   public_visible: boolean;
+  subscribable: boolean;
   created_at: string;
   updated_at: string;
   active_subscriptions: number;
@@ -711,6 +712,7 @@ export type PlanCreatePayload = {
   recommended?: boolean;
   video_360_enabled?: boolean;
   public_visible?: boolean;
+  subscribable?: boolean;
 };
 
 export type PlanPatchPayload = Partial<PlanCreatePayload>;

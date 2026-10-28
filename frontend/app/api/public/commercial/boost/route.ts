@@ -15,40 +15,44 @@
  * fallback centralizado (PUBLIC_BOOST_FALLBACK) — nunca 404/5xx para o card
  * público de /planos.
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
-import { PUBLIC_BOOST_FALLBACK } from "@/lib/commercial/public-boost";
+import { PUBLIC_BOOST_FALLBACK, isValidPublicBoost } from "@/lib/commercial/public-boost";
 
-export const revalidate = 900;
+export const revalidate = 60;
 
-const CACHE_HEADER = "public, s-maxage=900, stale-while-revalidate=86400";
+const CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=60";
 
 function boostResponse(boost: unknown) {
-  return NextResponse.json(
-    { boost },
-    { status: 200, headers: { "Cache-Control": CACHE_HEADER } }
-  );
+  return NextResponse.json({ boost }, { status: 200, headers: { "Cache-Control": CACHE_HEADER } });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const verified = request.nextUrl.searchParams.get("verified") === "1";
+  const fail = () =>
+    verified
+      ? NextResponse.json(
+          { error: "Destaque temporariamente indisponível." },
+          { status: 503, headers: { "Cache-Control": "no-store" } }
+        )
+      : boostResponse(PUBLIC_BOOST_FALLBACK);
   try {
     const backendUrl = resolveInternalBackendApiUrl("/api/public/commercial/boost");
-    if (!backendUrl) return boostResponse(PUBLIC_BOOST_FALLBACK);
+    if (!backendUrl) return fail();
 
     const response = await fetch(backendUrl, {
       method: "GET",
       headers: { Accept: "application/json" },
-      next: { revalidate: 900 },
+      next: { revalidate: 60 },
     });
-    if (!response.ok) return boostResponse(PUBLIC_BOOST_FALLBACK);
+    if (!response.ok) return fail();
 
     const body = (await response.json().catch(() => null)) as { boost?: unknown } | null;
-    if (!body || typeof body !== "object" || !body.boost) {
-      return boostResponse(PUBLIC_BOOST_FALLBACK);
-    }
-
-    return boostResponse(body.boost);
+    if (!isValidPublicBoost(body?.boost)) return fail();
+    return verified
+      ? NextResponse.json({ boost: body.boost }, { headers: { "Cache-Control": "no-store" } })
+      : boostResponse(body.boost);
   } catch {
-    return boostResponse(PUBLIC_BOOST_FALLBACK);
+    return fail();
   }
 }

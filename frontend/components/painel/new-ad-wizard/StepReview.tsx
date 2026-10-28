@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { DashboardPayload, BoostOption } from "@/lib/dashboard-types";
 import type { SubscriptionPlan } from "@/lib/plans/plan-store";
 import { fetchPlansFromAPI } from "@/lib/plans/plan-service";
 import { computeAdQuality } from "@/lib/painel/ad-quality";
 import {
   buildMonetizationCards,
-  COMPARISON_ROWS,
   TRUST_ITEMS,
   type MonetizationCard,
   type MonetizationKey,
@@ -292,7 +292,7 @@ function PlanCard({
           onSelect();
         }
       }}
-      className={`relative flex cursor-pointer flex-col rounded-2xl border bg-white p-5 text-left shadow-card outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary/50 ${style.ring}`}
+      className={`relative flex cursor-pointer flex-col rounded-[22px] border bg-white p-5 text-left shadow-[0_8px_24px_rgba(15,23,42,0.05)] outline-none transition hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary/50 ${style.ring}`}
     >
       {card.badge ? (
         <span
@@ -332,18 +332,10 @@ function PlanCard({
         ))}
       </ul>
 
-      {card.cautions?.length ? (
-        <ul className="mt-3 space-y-1 border-t border-cnc-line/70 pt-3 text-[11px] text-cnc-muted">
-          {card.cautions.map((c) => (
-            <li key={c} className="flex items-start gap-2">
-              <span
-                aria-hidden
-                className="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-cnc-muted"
-              />
-              <span>{c}</span>
-            </li>
-          ))}
-        </ul>
+      {card.note ? (
+        <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-cnc-muted">
+          {card.note}
+        </p>
       ) : null}
 
       <button
@@ -366,7 +358,6 @@ export default function StepReview({
   patch,
   dashboard,
   dashboardError,
-  boostOptions,
   submitState,
   submitMessage,
   subscribeState,
@@ -377,19 +368,72 @@ export default function StepReview({
   onSubscribe,
 }: Props) {
   const [plans, setPlans] = useState<SubscriptionPlan[] | null>(null);
+  const [catalogError, setCatalogError] = useState(false);
+  const [publicBoost, setPublicBoost] = useState<{ checked: boolean; option: BoostOption | null }>({
+    checked: false,
+    option: null,
+  });
   const [selected, setSelected] = useState<MonetizationKey>("free");
   const [termsError, setTermsError] = useState(false);
 
-  // Refina preços com dados reais; cards já renderizam com os valores oficiais
-  // de fallback antes do fetch resolver (sem flash / sem dependência de rede).
+  // Mesma fonte de /planos; nunca apresentar preço pago presumido.
   useEffect(() => {
     let active = true;
-    fetchPlansFromAPI({ activeOnly: true })
+    fetchPlansFromAPI({ activeOnly: true, fallbackOnError: false })
       .then((rows) => {
-        if (active) setPlans(rows);
+        if (active) {
+          setPlans(rows);
+          setCatalogError(false);
+        }
       })
       .catch(() => {
-        /* mantém fallback centralizado */
+        if (active) {
+          setPlans(null);
+          setCatalogError(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Preço/duração/ativação do Destaque: mesma API pública usada em /planos.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/public/commercial/boost?verified=1", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Destaque indisponível");
+        const payload = (await res.json()) as {
+          boost?: {
+            id?: string;
+            name?: string;
+            price_cents?: number;
+            duration_days?: number;
+            active?: boolean;
+          };
+        };
+        const boost = payload.boost;
+        if (
+          !boost ||
+          !boost.active ||
+          boost.duration_days !== 7 ||
+          !Number.isFinite(boost.price_cents) ||
+          Number(boost.price_cents) <= 0
+        )
+          return null;
+        return {
+          id: boost.id || "boost-7d",
+          days: boost.duration_days,
+          price: Number(boost.price_cents) / 100,
+          label: boost.name || "Destaque 7 dias",
+          description: "",
+        } satisfies BoostOption;
+      })
+      .then((option) => {
+        if (active) setPublicBoost({ checked: true, option });
+      })
+      .catch(() => {
+        if (active) setPublicBoost({ checked: true, option: null });
       });
     return () => {
       active = false;
@@ -397,13 +441,17 @@ export default function StepReview({
   }, []);
 
   const boostOption = useMemo(
-    () => boostOptions.find((b) => b.days === 7) ?? boostOptions[0] ?? null,
-    [boostOptions]
+    () => (publicBoost.checked ? publicBoost.option : null),
+    [publicBoost]
   );
-
   const cards = useMemo(
-    () => buildMonetizationCards({ plans: plans ?? undefined, boostOption }),
-    [plans, boostOption]
+    () =>
+      buildMonetizationCards({
+        plans: plans ?? undefined,
+        boostOption,
+        accountType: dashboard?.user?.type,
+      }),
+    [plans, boostOption, dashboard?.user?.type]
   );
   const selectedCard = cards.find((c) => c.key === selected) ?? cards[cards.length - 1];
 
@@ -681,9 +729,31 @@ export default function StepReview({
         >
           Aumente suas chances de vender
         </h2>
-        <p className="mt-1 text-sm text-cnc-muted">
-          Escolha a melhor opção para destacar seu anúncio e vender mais rápido.
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-cnc-muted">
+            Compare os planos e escolha como publicar. Sem comissão sobre a venda.
+          </p>
+          <Link
+            href="/planos"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-bold text-primary hover:underline"
+          >
+            Ver detalhes de todos os planos ↗
+          </Link>
+        </div>
+        <p className="mt-2 text-xs text-cnc-muted">
+          Se você já tem um plano ativo, publicar sem destaque mantém os benefícios da assinatura.
         </p>
+        {catalogError ? (
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            Não foi possível confirmar os planos pagos. Você pode publicar sem destaque; tente
+            novamente para contratar um plano.
+          </div>
+        ) : null}
 
         <div
           role="radiogroup"
@@ -700,64 +770,22 @@ export default function StepReview({
           ))}
         </div>
 
+        {selectedCard.action === "subscribe" ? (
+          <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-xs leading-5 text-slate-600">
+            A assinatura não publica este anúncio automaticamente. Seu rascunho fica salvo neste
+            navegador; após a ativação do plano, retorne para concluir a publicação.
+          </p>
+        ) : selectedCard.action === "publish-boost" ? (
+          <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs leading-5 text-slate-600">
+            O anúncio será enviado primeiro. A compra do Destaque acontece na etapa seguinte.
+          </p>
+        ) : null}
+
         {subscribeMessage ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {subscribeMessage}
           </p>
         ) : null}
-      </section>
-
-      {/* Comparativo */}
-      <section className="overflow-hidden rounded-2xl border border-cnc-line bg-white shadow-card">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-cnc-bg/60 text-left">
-                <th className="w-44 px-5 py-3 text-xs font-bold uppercase tracking-wide text-cnc-muted">
-                  Compare as opções
-                </th>
-                {cards.map((c) => (
-                  <th
-                    key={c.key}
-                    className="px-3 py-3 text-[13px] font-extrabold text-cnc-text-strong"
-                  >
-                    {c.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {COMPARISON_ROWS.map((row) => (
-                <tr key={row.label} className="border-t border-cnc-line/70">
-                  <th className="px-5 py-2.5 text-left text-[13px] font-semibold text-cnc-muted">
-                    {row.label}
-                  </th>
-                  {cards.map((c) => {
-                    const v = row.values[c.key];
-                    const positive = v === "Sim";
-                    const negative = v === "Não";
-                    return (
-                      <td
-                        key={c.key}
-                        className="px-3 py-2.5 align-middle text-[13px] text-cnc-text"
-                      >
-                        {positive ? (
-                          <Check className="h-4 w-4 text-cnc-success" />
-                        ) : negative ? (
-                          <span aria-hidden className="text-cnc-muted-soft">
-                            —
-                          </span>
-                        ) : (
-                          v
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
 
       {/* Confiança — tira horizontal única, células separadas por hairline (spec §14) */}

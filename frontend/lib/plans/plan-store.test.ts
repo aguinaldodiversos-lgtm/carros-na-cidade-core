@@ -14,8 +14,8 @@ import { getPlans, getPlanById } from "./plan-store";
  *
  *   Grátis CPF       — 3 ads,  8 fotos, peso 1, sem vídeo, 0 destaques/mês
  *   Grátis CNPJ      — 10 ads, 8 fotos, peso 1, sem vídeo, 0 destaques/mês
- *   Start CNPJ       — 20 ads, 12 fotos, peso 2, sem vídeo, 1 destaque/mês — R$ 79,90/mês
- *   Pro CNPJ         — ilimitado (trava 1000), 15 fotos, peso 3, vídeo 360, 3 destaques/mês — R$ 149,90/mês
+ *   Start CNPJ       — 20 ads, 12 fotos, peso 2, sem vídeo e sem créditos mensais — R$ 79,90/mês
+ *   Pro CNPJ         — ilimitado (trava 1000), 15 fotos, peso 3, sem vídeo e sem créditos mensais — R$ 149,90/mês
  *   Destaque 7 dias  — peso 4 enquanto ativo, R$ 39,90 (boost avulso, fora do plan-store)
  *
  * Planos descontinuados (CPF Premium Highlight, Evento Premium): não aparecem
@@ -73,11 +73,11 @@ describe("plan-store fallback — alinhamento à oferta oficial de lançamento",
       expect(plan.ad_limit).toBe(20);
     });
 
-    it("12 fotos, peso 2, sem vídeo 360, 1 destaque mensal incluído", () => {
+    it("12 fotos, peso 2, sem vídeo 360 ou créditos não implementados", () => {
       expect(plan.max_photos).toBe(12);
       expect(plan.weight).toBe(2);
       expect(plan.video_360_enabled).toBe(false);
-      expect(plan.monthly_highlight_credits).toBe(1);
+      expect(plan.monthly_highlight_credits).toBe(0);
     });
   });
 
@@ -95,11 +95,11 @@ describe("plan-store fallback — alinhamento à oferta oficial de lançamento",
       expect(plan.ad_limit).toBeGreaterThanOrEqual(1000);
     });
 
-    it("15 fotos, peso 3, vídeo 360 habilitado, 3 destaques mensais inclusos", () => {
+    it("15 fotos, peso 3, sem vídeo 360 ou créditos mensais", () => {
       expect(plan.max_photos).toBe(15);
       expect(plan.weight).toBe(3);
-      expect(plan.video_360_enabled).toBe(true);
-      expect(plan.monthly_highlight_credits).toBe(3);
+      expect(plan.video_360_enabled).toBe(false);
+      expect(plan.monthly_highlight_credits).toBe(0);
     });
 
     it("é o plano recomendado para CNPJ", () => {
