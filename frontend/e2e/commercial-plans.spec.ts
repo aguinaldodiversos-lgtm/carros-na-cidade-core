@@ -101,9 +101,8 @@ test("vitrine /planos usa preços, fotos e hierarquia do catálogo real", async 
   await expect(free).toContainText(
     `${Math.min(cpf.max_photos, cnpj.max_photos)} fotos por anúncio`
   );
-  expect(normalized((await page.locator("[data-plan-id]").allTextContents()).join(" "))).not.toMatch(
-    /v[ií]deo 360|cr[eé]ditos mensais de destaque/i
-  );
+  const cardCopy = (await page.locator("[data-plan-id]").allTextContents()).join(" ");
+  expect(normalized(cardCopy)).not.toMatch(/v[ií]deo 360|cr[eé]ditos mensais de destaque/i);
 });
 
 test("a etapa final CNPJ apresenta os mesmos valores e preserva o anúncio", async ({
