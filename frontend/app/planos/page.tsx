@@ -242,7 +242,7 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
           ♛
         </div>
       ) : null}
-      <header className={["min-h-[125px]", plan.style === "accent" ? "pr-14" : ""].join(" ")}>
+      <header className={plan.style === "accent" ? "min-h-[125px] pr-14" : "min-h-[125px]"}>
         <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
         <p className="mt-3 text-[13px] leading-6 text-slate-500">{plan.intro}</p>
       </header>
