@@ -310,6 +310,10 @@ function mapPlanRow(row) {
     description: String(row.description || ""),
     benefits: safeJsonArray(row.benefits),
     recommended: Boolean(row.recommended),
+    max_photos: toNumber(row.max_photos, 8),
+    weight: toNumber(row.weight, 1),
+    sort_order: toNumber(row.sort_order, 50),
+    public_visible: Boolean(row.public_visible),
     // Elegibilidade data-driven ao checkout de assinatura (migration 040).
     subscribable: Boolean(row.subscribable),
   };
@@ -427,6 +431,10 @@ async function queryPlansFromDatabase() {
         description,
         benefits,
         recommended,
+        max_photos,
+        weight,
+        sort_order,
+        public_visible,
         subscribable
       FROM subscription_plans
       ORDER BY priority_level ASC, price ASC, name ASC
@@ -596,7 +604,7 @@ export async function countNonDeletedAdsForUser(userId) {
   }
 }
 
-export async function listPlans({ type, onlyActive = true } = {}) {
+export async function listPlans({ type, onlyActive = true, publicOnly = false } = {}) {
   const plans = await queryPlansFromDatabase();
 
   // Filtro de produto Evento (dormente) — quando EVENTS_PUBLIC_ENABLED
@@ -609,6 +617,7 @@ export async function listPlans({ type, onlyActive = true } = {}) {
   return plans
     .filter((plan) => (type ? plan.type === normalizeAccountType(type) : true))
     .filter((plan) => (onlyActive ? plan.is_active : true))
+    .filter((plan) => (publicOnly ? plan.public_visible !== false : true))
     .filter((plan) => (eventsPublic ? true : !isEventPlanId(plan.id)));
 }
 
@@ -653,7 +662,7 @@ export async function resolveCurrentPlan(user) {
 
 function getFreeLimit(accountType, cnpjVerified) {
   if (accountType === "pending" || accountType === "CPF") return 3;
-  return cnpjVerified ? 20 : 0;
+  return cnpjVerified ? 10 : 0;
 }
 
 function primaryImageUrlFromAdRow(row) {
@@ -1050,6 +1059,7 @@ export async function getDashboardPayload(userId, options = {}) {
             id: currentPlan.id,
             name: currentPlan.name,
             ad_limit: currentPlan.ad_limit,
+            max_photos: currentPlan.max_photos,
             billing_model: currentPlan.billing_model,
           }
         : null,
@@ -1058,6 +1068,7 @@ export async function getDashboardPayload(userId, options = {}) {
             id: currentPlan.id,
             name: currentPlan.name,
             ad_limit: currentPlan.ad_limit,
+            max_photos: currentPlan.max_photos,
             billing_model: currentPlan.billing_model,
           }
         : null,
