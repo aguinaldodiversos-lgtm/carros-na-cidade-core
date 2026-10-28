@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import {
+  calculateFinancingAmounts,
+  calculateMonthlyPayment,
+  DEFAULT_MONTHLY_RATE,
+  FINANCING_PROVISION_PCT,
+} from "@/lib/financing/financing-calculator";
 
 /**
  * FinancingSimulator — núcleo interativo do simulador de financiamento,
@@ -11,9 +17,8 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
  * órfãos) — ou seja, o usuário via parcelas diferentes conforme a tela. Isso era
  * bug de produção, não dívida técnica; esta unificação elimina as três cópias.
  *
- * Taxa padrão: DEFAULT_MONTHLY_RATE = 1,29% a.m. — escolhida por ser a ÚNICA que
- * já era visível em produção (o /simulador); as outras duas viviam só em código
- * morto. Trocar para uma taxa mais realista é decisão de produto à parte.
+ * Taxa inicial: 1,80% a.m., editável. O principal inclui provisão adicional
+ * estimada de 3,373% sobre o saldo financiado (não é IOF contratual exato).
  *
  * Renderiza o card de parâmetros (Valor/Entrada/Taxa/Prazo) + a tabela de
  * parcelas 12/24/36/48/60x. `valueEditable=false` fixa o valor do veículo (preço
@@ -30,8 +35,7 @@ const DOWN_MIN = 0;
 const RATE_MIN = 0.5;
 const RATE_MAX = 3.5;
 
-/** Taxa mensal padrão (a.m.). Ver nota de unificação no topo do arquivo. */
-export const DEFAULT_MONTHLY_RATE = 1.29;
+export { DEFAULT_MONTHLY_RATE } from "@/lib/financing/financing-calculator";
 
 export type SimulationResult = {
   vehicleValue: number;
@@ -39,6 +43,9 @@ export type SimulationResult = {
   monthlyRate: number;
   term: number;
   installment: number;
+  financedBase: number;
+  additionalProvision: number;
+  financedWithProvision: number;
 };
 
 function parseMoney(value: number | string | null | undefined) {
@@ -59,14 +66,6 @@ function formatBRL(value: number, fractionDigits: number = 2) {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(value);
-}
-
-/** Parcela mensal pela fórmula de amortização (Price). Fonte única de cálculo. */
-function calculateMonthlyPayment(financedAmount: number, monthlyRatePct: number, months: number) {
-  if (financedAmount <= 0 || months <= 0) return 0;
-  const monthlyRate = monthlyRatePct / 100;
-  if (monthlyRate === 0) return financedAmount / months;
-  return (financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months));
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -213,20 +212,23 @@ export default function FinancingSimulator({
     setDownPayment((prev) => Math.min(prev, next));
   }, [valueEditable, initialVehicleValue]);
 
-  const effectiveFinanced = Math.max(vehicleValue - downPayment, 0);
+  const { financedBase, additionalProvision, financedWithProvision } = calculateFinancingAmounts(
+    vehicleValue,
+    downPayment
+  );
   const downPaymentPct = vehicleValue > 0 ? Math.round((downPayment / vehicleValue) * 100) : 0;
 
   const installmentTable = useMemo(
     () =>
       TERMS.map((term) => {
-        const monthly = calculateMonthlyPayment(effectiveFinanced, monthlyRate, term);
+        const monthly = calculateMonthlyPayment(financedWithProvision, monthlyRate, term);
         return {
           term,
           monthly,
-          total: monthly * term + downPayment,
+          total: Number((monthly * term + downPayment).toFixed(2)),
         };
       }),
-    [effectiveFinanced, monthlyRate, downPayment]
+    [financedWithProvision, monthlyRate, downPayment]
   );
 
   const selectedInstallment =
@@ -239,8 +241,21 @@ export default function FinancingSimulator({
       monthlyRate,
       term: selectedTerm,
       installment: selectedInstallment,
+      financedBase,
+      additionalProvision,
+      financedWithProvision,
     });
-  }, [onResultChange, vehicleValue, downPayment, monthlyRate, selectedTerm, selectedInstallment]);
+  }, [
+    onResultChange,
+    vehicleValue,
+    downPayment,
+    monthlyRate,
+    selectedTerm,
+    selectedInstallment,
+    financedBase,
+    additionalProvision,
+    financedWithProvision,
+  ]);
 
   return (
     <>
@@ -287,6 +302,21 @@ export default function FinancingSimulator({
             onChange={(v) => setSelectedTerm(v as TermOption)}
             options={TERMS.map((t) => ({ value: t, label: `${t} meses` }))}
           />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-cnc-line bg-cnc-bg px-3 py-2.5 text-[12px] leading-relaxed text-cnc-muted">
+          <div className="flex justify-between gap-3">
+            <span>Saldo após a entrada</span>
+            <strong className="tabular-nums text-cnc-text-strong">{formatBRL(financedBase)}</strong>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span>Provisão adicional estimada ({FINANCING_PROVISION_PCT.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}%)</span>
+            <strong className="tabular-nums text-cnc-text-strong">{formatBRL(additionalProvision)}</strong>
+          </div>
+          <div className="flex justify-between gap-3 border-t border-cnc-line pt-1 font-semibold">
+            <span>Valor usado no cálculo</span>
+            <strong className="tabular-nums text-cnc-text-strong">{formatBRL(financedWithProvision)}</strong>
+          </div>
         </div>
 
         <button
@@ -376,7 +406,7 @@ export default function FinancingSimulator({
           <span className="text-primary">
             <ShieldIcon />
           </span>
-          <span>Cálculo estimado. Valores sujeitos à análise de crédito e não incluem tarifas bancárias, tributos e demais encargos da operação.</span>
+          <span>Estimativa com provisão adicional de 3,373% sobre o saldo financiado, que não representa o IOF exato do contrato. A taxa inicial de 1,80% a.m. é editável. Parcela sujeita à análise de crédito; tarifas, seguros e outros custos do CET não estão incluídos.</span>
         </p>
       </section>
     </>
