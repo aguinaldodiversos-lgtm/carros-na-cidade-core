@@ -739,6 +739,17 @@ export default function StepReview({
           ))}
         </div>
 
+        {selectedCard.action === "subscribe" ? (
+          <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-xs leading-5 text-slate-600">
+            A assinatura não publica este anúncio automaticamente. Seu rascunho fica salvo neste navegador;
+            após a ativação do plano, retorne para concluir a publicação.
+          </p>
+        ) : selectedCard.action === "publish-boost" ? (
+          <p className="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs leading-5 text-slate-600">
+            O anúncio será enviado primeiro. A compra do Destaque acontece na etapa seguinte.
+          </p>
+        ) : null}
+
         {subscribeMessage ? (
           <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {subscribeMessage}
