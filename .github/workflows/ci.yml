@@ -234,6 +234,11 @@ jobs:
         env:
           CI: "true"
 
+      - name: Run E2E commercial plans and publication selection
+        run: npx playwright test e2e/commercial-plans.spec.ts --project=chromium
+        env:
+          CI: "true"
+
       - name: Run SEO regression checks (canonicals, LGPD and blog claims)
         run: npx playwright test e2e/seo-audit-regressions.spec.ts --project=chromium
         env:
