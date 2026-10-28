@@ -5,6 +5,8 @@ import { getPlans } from "@/lib/plans/plan-store";
 type GetPlansOptions = {
   type?: PlanType;
   activeOnly?: boolean;
+  /** Não exibir preços do catálogo local se não for possível confirmar a API. */
+  fallbackOnError?: boolean;
 };
 
 export async function fetchPlansFromAPI(options: GetPlansOptions = {}) {
@@ -26,7 +28,8 @@ export async function fetchPlansFromAPI(options: GetPlansOptions = {}) {
       type: options.type,
       activeOnly: options.activeOnly ?? true,
     })) as SubscriptionPlan[];
-  } catch {
+  } catch (error) {
+    if (options.fallbackOnError === false) throw error;
     return getPlans({ type: options.type, onlyActive: options.activeOnly ?? true });
   }
 }
