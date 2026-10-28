@@ -371,15 +371,17 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 export default async function PlanosPage() {
   const [boost, catalog] = await Promise.all([
     fetchPublicBoost(),
-    fetchPlansFromAPI({ activeOnly: true }),
+    fetchPlansFromAPI({ activeOnly: true, fallbackOnError: false }).catch(() => null),
   ]);
-  const publicPlans = catalog.filter((plan) => plan.is_active && plan.public_visible !== false);
+  const publicPlans = (catalog ?? []).filter(
+    (plan) => plan.is_active && plan.public_visible !== false
+  );
   const find = (id: string) => publicPlans.find((plan) => plan.id === id);
   const pro = find("cnpj-store-pro");
   const start = find("cnpj-store-start");
   const freeCpf = find("cpf-free-essential");
   const freeCnpj = find("cnpj-free-store");
-  const plans: PlanCardData[] = [
+  const plans: PlanCardData[] = catalog === null ? [] : [
     buildDestaqueCard(boost),
     ...(pro ? [buildSubscriptionCard(pro, "pro")] : []),
     ...(start ? [buildSubscriptionCard(start, "start")] : []),
@@ -406,6 +408,14 @@ export default async function PlanosPage() {
           ))}
         </div>
       </section>
+
+      {catalog === null ? (
+        <div role="status" className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+          Não foi possível confirmar os preços e benefícios dos planos. Para evitar
+          informações desatualizadas, a contratação está temporariamente indisponível.
+          Tente novamente em instantes.
+        </div>
+      ) : null}
 
       {/* Cards */}
       <section
