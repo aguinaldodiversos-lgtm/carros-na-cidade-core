@@ -310,12 +310,19 @@ export default function FinancingSimulator({
             <strong className="tabular-nums text-cnc-text-strong">{formatBRL(financedBase)}</strong>
           </div>
           <div className="flex justify-between gap-3">
-            <span>Provisão adicional estimada ({FINANCING_PROVISION_PCT.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}%)</span>
-            <strong className="tabular-nums text-cnc-text-strong">{formatBRL(additionalProvision)}</strong>
+            <span>
+              Provisão adicional estimada (
+              {FINANCING_PROVISION_PCT.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}%)
+            </span>
+            <strong className="tabular-nums text-cnc-text-strong">
+              {formatBRL(additionalProvision)}
+            </strong>
           </div>
           <div className="flex justify-between gap-3 border-t border-cnc-line pt-1 font-semibold">
             <span>Valor usado no cálculo</span>
-            <strong className="tabular-nums text-cnc-text-strong">{formatBRL(financedWithProvision)}</strong>
+            <strong className="tabular-nums text-cnc-text-strong">
+              {formatBRL(financedWithProvision)}
+            </strong>
           </div>
         </div>
 
@@ -406,7 +413,11 @@ export default function FinancingSimulator({
           <span className="text-primary">
             <ShieldIcon />
           </span>
-          <span>Estimativa com provisão adicional de 3,373% sobre o saldo financiado, que não representa o IOF exato do contrato. A taxa inicial de 1,80% a.m. é editável. Parcela sujeita à análise de crédito; tarifas, seguros e outros custos do CET não estão incluídos.</span>
+          <span>
+            Estimativa com provisão adicional de 3,373% sobre o saldo financiado, que não representa
+            o IOF exato do contrato. A taxa inicial de 1,80% a.m. é editável. Parcela sujeita à
+            análise de crédito; tarifas, seguros e outros custos do CET não estão incluídos.
+          </span>
         </p>
       </section>
     </>
