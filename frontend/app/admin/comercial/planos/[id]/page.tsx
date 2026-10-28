@@ -214,8 +214,9 @@ export default function AdminPlanForm() {
           subscribable: draft.subscribable,
         };
         const patch = Object.fromEntries(
-          Object.entries(values).filter(([key, value]) =>
-            JSON.stringify(value) !== JSON.stringify(initialDraft.current?.[key as keyof Draft])
+          Object.entries(values).filter(
+            ([key, value]) =>
+              JSON.stringify(value) !== JSON.stringify(initialDraft.current?.[key as keyof Draft])
           )
         ) as PlanPatchPayload;
         if (!Object.keys(patch).length) {
@@ -335,7 +336,10 @@ export default function AdminPlanForm() {
 
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-4">
         <h2 className="text-sm font-bold text-cnc-text">Preço e limites</h2>
-        <p className="text-xs text-cnc-muted">Somente fotografias convencionais; vídeo 360 e créditos mensais de destaque não são oferecidos.</p>
+        <p className="text-xs text-cnc-muted">
+          Somente fotografias convencionais; vídeo 360 e créditos mensais de destaque não são
+          oferecidos.
+        </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Field label="Preço (R$)">
             <input
@@ -395,10 +399,7 @@ export default function AdminPlanForm() {
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-4">
         <h2 className="text-sm font-bold text-cnc-text">Ranking e exposição</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Field
-            label="Priority level (0..200)"
-            hint="Desempate fino dentro da camada"
-          >
+          <Field label="Priority level (0..200)" hint="Desempate fino dentro da camada">
             <input
               type="number"
               min={0}
@@ -408,7 +409,10 @@ export default function AdminPlanForm() {
               className="w-full rounded-lg border border-cnc-line px-3 py-2 text-sm"
             />
           </Field>
-          <Field label={`Peso comercial — ${commercialLayerLabel(draft.weight)}`} hint="Grátis 1 · Start 2 · Pro 3 · Destaque reservado 4">
+          <Field
+            label={`Peso comercial — ${commercialLayerLabel(draft.weight)}`}
+            hint="Grátis 1 · Start 2 · Pro 3 · Destaque reservado 4"
+          >
             <input
               type="number"
               min={0.01}
@@ -422,8 +426,8 @@ export default function AdminPlanForm() {
         </div>
 
         <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] text-amber-800">
-          A camada principal das listagens utiliza o <strong>peso comercial</strong>.
-          A prioridade é apenas um desempate dentro da camada. Peso 4 é exclusivo do Destaque.
+          A camada principal das listagens utiliza o <strong>peso comercial</strong>. A prioridade é
+          apenas um desempate dentro da camada. Peso 4 é exclusivo do Destaque.
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">

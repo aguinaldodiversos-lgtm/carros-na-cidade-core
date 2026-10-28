@@ -24,10 +24,7 @@ export const revalidate = 60;
 const CACHE_HEADER = "public, s-maxage=60, stale-while-revalidate=60";
 
 function boostResponse(boost: unknown) {
-  return NextResponse.json(
-    { boost },
-    { status: 200, headers: { "Cache-Control": CACHE_HEADER } }
-  );
+  return NextResponse.json({ boost }, { status: 200, headers: { "Cache-Control": CACHE_HEADER } });
 }
 
 export async function GET() {

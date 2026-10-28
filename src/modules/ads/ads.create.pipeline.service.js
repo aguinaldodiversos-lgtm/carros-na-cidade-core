@@ -81,10 +81,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
       throw new AppError("Limite de fotografias não configurado para este plano.", 503);
     }
     if (validated.images.length > maxPhotos) {
-      throw new AppError(
-        `Seu plano permite até ${maxPhotos} fotos por anúncio.`,
-        400
-      );
+      throw new AppError(`Seu plano permite até ${maxPhotos} fotos por anúncio.`, 400);
     }
 
     // ──────────────────────────────────────────────────────────────────

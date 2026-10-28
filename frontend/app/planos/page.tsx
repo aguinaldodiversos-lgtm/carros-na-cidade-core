@@ -41,7 +41,6 @@ export const metadata: Metadata = {
   },
 };
 
-
 type PlanCardData = {
   id: string;
   name: string;
@@ -71,8 +70,18 @@ function additionalBenefits(plan: SubscriptionPlan): string[] {
     .filter((item) => typeof item === "string")
     .map((item) => item.trim())
     .filter((item) => item.length > 0)
-    .filter((item) => !/v[ií]deo|360|cr[eé]dito|destaque mensal|destaques mensais|dashboard de performance|banner regional/i.test(item))
-    .filter((item) => !/an[uú]ncios?|fotos?|prioridade|peso [1234]|perfil de loja|visibilidade|listagens/i.test(item))
+    .filter(
+      (item) =>
+        !/v[ií]deo|360|cr[eé]dito|destaque mensal|destaques mensais|dashboard de performance|banner regional/i.test(
+          item
+        )
+    )
+    .filter(
+      (item) =>
+        !/an[uú]ncios?|fotos?|prioridade|peso [1234]|perfil de loja|visibilidade|listagens/i.test(
+          item
+        )
+    )
     .slice(0, 2);
 }
 
@@ -80,9 +89,14 @@ function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): P
   const pro = tier === "pro";
   const ranking = Number(plan.weight ?? (pro ? 3 : 2));
   const benefits = [
-    pro && plan.ad_limit >= 1000 ? "Anúncios ilimitados*" : "Até " + plan.ad_limit + " anúncios ativos",
+    pro && plan.ad_limit >= 1000
+      ? "Anúncios ilimitados*"
+      : "Até " + plan.ad_limit + " anúncios ativos",
     "Até " + (plan.max_photos ?? (pro ? 15 : 12)) + " fotos por anúncio",
-    (pro ? "Maior prioridade nas listagens" : "Prioridade nas listagens") + " (peso " + ranking + ")",
+    (pro ? "Maior prioridade nas listagens" : "Prioridade nas listagens") +
+      " (peso " +
+      ranking +
+      ")",
     ...(plan.has_store_profile ? ["Perfil de loja personalizado"] : []),
     ...additionalBenefits(plan),
   ];
@@ -92,7 +106,11 @@ function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): P
     badge: plan.recommended ? "MAIS COMPLETO" : undefined,
     priceLabel: priceBRL(Number(plan.price)),
     periodLabel: "/mês",
-    intro: plan.description || (pro ? "Mais visibilidade e oportunidades para sua loja." : "Sua loja com mais presença nas buscas locais."),
+    intro:
+      plan.description ||
+      (pro
+        ? "Mais visibilidade e oportunidades para sua loja."
+        : "Sua loja com mais presença nas buscas locais."),
     benefits,
     illustration: pro ? "/images/dolphin.webp" : "/images/corolla.jpeg",
     cta: {
@@ -101,12 +119,16 @@ function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): P
     },
     style: pro ? "highlight" : "neutral",
     disabled: plan.subscribable === false,
-    unavailableNote: plan.subscribable === false ? "Contratações temporariamente indisponíveis." : undefined,
+    unavailableNote:
+      plan.subscribable === false ? "Contratações temporariamente indisponíveis." : undefined,
     note: pro && plan.ad_limit >= 1000 ? "*Sujeito à trava técnica de segurança." : undefined,
   };
 }
 
-function buildFreeCard(cpf: SubscriptionPlan | undefined, cnpj: SubscriptionPlan | undefined): PlanCardData {
+function buildFreeCard(
+  cpf: SubscriptionPlan | undefined,
+  cnpj: SubscriptionPlan | undefined
+): PlanCardData {
   const pictures = Math.min(cpf?.max_photos ?? 8, cnpj?.max_photos ?? 8);
   return {
     id: "gratis",
@@ -148,7 +170,6 @@ function buildDestaqueCard(boost: Awaited<ReturnType<typeof fetchPublicBoost>>):
     unavailableNote: boost.active ? undefined : "Compra de destaque temporariamente indisponível.",
   };
 }
-
 
 const HERO_CHIPS = ["Sem comissão", "Mais visibilidade", "Cadastro simples"] as const;
 
@@ -205,9 +226,11 @@ function HeroChip({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 function PlanCardView({ plan }: { plan: PlanCardData }) {
-  const styleByVariant: Record<PlanCardData["style"], { card: string; cta: string; badge: string; check: string }> = {
+  const styleByVariant: Record<
+    PlanCardData["style"],
+    { card: string; cta: string; badge: string; check: string }
+  > = {
     highlight: {
       card: "border-blue-500 bg-gradient-to-b from-blue-50/80 via-white to-white shadow-[0_14px_40px_rgba(29,78,216,0.08)]",
       cta: "bg-blue-600 text-white hover:bg-blue-700",
@@ -231,52 +254,91 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
   return (
     <article
       data-plan-id={plan.id}
-      className={["relative flex h-full min-h-[540px] flex-col rounded-[22px] border p-5 transition hover:-translate-y-0.5 sm:p-6", style.card].join(" ")}
+      className={[
+        "relative flex h-full min-h-[540px] flex-col rounded-[22px] border p-5 transition hover:-translate-y-0.5 sm:p-6",
+        style.card,
+      ].join(" ")}
     >
       {plan.badge ? (
-        <span className={["absolute -top-3 left-5 rounded-full px-3 py-1 text-[10px] font-extrabold tracking-wide", style.badge].join(" ")}>
+        <span
+          className={[
+            "absolute -top-3 left-5 rounded-full px-3 py-1 text-[10px] font-extrabold tracking-wide",
+            style.badge,
+          ].join(" ")}
+        >
           {plan.badge}
         </span>
       ) : null}
       {plan.illustration ? (
-        <div aria-hidden="true" className="absolute right-4 top-5 h-[68px] w-[100px] overflow-hidden rounded-[22px] bg-slate-100/80 opacity-90">
+        <div
+          aria-hidden="true"
+          className="absolute right-4 top-5 h-[68px] w-[100px] overflow-hidden rounded-[22px] bg-slate-100/80 opacity-90"
+        >
           <Image src={plan.illustration} alt="" fill sizes="100px" className="object-cover" />
         </div>
       ) : plan.style === "accent" ? (
-        <div aria-hidden="true" className="absolute right-5 top-6 grid h-12 w-12 place-items-center rounded-2xl bg-amber-100 text-3xl text-amber-500">♛</div>
+        <div
+          aria-hidden="true"
+          className="absolute right-5 top-6 grid h-12 w-12 place-items-center rounded-2xl bg-amber-100 text-3xl text-amber-500"
+        >
+          ♛
+        </div>
       ) : null}
       <header className="min-h-[125px] pr-24">
         <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
         <p className="mt-3 text-[13px] leading-6 text-slate-500">{plan.intro}</p>
       </header>
       <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <strong className="text-[32px] font-extrabold tracking-tight text-slate-950">{plan.priceLabel}</strong>
+        <strong className="text-[32px] font-extrabold tracking-tight text-slate-950">
+          {plan.priceLabel}
+        </strong>
         <span className="text-[12px] text-slate-500">{plan.periodLabel}</span>
       </p>
       <ul className="mt-6 flex-1 space-y-3 text-[13px] leading-5 text-slate-900">
         {plan.benefits.map((benefit) => (
           <li key={benefit} className="flex items-start gap-2.5">
-            <span aria-hidden="true" className={["mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold", style.check].join(" ")}>✓</span>
+            <span
+              aria-hidden="true"
+              className={[
+                "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[12px] font-bold",
+                style.check,
+              ].join(" ")}
+            >
+              ✓
+            </span>
             <span>{benefit}</span>
           </li>
         ))}
       </ul>
-      {plan.note ? <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">{plan.note}</p> : null}
+      {plan.note ? (
+        <p className="mt-4 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+          {plan.note}
+        </p>
+      ) : null}
       {plan.disabled ? (
-        <span aria-disabled="true" className="mt-5 flex h-12 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-500">Indisponível</span>
+        <span
+          aria-disabled="true"
+          className="mt-5 flex h-12 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-500"
+        >
+          Indisponível
+        </span>
       ) : (
         <Link
           href={plan.cta.href}
-          className={["mt-5 flex h-12 items-center justify-center gap-3 rounded-xl text-sm font-bold transition", style.cta].join(" ")}
+          className={[
+            "mt-5 flex h-12 items-center justify-center gap-3 rounded-xl text-sm font-bold transition",
+            style.cta,
+          ].join(" ")}
         >
           {plan.cta.label} <span aria-hidden="true">→</span>
         </Link>
       )}
-      {plan.disabled && plan.unavailableNote ? <p className="mt-2 text-center text-xs text-slate-500">{plan.unavailableNote}</p> : null}
+      {plan.disabled && plan.unavailableNote ? (
+        <p className="mt-2 text-center text-xs text-slate-500">{plan.unavailableNote}</p>
+      ) : null}
     </article>
   );
 }
-
 
 function BenefitCard({ title, description }: { title: string; description: string }) {
   return (

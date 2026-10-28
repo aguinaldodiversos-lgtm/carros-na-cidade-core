@@ -59,7 +59,9 @@ export function validatePlanFields(patch, { isCreate }) {
   const sanitized = {};
 
   if (isCreate || "id" in patch) {
-    const id = String(patch.id || "").trim().toLowerCase();
+    const id = String(patch.id || "")
+      .trim()
+      .toLowerCase();
     if (!SLUG_REGEX.test(id)) {
       throw new AppError(
         "id (slug) inválido. Use minúsculas, números e hifens (2..64 chars).",
@@ -77,7 +79,9 @@ export function validatePlanFields(patch, { isCreate }) {
   }
 
   if (isCreate || "type" in patch) {
-    const type = String(patch.type || "").trim().toUpperCase();
+    const type = String(patch.type || "")
+      .trim()
+      .toUpperCase();
     if (!PLAN_TYPES.includes(type)) {
       throw new AppError(`type deve ser um de: ${PLAN_TYPES.join(", ")}`, 400);
     }
@@ -87,7 +91,8 @@ export function validatePlanFields(patch, { isCreate }) {
   if (isCreate || "price" in patch) {
     const price = Number(patch.price);
     if (!isNonNegativeFinite(price)) throw new AppError("price não pode ser negativo", 400);
-    if (price > MAX_PRICE) throw new AppError(`price excede o máximo permitido (${MAX_PRICE})`, 400);
+    if (price > MAX_PRICE)
+      throw new AppError(`price excede o máximo permitido (${MAX_PRICE})`, 400);
     sanitized.price = price;
   }
 
@@ -130,7 +135,9 @@ export function validatePlanFields(patch, { isCreate }) {
   }
 
   if (isCreate || "billing_model" in patch) {
-    const bm = String(patch.billing_model || "free").trim().toLowerCase();
+    const bm = String(patch.billing_model || "free")
+      .trim()
+      .toLowerCase();
     if (!BILLING_MODELS.includes(bm)) {
       throw new AppError(`billing_model deve ser um de: ${BILLING_MODELS.join(", ")}`, 400);
     }
@@ -206,7 +213,11 @@ function buildDiff(oldRow, newPatch) {
   const oldValue = {};
   const newValue = {};
   for (const key of Object.keys(newPatch)) {
-    if (oldRow && oldRow[key] !== undefined && JSON.stringify(oldRow[key]) !== JSON.stringify(newPatch[key])) {
+    if (
+      oldRow &&
+      oldRow[key] !== undefined &&
+      JSON.stringify(oldRow[key]) !== JSON.stringify(newPatch[key])
+    ) {
       oldValue[key] = oldRow[key];
       newValue[key] = newPatch[key];
     } else if (!oldRow) {

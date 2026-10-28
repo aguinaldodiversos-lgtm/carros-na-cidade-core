@@ -114,10 +114,9 @@ function TabButton({
 function PlansTab() {
   const router = useRouter();
   const list = useAdminFetch(() => adminApi.plans.list(), []);
-  const [confirm, setConfirm] = useState<
-    | { type: "none" }
-    | { type: "toggle"; plan: PlanRow }
-  >({ type: "none" });
+  const [confirm, setConfirm] = useState<{ type: "none" } | { type: "toggle"; plan: PlanRow }>({
+    type: "none",
+  });
   const [flash, setFlash] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   function showFlash(kind: "success" | "error", text: string) {
@@ -362,7 +361,9 @@ function HighlightsTab() {
                       {h.ad_city && h.ad_state ? `${h.ad_city}/${h.ad_state}` : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-cnc-muted">{h.advertiser_name ?? "—"}</td>
-                    <td className="px-4 py-2.5 font-mono text-cnc-muted">{h.user_plan_id ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-cnc-muted">
+                      {h.user_plan_id ?? "—"}
+                    </td>
                     <td className="px-4 py-2.5 text-cnc-text whitespace-nowrap">
                       {fmtDate(h.highlight_until)}
                     </td>
@@ -456,8 +457,8 @@ function CommercialRulesTab() {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        Estas configurações afetam o produto inteiro (preço/duração de destaque avulso, comportamento
-        de compra duplicada, trava do plano Pro). Toda alteração registra motivo em{" "}
+        Estas configurações afetam o produto inteiro (preço/duração de destaque avulso,
+        comportamento de compra duplicada, trava do plano Pro). Toda alteração registra motivo em{" "}
         <code>admin_actions</code>.
       </div>
 
@@ -488,8 +489,8 @@ function CommercialRulesTab() {
             <div>
               <h2 className="text-base font-bold text-cnc-text">Destaque {boostDays} dias</h2>
               <p className="mt-0.5 text-[11px] text-cnc-muted">
-                Tipo: Produto avulso / impulsionamento · Fonte:{" "}
-                <code>platform_settings</code> (commercial.boost_default_*)
+                Tipo: Produto avulso / impulsionamento · Fonte: <code>platform_settings</code>{" "}
+                (commercial.boost_default_*)
               </p>
             </div>
             <span
@@ -608,8 +609,8 @@ function CommercialRulesTab() {
       <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card space-y-3">
         <h2 className="text-sm font-bold text-cnc-text">Limite técnico do Pro</h2>
         <p className="text-xs leading-5 text-cnc-muted">
-          O limite efetivo para publicar está em <code>subscription_plans.ad_limit</code>.
-          Para evitar divergência, ajuste o número diretamente no editor do plano Pro.
+          O limite efetivo para publicar está em <code>subscription_plans.ad_limit</code>. Para
+          evitar divergência, ajuste o número diretamente no editor do plano Pro.
         </p>
         <Link
           href="/admin/comercial/planos/cnpj-store-pro"

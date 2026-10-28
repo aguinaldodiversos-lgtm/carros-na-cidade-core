@@ -6,29 +6,68 @@ import { fetchPlansFromAPI } from "@/lib/plans/plan-service";
 
 vi.mock("@/lib/commercial/public-boost", () => ({
   fetchPublicBoost: vi.fn(async () => ({
-    id: "boost-7d", name: "Destaque 7 dias", price_cents: 3990,
-    duration_days: 7, active: true,
+    id: "boost-7d",
+    name: "Destaque 7 dias",
+    price_cents: 3990,
+    duration_days: 7,
+    active: true,
   })),
-  formatBoostPriceBRL: (cents: number) => (cents / 100).toLocaleString("pt-BR", {
-    style: "currency", currency: "BRL",
-  }),
+  formatBoostPriceBRL: (cents: number) =>
+    (cents / 100).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }),
 }));
 
 vi.mock("@/lib/plans/plan-service", () => ({
   fetchPlansFromAPI: vi.fn(async () => [
     { id: "cpf-free-essential", is_active: true, public_visible: true, ad_limit: 3, max_photos: 8 },
-    { id: "cnpj-free-store", is_active: true, public_visible: true, ad_limit: 10, max_photos: 8, has_store_profile: true },
-    { id: "cnpj-store-start", name: "Lojista Start", is_active: true, public_visible: true, subscribable: true,
-      type: "CNPJ", ad_limit: 20, max_photos: 12, weight: 2, price: 79.9, has_store_profile: true,
-      benefits: ["Veículos para avaliação"], description: "Presença e oportunidades para sua loja." },
-    { id: "cnpj-store-pro", name: "Lojista Pro", is_active: true, public_visible: true, subscribable: true,
-      type: "CNPJ", ad_limit: 1000, max_photos: 15, weight: 3, price: 149.9, has_store_profile: true,
-      recommended: true, benefits: ["Compradores procurando", "Veículos para avaliação"],
-      description: "Mais visibilidade para sua loja." },
+    {
+      id: "cnpj-free-store",
+      is_active: true,
+      public_visible: true,
+      ad_limit: 10,
+      max_photos: 8,
+      has_store_profile: true,
+    },
+    {
+      id: "cnpj-store-start",
+      name: "Lojista Start",
+      is_active: true,
+      public_visible: true,
+      subscribable: true,
+      type: "CNPJ",
+      ad_limit: 20,
+      max_photos: 12,
+      weight: 2,
+      price: 79.9,
+      has_store_profile: true,
+      benefits: ["Veículos para avaliação"],
+      description: "Presença e oportunidades para sua loja.",
+    },
+    {
+      id: "cnpj-store-pro",
+      name: "Lojista Pro",
+      is_active: true,
+      public_visible: true,
+      subscribable: true,
+      type: "CNPJ",
+      ad_limit: 1000,
+      max_photos: 15,
+      weight: 3,
+      price: 149.9,
+      has_store_profile: true,
+      recommended: true,
+      benefits: ["Compradores procurando", "Veículos para avaliação"],
+      description: "Mais visibilidade para sua loja.",
+    },
   ]),
 }));
 
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 async function page() {
   return render(await PlanosPage());
@@ -43,9 +82,11 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     expect(String(metadata.title)).toContain("Planos");
     expect(metadata.alternates?.canonical).toBe("/planos");
     expect(container.textContent).toContain("Escolha o plano ideal para anunciar seu veículo");
-    expect(Array.from(container.querySelectorAll("[data-plan-id]")).map((el) => el.getAttribute("data-plan-id"))).toEqual([
-      "destaque-7-dias", "lojista-pro", "lojista-start", "gratis",
-    ]);
+    expect(
+      Array.from(container.querySelectorAll("[data-plan-id]")).map((el) =>
+        el.getAttribute("data-plan-id")
+      )
+    ).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
   });
 
   it("exibe limites, pesos, oportunidades e ausência de recursos não entregues", async () => {
@@ -63,9 +104,20 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
 
   it("edição de preço do Admin aparece no card após a leitura do catálogo", async () => {
     vi.mocked(fetchPlansFromAPI).mockResolvedValueOnce([
-      { id: "cnpj-store-start", name: "Plano Loja Start", type: "CNPJ", price: 89.9,
-        ad_limit: 20, max_photos: 12, weight: 2, subscribable: true,
-        is_active: true, public_visible: true, benefits: [], has_store_profile: true } as never,
+      {
+        id: "cnpj-store-start",
+        name: "Plano Loja Start",
+        type: "CNPJ",
+        price: 89.9,
+        ad_limit: 20,
+        max_photos: 12,
+        weight: 2,
+        subscribable: true,
+        is_active: true,
+        public_visible: true,
+        benefits: [],
+        has_store_profile: true,
+      } as never,
     ]);
     const { container } = await page();
     expect(cardText(container, "lojista-start")).toMatch(/R\$\s*89,90/);
@@ -74,7 +126,13 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
 
   it("plano não público ou inativo desaparece da vitrine", async () => {
     vi.mocked(fetchPlansFromAPI).mockResolvedValueOnce([
-      { id: "cnpj-store-pro", type: "CNPJ", price: 149.9, is_active: true, public_visible: false } as never,
+      {
+        id: "cnpj-store-pro",
+        type: "CNPJ",
+        price: 149.9,
+        is_active: true,
+        public_visible: false,
+      } as never,
     ]);
     const { container } = await page();
     expect(container.querySelector('[data-plan-id="lojista-pro"]')).toBeNull();
