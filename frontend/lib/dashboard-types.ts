@@ -14,6 +14,7 @@ export type DashboardPlanSummary = {
   id: string;
   name: string;
   ad_limit: number;
+  max_photos?: number;
   billing_model: "free" | "one_time" | "monthly";
 };
 
