@@ -51,13 +51,6 @@ jobs:
       - name: Prettier (format check — arquivos alterados)
         run: npm run format:check:changed
 
-      # Temporário: capturar diff exato do Prettier dos arquivos da PR96.
-      - name: Diagnóstico de formatação do simulador
-        if: failure()
-        run: |
-          npm run format:changed
-          git --no-pager diff -- frontend/components/financing/FinancingSimulator.tsx frontend/lib/financing/financing-calculator.ts frontend/lib/vehicle/simulation-whatsapp-note.test.ts
-
       - name: ESLint (backend)
         run: npm run lint
 
