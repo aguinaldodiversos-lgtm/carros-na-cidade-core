@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   try {
     const plans = await fetchPlans({ activeOnly: false });
-    const plan = plans.find((p) => p.id === params.id && p.public_visible !== false);
+    const plan = plans.find((p) => p.id === params.id && p.is_active && p.public_visible !== false);
     if (!plan) return NextResponse.json({ error: "Plano não encontrado" }, { status: 404 });
     return NextResponse.json({ plan }, { headers: { "Cache-Control": "no-store" } });
   } catch {
