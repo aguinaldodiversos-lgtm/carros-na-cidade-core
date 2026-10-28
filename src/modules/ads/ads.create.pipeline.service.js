@@ -73,6 +73,20 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
     });
     advertiserId = advertiser.id;
 
+    // A capacidade estrutural de upload não substitui o limite comercial.
+    // Revalidar no servidor impede contornar o wizard por chamadas diretas.
+    const currentPlan = await resolveCurrentPlan(account);
+    const maxPhotos = Number(currentPlan?.max_photos ?? 8);
+    if (!Number.isInteger(maxPhotos) || maxPhotos < 1) {
+      throw new AppError("Limite de fotografias não configurado para este plano.", 503);
+    }
+    if (validated.images.length > maxPhotos) {
+      throw new AppError(
+        `Seu plano permite até ${maxPhotos} fotos por anúncio.`,
+        400
+      );
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // FIPE — snapshot SERVER-SIDE.
     //
