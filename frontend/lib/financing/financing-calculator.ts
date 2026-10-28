@@ -35,7 +35,5 @@ export function calculateMonthlyPayment(
 
   const monthlyRate = monthlyRatePct / 100;
   if (monthlyRate === 0) return roundMoney(financedAmount / months);
-  return roundMoney(
-    (financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months))
-  );
+  return roundMoney((financedAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -months)));
 }
