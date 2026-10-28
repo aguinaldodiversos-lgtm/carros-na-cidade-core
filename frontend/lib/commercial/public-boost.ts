@@ -48,7 +48,7 @@ function isValidPublicBoost(value: unknown): value is PublicBoost {
 }
 
 /**
- * Busca server-side com ISR (revalidate 900s). Qualquer falha (sem base,
+ * Busca server-side com ISR (revalidate 60s). Qualquer falha (sem base,
  * !ok, shape inválido, exceção) cai no fallback centralizado — a página
  * pública nunca quebra por causa do boost.
  */
@@ -58,7 +58,7 @@ export async function fetchPublicBoost(): Promise<PublicBoost> {
     if (!url) return PUBLIC_BOOST_FALLBACK;
 
     const res = await fetch(url, {
-      next: { revalidate: 900 },
+      next: { revalidate: 60 },
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return PUBLIC_BOOST_FALLBACK;
