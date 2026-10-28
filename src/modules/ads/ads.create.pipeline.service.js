@@ -1,6 +1,7 @@
 import { slugify } from "../../shared/utils/slugify.js";
 import { ensurePublishEligibility } from "./ads.publish.eligibility.service.js";
 import { resolveCurrentPlan } from "../account/account.service.js";
+import { assertPhotoAllowance } from "./ads.photo-allowance.js";
 import { executeAdInsert, prepareAdInsertPayload } from "./ads.persistence.service.js";
 import { validateCreateAdPayload } from "./ads.validators.js";
 import { logAdsPublishFailure, sanitizeAdPayloadForLog } from "./ads.publish-flow.log.js";
@@ -76,13 +77,7 @@ export async function createAdNormalized(rawPayload, user, ctx = {}) {
     // A capacidade estrutural de upload não substitui o limite comercial.
     // Revalidar no servidor impede contornar o wizard por chamadas diretas.
     const currentPlan = await resolveCurrentPlan(account);
-    const maxPhotos = Number(currentPlan?.max_photos ?? 8);
-    if (!Number.isInteger(maxPhotos) || maxPhotos < 1) {
-      throw new AppError("Limite de fotografias não configurado para este plano.", 503);
-    }
-    if (validated.images.length > maxPhotos) {
-      throw new AppError(`Seu plano permite até ${maxPhotos} fotos por anúncio.`, 400);
-    }
+    assertPhotoAllowance(validated.images, currentPlan?.max_photos ?? 8);
 
     // ──────────────────────────────────────────────────────────────────
     // FIPE — snapshot SERVER-SIDE.
