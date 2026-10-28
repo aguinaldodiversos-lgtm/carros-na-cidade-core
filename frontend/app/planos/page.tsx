@@ -138,27 +138,6 @@ function buildDestaqueCard(boost: PublicBoost | null): PlanCardData {
 
 const HERO_CHIPS = ["Sem comissão", "Mais visibilidade", "Cadastro simples"] as const;
 
-const KEY_BENEFITS = [
-  {
-    title: "Mais confiança para o comprador",
-    description:
-      "Anúncios validados, com cidade clara e contato direto — comprador chega mais qualificado.",
-  },
-  {
-    title: "Mais alcance local e regional",
-    description: "O catálogo organiza estoque pela cidade do anúncio e aparece em buscas locais.",
-  },
-  {
-    title: "Página com visual profissional",
-    description:
-      "Layout limpo, fotos em destaque e ficha técnica clara — sua vitrine digital pronta.",
-  },
-  {
-    title: "Sem promessas confusas",
-    description: "Cobramos apenas o que entregamos hoje. Sem letras pequenas, sem pegadinha.",
-  },
-] as const;
-
 const FAQ = [
   {
     q: "O Destaque altera a quantidade de anúncios ou fotos?",
@@ -298,15 +277,6 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
   );
 }
 
-function BenefitCard({ title, description }: { title: string; description: string }) {
-  return (
-    <article className="rounded-xl border border-cnc-line bg-white p-4 shadow-card">
-      <h3 className="text-sm font-extrabold text-cnc-text-strong sm:text-base">{title}</h3>
-      <p className="mt-1 text-xs text-cnc-muted sm:text-sm">{description}</p>
-    </article>
-  );
-}
-
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   // <details> nativo evita JS adicional e é acessível por padrão.
   return (
@@ -389,21 +359,6 @@ export default async function PlanosPage() {
         {plans.map((plan) => (
           <PlanCardView key={plan.id} plan={plan} />
         ))}
-      </section>
-
-      {/* Benefícios */}
-      <section aria-labelledby="planos-beneficios-title" className="mt-14">
-        <h2
-          id="planos-beneficios-title"
-          className="text-2xl font-extrabold text-cnc-text-strong sm:text-3xl"
-        >
-          Por que escolher o Carros na Cidade
-        </h2>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {KEY_BENEFITS.map((b) => (
-            <BenefitCard key={b.title} title={b.title} description={b.description} />
-          ))}
-        </div>
       </section>
 
       {/* FAQ */}
