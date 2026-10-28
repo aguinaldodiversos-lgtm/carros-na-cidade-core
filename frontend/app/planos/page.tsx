@@ -10,12 +10,12 @@ import { fetchPublicBoost, formatBoostPriceBRL } from "@/lib/commercial/public-b
  *
  * Política de copy desta fase:
  *   - SOMENTE benefícios já entregáveis hoje. Sem promessa de vídeo 360,
- *     créditos mensais, 15 fotos no Pro (wizard ainda limita 10), CRM,
+ *     créditos mensais e vídeo 360; as fotos são permitidas conforme o plano.
  *     Banner Regional ou Evento Premium.
  *   - Mercado Pago NÃO é acionado nesta fase. CTAs apontam para fluxos
  *     existentes (/anunciar, /cadastro, /ajuda) — Fase 3B liga checkout.
- *   - Cards de assinatura/grátis são copy de marketing estática (não billing).
- *   - O card "Destaque 7 dias" é a ÚNICA parte dinâmica: preço/duração vêm
+ *   - Cards de assinatura/grátis usam o catálogo comercial público.
+ *   - O card "Destaque 7 dias" tem preço e duração dinâmicos, que vêm
  *     de platform_settings via o endpoint público GET
  *     /api/public/commercial/boost (mesma fonte do modal/checkout), com
  *     fallback centralizado e ISR — sem login, sem dado sensível, SEO-safe.
@@ -139,7 +139,7 @@ function buildDestaqueCard(boost: Awaited<ReturnType<typeof fetchPublicBoost>>):
     benefits: [
       "Topo das listagens por " + days + " dias (peso 4)",
       "Disponível para CPF e CNPJ",
-      "Novas compras prolongam o destaque",
+      "Destaque avulso, sem mensalidade",
     ],
     note: "Mantém os limites de anúncios e fotos do seu plano.",
     cta: { label: "Destacar agora", href: "/login?next=/anunciar?acao=destaque" },
@@ -180,7 +180,7 @@ const FAQ = [
   },
   {
     q: "Posso contratar o Destaque mais de uma vez?",
-    a: "Sim. Compras repetidas prorrogam o período no topo — o anúncio segue destacado pelo tempo somado.",
+    a: "As condições de uma nova contratação dependem das regras comerciais vigentes, mostradas antes do pagamento.",
   },
   {
     q: "Posso anunciar gratuitamente?",
@@ -245,7 +245,7 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
       ) : plan.style === "accent" ? (
         <div aria-hidden="true" className="absolute right-5 top-6 grid h-12 w-12 place-items-center rounded-2xl bg-amber-100 text-3xl text-amber-500">♛</div>
       ) : null}
-      <header className="min-h-[125px] pr-16">
+      <header className="min-h-[125px] pr-24">
         <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
         <p className="mt-3 text-[13px] leading-6 text-slate-500">{plan.intro}</p>
       </header>
