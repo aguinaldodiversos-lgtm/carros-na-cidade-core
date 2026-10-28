@@ -50,10 +50,13 @@ describe("Consulta verificada do Destaque no servidor", () => {
   });
 
   it("não aceita contrato comercial incompleto", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ boost: { price_cents: 3990, active: true } }),
-    } as Response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ boost: { price_cents: 3990, active: true } }),
+      } as Response)
+    );
     await expect(fetchVerifiedPublicBoost()).resolves.toBeNull();
   });
 });
