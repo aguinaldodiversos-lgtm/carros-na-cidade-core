@@ -1,4 +1,5 @@
 import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
+import { buildInternalBackendHeaders } from "@/lib/http/internal-backend-headers";
 
 /**
  * Config pública do produto avulso de destaque (boost-7d), consumida pelo
@@ -80,7 +81,7 @@ export async function fetchVerifiedPublicBoost(): Promise<PublicBoost | null> {
     if (!url) return null;
     const response = await fetch(url, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: { ...buildInternalBackendHeaders(), Accept: "application/json" },
     });
     if (!response.ok) return null;
     const payload = (await response.json()) as { boost?: unknown };

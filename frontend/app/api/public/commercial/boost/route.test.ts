@@ -54,6 +54,12 @@ describe("BFF /api/public/commercial/boost", () => {
       active: true,
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://backend.local/api/public/commercial/boost",
+      expect.objectContaining({
+        headers: expect.objectContaining({ "User-Agent": "cnc-internal/1.0" }),
+      })
+    );
   });
 
   it("reflete edição admin (preço/dias diferentes vindos do backend)", async () => {
@@ -151,5 +157,9 @@ describe("BFF /api/public/commercial/boost", () => {
     const res = await GET(request(true));
     expect(res.status).toBe(200);
     expect((await res.json()).boost.price_cents).toBe(4590);
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      "http://backend.local/api/public/commercial/boost",
+      expect.objectContaining({ cache: "no-store" })
+    );
   });
 });

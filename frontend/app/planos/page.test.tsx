@@ -132,11 +132,20 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     expect(container.querySelectorAll("[data-plan-id]")).toHaveLength(0);
   });
 
-  it("não exibe preço de destaque quando API comercial está indisponível", async () => {
+  it("preserva o card Destaque e os quatro planos, sem anunciar preço não confirmado", async () => {
     vi.mocked(fetchVerifiedPublicBoost).mockResolvedValueOnce(null);
     const { container } = await page();
-    expect(container.querySelector('[data-plan-id="destaque-7-dias"]')).toBeNull();
-    expect(container.querySelector('[data-plan-id="lojista-pro"]')).toBeTruthy();
+    expect(
+      Array.from(container.querySelectorAll("[data-plan-id]")).map((el) =>
+        el.getAttribute("data-plan-id")
+      )
+    ).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
+    const boost = container.querySelector('[data-plan-id="destaque-7-dias"]');
+    expect(boost?.textContent).toContain("Preço indisponível");
+    expect(boost?.textContent).toContain("Não foi possível confirmar o preço");
+    expect(boost?.textContent).not.toContain("R$ 39,90");
+    expect(boost?.querySelector('a[href*="destaque"]')).toBeNull();
+    expect(boost?.querySelector('[aria-disabled="true"]')).toBeTruthy();
   });
 
   it("plano não público ou inativo desaparece da vitrine", async () => {

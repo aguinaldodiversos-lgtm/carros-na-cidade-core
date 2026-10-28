@@ -116,21 +116,27 @@ function buildFreeCard(
   };
 }
 
-function buildDestaqueCard(boost: PublicBoost): PlanCardData {
-  const days = boost.duration_days;
+function buildDestaqueCard(boost: PublicBoost | null): PlanCardData {
+  // O card permanece na grade mesmo se o backend estiver temporariamente
+  // indisponível. Sem preço confirmado, a compra fica bloqueada.
+  const days = boost?.duration_days ?? 7;
   return {
     id: "destaque-7-dias",
-    name: boost.name,
+    name: boost?.name ?? "Destaque 7 dias",
     badge: "TOPO POR " + days + " DIAS",
-    priceLabel: formatBoostPriceBRL(boost.price_cents),
-    periodLabel: "por anúncio",
+    priceLabel: boost ? formatBoostPriceBRL(boost.price_cents) : "Preço indisponível",
+    periodLabel: boost ? "por anúncio" : "",
     intro: "Coloque seu anúncio no topo das listagens locais e regionais por " + days + " dias.",
     benefits: boostBenefits(days),
     note: "Mantém os limites de anúncios e fotos do seu plano.",
     cta: { label: "Destacar agora", href: "/login?next=/anunciar?acao=destaque" },
     style: "accent",
-    disabled: !boost.active,
-    unavailableNote: boost.active ? undefined : "Compra de destaque temporariamente indisponível.",
+    disabled: !boost || !boost.active,
+    unavailableNote: !boost
+      ? "Não foi possível confirmar o preço. Tente novamente em instantes."
+      : boost.active
+        ? undefined
+        : "Compra de destaque temporariamente indisponível.",
   };
 }
 
@@ -348,7 +354,7 @@ export default async function PlanosPage() {
     catalog === null
       ? []
       : [
-          ...(boost ? [buildDestaqueCard(boost)] : []),
+          buildDestaqueCard(boost),
           ...(pro ? [buildSubscriptionCard(pro, "pro")] : []),
           ...(start ? [buildSubscriptionCard(start, "start")] : []),
           ...(freeCpf || freeCnpj ? [buildFreeCard(freeCpf, freeCnpj)] : []),
