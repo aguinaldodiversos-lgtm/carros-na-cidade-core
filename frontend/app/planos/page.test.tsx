@@ -60,7 +60,7 @@ vi.mock("@/lib/plans/plan-service", () => ({
       has_store_profile: true,
       recommended: true,
       benefits: ["Compradores procurando", "Veículos para avaliação"],
-      description: "Mais visibilidade para sua loja.",
+      description: "Mais visibilidade, mais fotos e acesso a oportunidades para sua loja.",
     },
   ]),
 }));
@@ -107,6 +107,10 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     expect(cardText(container, "destaque-7-dias")).toMatch(/R\$\s*39,90/);
     expect(cardText(container, "destaque-7-dias")).toContain("peso 4");
     expect(cardText(container, "lojista-pro")).not.toMatch(/\d+ fotos? por anúncio/i);
+    expect(cardText(container, "lojista-pro")).toContain(
+      "Mais visibilidade e acesso a oportunidades para sua loja."
+    );
+    expect(cardText(container, "lojista-pro")).not.toMatch(/mais fotos/i);
     expect(cardText(container, "lojista-pro")).toContain("peso 3");
     expect(cardText(container, "lojista-pro")).toContain("Compradores procurando");
     expect(cardText(container, "lojista-start")).not.toMatch(/\d+ fotos? por anúncio/i);
