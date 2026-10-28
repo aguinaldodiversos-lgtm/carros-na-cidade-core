@@ -5,8 +5,8 @@ import { BOOST_LAYER_WEIGHT } from "../../ads/filters/ads-ranking.sql.js";
 
 /**
  * Faixas e enums canônicos. Espelha os CHECK do schema 020 + a auditoria
- * documentada no header de ads-ranking.sql.js (camadas 50/80 do
- * commercialLayerExpr — mudar priority_level move o plano de camada).
+ * documentada em ads-ranking.sql.js. weight define a camada comercial;
+ * priority_level é apenas desempate dentro da camada.
  *
  * MAX_PRIORITY_LEVEL=200 é folgado para permitir admin moldar nichos
  * (ex.: plano Evento Premium em 100), mas previne ranking_weight absurdo
@@ -33,6 +33,8 @@ const FIELDS_REQUIRING_REASON = new Set([
   "is_active",
   "monthly_highlight_credits",
   "validity_days",
+  "subscribable",
+  "public_visible",
 ]);
 
 function isNonNegativeInt(n) {
@@ -180,6 +182,7 @@ export function validatePlanFields(patch, { isCreate }) {
     "recommended",
     "video_360_enabled",
     "public_visible",
+    "subscribable",
   ]) {
     if (isCreate || flag in patch) {
       sanitized[flag] = Boolean(patch[flag]);
