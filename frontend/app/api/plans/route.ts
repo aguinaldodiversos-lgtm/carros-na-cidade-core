@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const type = request.nextUrl.searchParams.get("type") as PlanType | null;
   const active = request.nextUrl.searchParams.get("active");
+  const verified = request.nextUrl.searchParams.get("verified") === "1";
   let plans;
   try {
     plans = await fetchPlans({
@@ -14,13 +15,17 @@ export async function GET(request: NextRequest) {
       activeOnly: active !== "false",
     });
   } catch {
+    if (verified) {
+      return NextResponse.json(
+        { error: "Catálogo comercial temporariamente indisponível." },
+        { status: 503, headers: { "Cache-Control": "no-store" } }
+      );
+    }
     plans = getPlans({
       type: type ?? undefined,
       onlyActive: active !== "false",
     });
   }
 
-  return NextResponse.json({
-    plans,
-  });
+  return NextResponse.json({ plans }, { headers: { "Cache-Control": "no-store" } });
 }
