@@ -381,12 +381,15 @@ export default async function PlanosPage() {
   const start = find("cnpj-store-start");
   const freeCpf = find("cpf-free-essential");
   const freeCnpj = find("cnpj-free-store");
-  const plans: PlanCardData[] = catalog === null ? [] : [
-    buildDestaqueCard(boost),
-    ...(pro ? [buildSubscriptionCard(pro, "pro")] : []),
-    ...(start ? [buildSubscriptionCard(start, "start")] : []),
-    ...(freeCpf || freeCnpj ? [buildFreeCard(freeCpf, freeCnpj)] : []),
-  ];
+  const plans: PlanCardData[] =
+    catalog === null
+      ? []
+      : [
+          buildDestaqueCard(boost),
+          ...(pro ? [buildSubscriptionCard(pro, "pro")] : []),
+          ...(start ? [buildSubscriptionCard(start, "start")] : []),
+          ...(freeCpf || freeCnpj ? [buildFreeCard(freeCpf, freeCnpj)] : []),
+        ];
 
   return (
     <main className="mx-auto w-full max-w-[1500px] px-4 py-8 sm:px-6 sm:py-12">
@@ -410,10 +413,13 @@ export default async function PlanosPage() {
       </section>
 
       {catalog === null ? (
-        <div role="status" className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
-          Não foi possível confirmar os preços e benefícios dos planos. Para evitar
-          informações desatualizadas, a contratação está temporariamente indisponível.
-          Tente novamente em instantes.
+        <div
+          role="status"
+          className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700"
+        >
+          Não foi possível confirmar os preços e benefícios dos planos. Para evitar informações
+          desatualizadas, a contratação está temporariamente indisponível. Tente novamente em
+          instantes.
         </div>
       ) : null}
 
