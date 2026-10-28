@@ -10,7 +10,11 @@ import {
   boostBenefits,
   FREE_PLAN_INTRO,
 } from "@/lib/plans/commercial-benefits";
-import { fetchVerifiedPublicBoost, formatBoostPriceBRL, type PublicBoost } from "@/lib/commercial/public-boost";
+import {
+  fetchVerifiedPublicBoost,
+  formatBoostPriceBRL,
+  type PublicBoost,
+} from "@/lib/commercial/public-boost";
 
 /**
  * /planos — landing pública de conversão (Fase 3A do alinhamento de planos).

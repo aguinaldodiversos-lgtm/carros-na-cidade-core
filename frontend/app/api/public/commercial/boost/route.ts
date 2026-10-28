@@ -29,9 +29,13 @@ function boostResponse(boost: unknown) {
 
 export async function GET(request: NextRequest) {
   const verified = request.nextUrl.searchParams.get("verified") === "1";
-  const fail = () => verified
-    ? NextResponse.json({ error: "Destaque temporariamente indisponível." }, { status: 503, headers: { "Cache-Control": "no-store" } })
-    : boostResponse(PUBLIC_BOOST_FALLBACK);
+  const fail = () =>
+    verified
+      ? NextResponse.json(
+          { error: "Destaque temporariamente indisponível." },
+          { status: 503, headers: { "Cache-Control": "no-store" } }
+        )
+      : boostResponse(PUBLIC_BOOST_FALLBACK);
   try {
     const backendUrl = resolveInternalBackendApiUrl("/api/public/commercial/boost");
     if (!backendUrl) return fail();

@@ -78,7 +78,10 @@ export async function fetchVerifiedPublicBoost(): Promise<PublicBoost | null> {
   try {
     const url = resolveInternalBackendApiUrl("/api/public/commercial/boost");
     if (!url) return null;
-    const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
     if (!response.ok) return null;
     const payload = (await response.json()) as { boost?: unknown };
     return isValidPublicBoost(payload?.boost) ? payload.boost : null;

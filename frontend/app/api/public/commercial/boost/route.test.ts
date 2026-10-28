@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-const request = (verified = false) => new NextRequest(`http://localhost/api/public/commercial/boost${verified ? "?verified=1" : ""}`);
+const request = (verified = false) =>
+  new NextRequest(`http://localhost/api/public/commercial/boost${verified ? "?verified=1" : ""}`);
 
 /**
  * BFF público GET /api/public/commercial/boost.
@@ -65,8 +66,14 @@ describe("BFF /api/public/commercial/boost", () => {
         ok: true,
         status: 200,
         json: async () => ({
-          boost: { id: "boost-7d", name: "Destaque", description: "Topo do catálogo",
-            price_cents: 4990, duration_days: 14, active: true },
+          boost: {
+            id: "boost-7d",
+            name: "Destaque",
+            description: "Topo do catálogo",
+            price_cents: 4990,
+            duration_days: 14,
+            active: true,
+          },
         }),
       } as Response)
     );
@@ -124,18 +131,25 @@ describe("BFF /api/public/commercial/boost", () => {
     vi.doMock("@/lib/env/backend-api", () => ({
       resolveInternalBackendApiUrl: () => "http://backend.local/api/public/commercial/boost",
     }));
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ boost: {
-        id: "boost-7d", name: "Destaque 7 dias", description: "Destaque",
-        price_cents: 4590, duration_days: 7, active: true,
-      }}),
-    } as Response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          boost: {
+            id: "boost-7d",
+            name: "Destaque 7 dias",
+            description: "Destaque",
+            price_cents: 4590,
+            duration_days: 7,
+            active: true,
+          },
+        }),
+      } as Response)
+    );
     const { GET } = await import("./route");
     const res = await GET(request(true));
     expect(res.status).toBe(200);
     expect((await res.json()).boost.price_cents).toBe(4590);
   });
-
-
 });
