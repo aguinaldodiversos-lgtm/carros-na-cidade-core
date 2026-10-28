@@ -358,7 +358,6 @@ export default function StepReview({
   patch,
   dashboard,
   dashboardError,
-  boostOptions,
   submitState,
   submitMessage,
   subscribeState,
