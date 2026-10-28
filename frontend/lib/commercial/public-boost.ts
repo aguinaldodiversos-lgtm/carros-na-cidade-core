@@ -30,7 +30,7 @@ export const PUBLIC_BOOST_FALLBACK: PublicBoost = {
   active: true,
 };
 
-function isValidPublicBoost(value: unknown): value is PublicBoost {
+export function isValidPublicBoost(value: unknown): value is PublicBoost {
   if (!value || typeof value !== "object") return false;
   const b = value as Record<string, unknown>;
   return (
@@ -67,6 +67,23 @@ export async function fetchPublicBoost(): Promise<PublicBoost> {
     return isValidPublicBoost(json?.boost) ? json.boost : PUBLIC_BOOST_FALLBACK;
   } catch {
     return PUBLIC_BOOST_FALLBACK;
+  }
+}
+
+/**
+ * Consulta verificada, sem valores de reserva para oferta e contratação.
+ * Usada na vitrine pública e na etapa comercial do anúncio.
+ */
+export async function fetchVerifiedPublicBoost(): Promise<PublicBoost | null> {
+  try {
+    const url = resolveInternalBackendApiUrl("/api/public/commercial/boost");
+    if (!url) return null;
+    const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { boost?: unknown };
+    return isValidPublicBoost(payload?.boost) ? payload.boost : null;
+  } catch {
+    return null;
   }
 }
 
