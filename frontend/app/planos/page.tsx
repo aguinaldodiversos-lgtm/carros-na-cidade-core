@@ -233,7 +233,12 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
           aria-label={`Prioridade de exibição: nível ${plan.priorityStars} de 4`}
         >
           {Array.from({ length: plan.priorityStars }, (_, index) => (
-            <svg key={index} aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-amber-400">
+            <svg
+              key={index}
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-6 w-6 fill-amber-400"
+            >
               <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
             </svg>
           ))}
@@ -354,7 +359,8 @@ export default async function PlanosPage() {
           ))}
         </div>
         <p className="mt-3 text-xs text-cnc-muted sm:text-sm">
-          As estrelas indicam o nível de prioridade de exibição dos anúncios, não avaliações de clientes.
+          As estrelas indicam o nível de prioridade de exibição dos anúncios, não avaliações de
+          clientes.
         </p>
       </section>
 
