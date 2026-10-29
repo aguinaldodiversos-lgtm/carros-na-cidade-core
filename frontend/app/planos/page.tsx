@@ -330,7 +330,8 @@ export default async function PlanosPage() {
           Escolha o plano ideal para anunciar seu veículo
         </h1>
         <p className="mt-3 text-sm text-cnc-muted sm:text-base">
-          Anuncie grátis ou escolha um plano para ampliar a visibilidade do seu veículo nas buscas locais e regionais.
+          Anuncie grátis ou escolha um plano para ampliar a visibilidade do seu veículo nas buscas
+          locais e regionais.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           {HERO_CHIPS.map((chip) => (
