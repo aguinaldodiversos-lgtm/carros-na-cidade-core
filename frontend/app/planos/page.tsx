@@ -62,6 +62,7 @@ type PlanCardData = {
   note?: string;
   cta: { label: string; href: string };
   style: "highlight" | "accent" | "neutral";
+  priorityStars: 1 | 2 | 3 | 4;
   disabled?: boolean;
   unavailableNote?: string;
 };
@@ -78,6 +79,7 @@ function buildSubscriptionCard(plan: SubscriptionPlan, tier: "pro" | "start"): P
   const benefits = subscriptionBenefits(plan, tier);
   return {
     id: pro ? "lojista-pro" : "lojista-start",
+    priorityStars: pro ? 3 : 2,
     name: pro ? "Lojista Pro" : "Lojista Start",
     badge: plan.recommended ? "MAIS COMPLETO" : undefined,
     priceLabel: priceBRL(Number(plan.price)),
@@ -102,6 +104,7 @@ function buildFreeCard(
 ): PlanCardData {
   return {
     id: "gratis",
+    priorityStars: 1,
     name: "Grátis",
     priceLabel: "R$ 0",
     periodLabel: "para sempre",
@@ -118,6 +121,7 @@ function buildDestaqueCard(boost: PublicBoost | null): PlanCardData {
   const days = boost?.duration_days ?? 7;
   return {
     id: "destaque-7-dias",
+    priorityStars: 4,
     name: boost?.name ?? "Destaque 7 dias",
     badge: "TOPO POR " + days + " DIAS",
     priceLabel: boost ? formatBoostPriceBRL(boost.price_cents) : "Preço indisponível",
@@ -223,6 +227,18 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
       ) : null}
       <header className={plan.style === "accent" ? "min-h-[125px] pr-14" : "min-h-[125px]"}>
         <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
+        <div className="mt-2 flex items-center gap-1" role="img" aria-label={`Prioridade de exibição: nível ${plan.priorityStars} de 4`}>
+          {Array.from({ length: plan.priorityStars }, (_, index) => (
+            <svg
+              key={index}
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-6 w-6 fill-amber-400"
+            >
+              <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z" />
+            </svg>
+          ))}
+        </div>
         <p className="mt-3 text-[13px] leading-6 text-slate-500">{plan.intro}</p>
       </header>
       <p className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -338,6 +354,9 @@ export default async function PlanosPage() {
             <HeroChip key={chip}>{chip}</HeroChip>
           ))}
         </div>
+        <p className="mt-3 text-xs text-cnc-muted sm:text-sm">
+          As estrelas indicam o nível de prioridade de exibição dos anúncios, não avaliações de clientes.
+        </p>
       </section>
 
       {catalog === null ? (
