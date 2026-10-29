@@ -227,7 +227,11 @@ function PlanCardView({ plan }: { plan: PlanCardData }) {
       ) : null}
       <header className={plan.style === "accent" ? "min-h-[125px] pr-14" : "min-h-[125px]"}>
         <h3 className="text-[21px] font-extrabold tracking-tight text-slate-950">{plan.name}</h3>
-        <div className="mt-2 flex items-center gap-1" role="img" aria-label={`Prioridade de exibição: nível ${plan.priorityStars} de 4`}>
+        <div
+          className="mt-2 flex items-center gap-1"
+          role="img"
+          aria-label={`Prioridade de exibição: nível ${plan.priorityStars} de 4`}
+        >
           {Array.from({ length: plan.priorityStars }, (_, index) => (
             <svg
               key={index}
