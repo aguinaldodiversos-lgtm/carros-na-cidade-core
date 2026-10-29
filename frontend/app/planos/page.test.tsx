@@ -90,6 +90,23 @@ describe("página de planos — fonte comercial e layout aprovado", () => {
     ).toEqual(["destaque-7-dias", "lojista-pro", "lojista-start", "gratis"]);
   });
 
+  it("mostra estrelas de prioridade sem confundir com avaliações", async () => {
+    const { container } = await page();
+    const expected = [
+      ["destaque-7-dias", 4],
+      ["lojista-pro", 3],
+      ["lojista-start", 2],
+      ["gratis", 1],
+    ] as const;
+    for (const [id, level] of expected) {
+      const card = container.querySelector(`[data-plan-id="${id}"]`);
+      const stars = card?.querySelector('[role="img"][aria-label^="Prioridade de exibição"]');
+      expect(stars?.getAttribute("aria-label")).toBe(`Prioridade de exibição: nível ${level} de 4`);
+      expect(stars?.querySelectorAll("svg")).toHaveLength(level);
+    }
+    expect(container.textContent).toContain("não avaliações de clientes");
+  });
+
   it("não usa fotos de veículos nos cards de planos", async () => {
     const { container } = await page();
     const cards = Array.from(container.querySelectorAll("[data-plan-id]"));
