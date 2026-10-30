@@ -123,10 +123,14 @@ export default async function PublicDealerPage({ params }: PageProps) {
   const payload = await fetchPublicDealer(params.slug);
   if (!payload) notFound();
 
-  const { dealer, rawAds, reviews } = payload;
+  const { dealer, rawAds, reviews, ads } = payload;
+  // O inventário mostrado segue o mesmo contrato público do catálogo:
+  // anúncios inválidos, sujos ou com preço zerado não entram na vitrine.
+  const acceptedSlugs = new Set(ads.map((ad) => ad.slug));
+  const validAds = rawAds.filter((ad) => acceptedSlugs.has(String(ad.slug || "")));
   return (
     <>
-      <DealerStorefront dealer={dealer} ads={rawAds} reviews={reviews} />
+      <DealerStorefront dealer={dealer} ads={validAds} reviews={reviews} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(buildDealerJsonLd(dealer)) }}
