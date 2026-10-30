@@ -23,15 +23,28 @@ export interface PublicDealer {
   name: string;
   /** Loja verificada por moderação interna. */
   verified: boolean;
+  description: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+  whatsapp: string | null;
   city: string | null;
   state: string | null;
   citySlug: string | null;
   totalActiveAds: number;
 }
 
+export interface DealerReview {
+  id: number;
+  author: string;
+  rating: number;
+  body: string;
+  createdAt: string;
+}
+
 /** Payload completo da página. */
 export interface PublicDealerPayload {
   dealer: PublicDealer;
+  reviews: DealerReview[];
   /** Anúncios prontos para os cards públicos (após `normalizePublicAd`). */
   ads: PublicAd[];
   /** Raw `AdItem`s devolvidos pelo backend — útil pra normalizadores
@@ -44,6 +57,7 @@ interface BackendShape {
   data?: {
     dealer?: Record<string, unknown> | null;
     ads?: unknown[] | null;
+    reviews?: unknown[] | null;
   };
 }
 
@@ -110,6 +124,10 @@ function parseDealer(raw: unknown): PublicDealer | null {
     slug,
     name: toStringSafe(r.name) || "Loja parceira",
     verified: toBooleanSafe(r.verified),
+    description: toStringSafe(r.description).slice(0, 600) || null,
+    coverUrl: toStringSafe(r.cover_url) || null,
+    logoUrl: toStringSafe(r.logo_url) || null,
+    whatsapp: toStringSafe(r.whatsapp) || null,
     city: toStringSafe(r.city) || null,
     state: toStringSafe(r.state) || null,
     citySlug: toStringSafe(r.city_slug) || null,
@@ -163,6 +181,16 @@ export async function fetchPublicDealer(slug: string): Promise<PublicDealerPaylo
   const dealer = parseDealer(json?.data?.dealer);
   if (!dealer) return null;
 
+  const reviews = (Array.isArray(json?.data?.reviews) ? json.data.reviews : [])
+    .filter((v): v is Record<string, unknown> => Boolean(v) && typeof v === "object")
+    .map((r) => ({
+      id: toIntSafe(r.id),
+      author: toStringSafe(r.author).slice(0, 60) || "Cliente",
+      rating: Math.max(1, Math.min(5, toIntSafe(r.rating, 1))),
+      body: toStringSafe(r.body).slice(0, 500),
+      createdAt: toStringSafe(r.created_at),
+    }))
+    .filter((r) => r.id > 0 && r.body.length >= 15);
   const rawAds = castRawAds(json?.data?.ads);
   const ads: PublicAd[] = [];
   for (const raw of rawAds) {
@@ -178,6 +206,7 @@ export async function fetchPublicDealer(slug: string): Promise<PublicDealerPaylo
   return {
     dealer: { ...dealer, totalActiveAds },
     ads,
+    reviews,
     rawAds,
   };
 }
