@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import { ensureAdvertiserForUser } from "../advertisers/advertiser.ensure.service.js";
@@ -20,6 +21,21 @@ import { isValidCnpj, normalizeCnpj } from "./cnpj-validation.js";
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validStoreImageUrl(value, userId, kind) {
+  if (value === "") return true;
+  if (typeof value !== "string" || value.length > 350) return false;
+  try {
+    const url = new URL(value, "https://carrosnacidade.com");
+    const hash = crypto.createHash("sha256").update(String(userId)).digest("hex").slice(0, 20);
+    const key = url.searchParams.get("key") || "";
+    return value.startsWith("/api/vehicle-images?") &&
+      url.pathname === "/api/vehicle-images" &&
+      url.searchParams.size === 1 &&
+      new RegExp("^dealers/" + hash + "/" + kind + "/[a-f0-9-]{36}\\.webp$").test(key);
+  } catch { return false; }
+}
+
 
 function onlyDigits(value) {
   return String(value ?? "").replace(/\D/g, "");
@@ -78,6 +94,9 @@ export async function getStoreProfile(userId) {
          NULLIF(TRIM(adv.phone), '')
        ) AS contact_number,
        adv.address,
+       adv.public_description,
+       adv.public_cover_url,
+       adv.public_logo_url,
        adv.city_id,
        adv.verified,
        cities.name AS city_name,
@@ -106,6 +125,9 @@ export async function getStoreProfile(userId) {
     email: adv.email || "",
     whatsapp: adv.whatsapp || "",
     address: adv.address || "",
+    description: adv.public_description || "",
+    cover_url: adv.public_cover_url || "",
+    logo_url: adv.public_logo_url || "",
     city: adv.city_id
       ? { id: Number(adv.city_id), name: adv.city_name || "", state: adv.city_state || "" }
       : null,
@@ -212,6 +234,24 @@ export async function updateStoreProfile(userId, input) {
   setIfColumnExists("email", email || null);
   setIfColumnExists("whatsapp", whatsapp || null);
   setIfColumnExists("address", address || null);
+
+  if (input && Object.prototype.hasOwnProperty.call(input, "description")) {
+    const description = String(input.description ?? "").trim();
+    if (description.length > 600) throw new AppError("Descrição limitada a 600 caracteres.", 400);
+    setIfColumnExists("public_description", description || null);
+  }
+  for (const [field, column, kind] of [
+    ["cover_url", "public_cover_url", "cover"],
+    ["logo_url", "public_logo_url", "logo"],
+  ]) {
+    if (input && Object.prototype.hasOwnProperty.call(input, field)) {
+      const url = String(input[field] ?? "").trim();
+      if (!validStoreImageUrl(url, userId, kind)) {
+        throw new AppError("Imagem da loja inválida. Envie pelo formulário da loja.", 400);
+      }
+      setIfColumnExists(column, url || null);
+    }
+  }
   // Cadastro verificado perde o selo se razão/nome ou endereço for alterado.
   // Alterar apenas contato não desfaz a vistoria administrativa.
   if (columns.has("verified") && (columns.has("name") || columns.has("address"))) {
