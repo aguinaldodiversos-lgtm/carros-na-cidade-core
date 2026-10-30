@@ -1,4 +1,5 @@
 import express from "express";
+import { listOwnerDealerReviews, hideOwnedDealerReview } from "../public/dealer-reviews.service.js";
 import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 import {
@@ -181,5 +182,17 @@ router.put(
     res.json({ success: true, store });
   })
 );
+
+router.get("/store/reviews", asyncHandler(async (req, res) => {
+  const reviews = await listOwnerDealerReviews(req.user.id);
+  res.set("Cache-Control", "private, no-store");
+  res.json({ success: true, reviews });
+}));
+
+router.delete("/store/reviews/:id", asyncHandler(async (req, res) => {
+  const result = await hideOwnedDealerReview(req.user.id, req.params.id);
+  res.set("Cache-Control", "private, no-store");
+  res.json(result);
+}));
 
 export default router;
