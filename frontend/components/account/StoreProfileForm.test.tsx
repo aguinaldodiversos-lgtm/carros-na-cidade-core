@@ -4,6 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import StoreProfileForm from "./StoreProfileForm";
 import type { StoreProfile } from "@/lib/account/backend-account";
 
+// A moderação possui chamadas próprias; aqui testamos apenas o formulário.
+vi.mock("@/components/account/StoreReviewModeration", () => ({
+  default: () => null,
+}));
+
 const sample: StoreProfile = {
   name: "Loja Exemplo",
   email: "contato@loja.test",

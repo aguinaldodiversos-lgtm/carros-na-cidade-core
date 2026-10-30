@@ -17,6 +17,7 @@ import { pool } from "../../infrastructure/database/db.js";
 import { DIRTY_TEST_AD_GUARD_SQL } from "../ads/filters/ads-filter.builder.js";
 import { normalizePublicAdRows } from "../ads/ads.public-images.js";
 import { serializeAdsForListing } from "../ads/ads.public-listing.js";
+import { listPublicDealerReviews } from "./dealer-reviews.service.js";
 
 const MAX_SLUG_LENGTH = 200;
 const ADS_PER_DEALER = 60;
@@ -48,6 +49,10 @@ export async function getPublicDealerBySlug(slug) {
       adv.company_name,
       adv.status,
       adv.verified,
+      adv.public_description,
+      adv.public_cover_url,
+      adv.public_logo_url,
+      NULLIF(TRIM(adv.whatsapp), '') AS public_whatsapp,
       c.slug  AS city_slug,
       c.name  AS city_name,
       c.state AS city_state
@@ -92,14 +97,13 @@ export async function getPublicDealerBySlug(slug) {
     [dealer.id, ADS_PER_DEALER]
   );
 
+  const reviews = await listPublicDealerReviews(dealer.id);
   const normalized = await normalizePublicAdRows(adsRes.rows);
   const ads = serializeAdsForListing(normalized);
 
   // Defesa extra: dropa qualquer ad sem slug — caller renderiza apenas
   // cards com /veiculo/<slug> válido.
-  const safeAds = ads.filter(
-    (ad) => typeof ad.slug === "string" && ad.slug.trim().length > 0
-  );
+  const safeAds = ads.filter((ad) => typeof ad.slug === "string" && ad.slug.trim().length > 0);
 
   return {
     dealer: {
@@ -107,11 +111,16 @@ export async function getPublicDealerBySlug(slug) {
       slug: dealer.slug,
       name: pickDisplayName(dealer),
       verified: Boolean(dealer.verified),
+      description: dealer.public_description || null,
+      cover_url: dealer.public_cover_url || null,
+      logo_url: dealer.public_logo_url || null,
+      whatsapp: dealer.public_whatsapp || null,
       city: dealer.city_name || null,
       state: dealer.city_state || null,
       city_slug: dealer.city_slug || null,
       total_active_ads: safeAds.length,
     },
     ads: safeAds,
+    reviews,
   };
 }

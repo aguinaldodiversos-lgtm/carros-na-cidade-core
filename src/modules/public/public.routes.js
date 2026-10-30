@@ -1,4 +1,6 @@
 import express from "express";
+import { authMiddleware } from "../../shared/middlewares/auth.middleware.js";
+import { submitDealerReview } from "./dealer-reviews.service.js";
 import { getHomeData } from "./public.controller.js";
 import { listPublicHeroBanners } from "../admin/home/admin-home.service.js";
 import {
@@ -232,6 +234,17 @@ router.get(
   cacheGet({ prefix: "public:dealer", ttlSeconds: 60, varyBy: ["params"] }),
   getPublicDealerBySlug
 );
+
+/** Uma avaliação por conta autenticada; sem avaliações fictícias. */
+router.post("/dealers/:slug/reviews", authMiddleware, async (req, res, next) => {
+  try {
+    const review = await submitDealerReview(req.params.slug, req.user.id, req.body || {});
+    res.set("Cache-Control", "no-store");
+    res.status(201).json({ success: true, review });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * Blog público (Fase 4.2) — somente posts status='published'.

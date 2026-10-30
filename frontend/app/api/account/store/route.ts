@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
       email: String(raw?.email ?? ""),
       whatsapp: String(raw?.whatsapp ?? ""),
       address: String(raw?.address ?? ""),
+      description: String(raw?.description ?? ""),
+      cover_url: String(raw?.cover_url ?? ""),
+      logo_url: String(raw?.logo_url ?? ""),
       city_id: Number(raw?.city_id),
     };
     const created = await createStoreProfile(auth.ctx.session, payload);
@@ -64,6 +67,9 @@ export async function PUT(request: NextRequest) {
       email: String(raw?.email ?? ""),
       whatsapp: String(raw?.whatsapp ?? ""),
       address: String(raw?.address ?? ""),
+      description: String(raw?.description ?? ""),
+      cover_url: String(raw?.cover_url ?? ""),
+      logo_url: String(raw?.logo_url ?? ""),
     };
 
     const updated = await updateStoreProfile(auth.ctx.session, payload);
