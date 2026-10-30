@@ -183,16 +183,22 @@ router.put(
   })
 );
 
-router.get("/store/reviews", asyncHandler(async (req, res) => {
-  const reviews = await listOwnerDealerReviews(req.user.id);
-  res.set("Cache-Control", "private, no-store");
-  res.json({ success: true, reviews });
-}));
+router.get(
+  "/store/reviews",
+  asyncHandler(async (req, res) => {
+    const reviews = await listOwnerDealerReviews(req.user.id);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, reviews });
+  })
+);
 
-router.delete("/store/reviews/:id", asyncHandler(async (req, res) => {
-  const result = await hideOwnedDealerReview(req.user.id, req.params.id);
-  res.set("Cache-Control", "private, no-store");
-  res.json(result);
-}));
+router.delete(
+  "/store/reviews/:id",
+  asyncHandler(async (req, res) => {
+    const result = await hideOwnedDealerReview(req.user.id, req.params.id);
+    res.set("Cache-Control", "private, no-store");
+    res.json(result);
+  })
+);
 
 export default router;

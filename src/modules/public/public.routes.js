@@ -241,7 +241,9 @@ router.post("/dealers/:slug/reviews", authMiddleware, async (req, res, next) => 
     const review = await submitDealerReview(req.params.slug, req.user.id, req.body || {});
     res.set("Cache-Control", "no-store");
     res.status(201).json({ success: true, review });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**

@@ -2,7 +2,10 @@ import { pool } from "../../infrastructure/database/db.js";
 import { AppError } from "../../shared/middlewares/error.middleware.js";
 
 function safeAuthorName(name) {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (!parts.length) return "Cliente";
   return (parts[0] + (parts.length > 1 ? " " + parts.at(-1).charAt(0) + "." : "")).slice(0, 60);
 }
@@ -19,14 +22,25 @@ export async function listPublicDealerReviews(dealerId) {
 export async function submitDealerReview(slug, userId, input) {
   const rating = Number(input?.rating);
   const body = String(input?.body ?? "").trim();
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5 || body.length < 15 || body.length > 500) {
+  if (
+    !Number.isInteger(rating) ||
+    rating < 1 ||
+    rating > 5 ||
+    body.length < 15 ||
+    body.length > 500
+  ) {
     throw new AppError("Escolha 1 a 5 estrelas e escreva entre 15 e 500 caracteres.", 400);
   }
   const result = await pool.query(
     "SELECT a.id, a.user_id::text AS owner_id, u.name AS reviewer_name " +
       "FROM advertisers a JOIN users u ON u.id::text = $2 " +
       "WHERE a.slug = $1 AND COALESCE(a.status, 'active') = 'active' LIMIT 1",
-    [String(slug || "").trim().toLowerCase(), String(userId)]
+    [
+      String(slug || "")
+        .trim()
+        .toLowerCase(),
+      String(userId),
+    ]
   );
   const dealer = result.rows[0];
   if (!dealer) throw new AppError("Loja não encontrada.", 404);

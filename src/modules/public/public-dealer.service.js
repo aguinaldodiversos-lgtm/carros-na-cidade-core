@@ -103,9 +103,7 @@ export async function getPublicDealerBySlug(slug) {
 
   // Defesa extra: dropa qualquer ad sem slug — caller renderiza apenas
   // cards com /veiculo/<slug> válido.
-  const safeAds = ads.filter(
-    (ad) => typeof ad.slug === "string" && ad.slug.trim().length > 0
-  );
+  const safeAds = ads.filter((ad) => typeof ad.slug === "string" && ad.slug.trim().length > 0);
 
   return {
     dealer: {

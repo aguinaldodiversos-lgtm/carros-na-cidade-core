@@ -23,7 +23,10 @@ export async function POST(request: NextRequest) {
   const kind = form?.get("kind");
   const photo = form?.get("photo");
   if ((kind !== "cover" && kind !== "logo") || !(photo instanceof File)) {
-    return NextResponse.json({ error: "Selecione uma imagem da fachada ou logotipo." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Selecione uma imagem da fachada ou logotipo." },
+      { status: 400 }
+    );
   }
   if (!ALLOWED.has(photo.type) || !photo.size || photo.size > MAX_INPUT_BYTES) {
     return NextResponse.json({ error: "Envie JPG, PNG ou WebP de até 6 MB." }, { status: 400 });
@@ -46,12 +49,19 @@ export async function POST(request: NextRequest) {
 
     const converted = await sharp(input)
       .rotate()
-      .resize(kind === "cover" ? { width: 1600, height: 900, fit: "inside", withoutEnlargement: true } :
-        { width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+      .resize(
+        kind === "cover"
+          ? { width: 1600, height: 900, fit: "inside", withoutEnlargement: true }
+          : { width: 512, height: 512, fit: "inside", withoutEnlargement: true }
+      )
       .webp({ quality: 82 })
       .toBuffer();
 
-    const userHash = crypto.createHash("sha256").update(String(auth.ctx.session.id)).digest("hex").slice(0, 20);
+    const userHash = crypto
+      .createHash("sha256")
+      .update(String(auth.ctx.session.id))
+      .digest("hex")
+      .slice(0, 20);
     const key = "dealers/" + userHash + "/" + kind + "/" + crypto.randomUUID() + ".webp";
     const client = new S3Client({
       region: process.env.AWS_REGION || "auto",
@@ -59,14 +69,16 @@ export async function POST(request: NextRequest) {
       forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
     });
-    await client.send(new PutObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-      Body: converted,
-      ContentType: "image/webp",
-      ContentLength: converted.length,
-      CacheControl: "public, max-age=31536000, immutable",
-    }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+        Body: converted,
+        ContentType: "image/webp",
+        ContentLength: converted.length,
+        CacheControl: "public, max-age=31536000, immutable",
+      })
+    );
 
     const url = "/api/vehicle-images?key=" + encodeURIComponent(key);
     return applyBffCookies(NextResponse.json({ success: true, url }), auth.ctx);

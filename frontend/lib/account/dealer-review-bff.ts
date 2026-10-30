@@ -24,7 +24,10 @@ export async function forwardDealerReviewRequest(
       cache: "no-store",
     });
     const payload = await response.json().catch(() => ({ error: "Erro no servidor." }));
-    const result = NextResponse.json(payload, { status: response.status, headers: { "Cache-Control": "private, no-store" } });
+    const result = NextResponse.json(payload, {
+      status: response.status,
+      headers: { "Cache-Control": "private, no-store" },
+    });
     return applyBffCookies(result, auth.ctx);
   } catch {
     return NextResponse.json({ error: "Não foi possível concluir a operação." }, { status: 502 });

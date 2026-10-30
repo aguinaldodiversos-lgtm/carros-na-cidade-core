@@ -29,13 +29,16 @@ function validStoreImageUrl(value, userId, kind) {
     const url = new URL(value, "https://carrosnacidade.com");
     const hash = crypto.createHash("sha256").update(String(userId)).digest("hex").slice(0, 20);
     const key = url.searchParams.get("key") || "";
-    return value.startsWith("/api/vehicle-images?") &&
+    return (
+      value.startsWith("/api/vehicle-images?") &&
       url.pathname === "/api/vehicle-images" &&
       url.searchParams.size === 1 &&
-      new RegExp("^dealers/" + hash + "/" + kind + "/[a-f0-9-]{36}\\.webp$").test(key);
-  } catch { return false; }
+      new RegExp("^dealers/" + hash + "/" + kind + "/[a-f0-9-]{36}\\.webp$").test(key)
+    );
+  } catch {
+    return false;
+  }
 }
-
 
 function onlyDigits(value) {
   return String(value ?? "").replace(/\D/g, "");
