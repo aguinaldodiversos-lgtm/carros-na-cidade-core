@@ -1,7 +1,5 @@
-import crypto from "node:crypto";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
+import { resolveInternalBackendApiUrl } from "@/lib/env/backend-api";
 import { applyBffCookies, authenticateBffRequest } from "@/lib/http/bff-session";
 
 export const runtime = "nodejs";
@@ -14,14 +12,11 @@ export async function POST(request: NextRequest) {
   const auth = await authenticateBffRequest(request);
   if (!auth.ok) return auth.response;
 
-  // Em produção o Render/Cloudflare pode entregar request.nextUrl.origin como
-  // host interno, mesmo quando Origin é o domínio oficial do navegador.
-  // A allowlist explícita preserva proteção contra CSRF (não confiar em Host/XFH).
+  // Domínios públicos confiáveis. request.nextUrl.origin pode ser um host
+  // interno de proxy no Render; não utilizá-lo para autorizar produção.
   const sourceOrigin = request.headers.get("origin");
   const allowedOrigins = new Set(["https://www.carrosnacidade.com", "https://carrosnacidade.com"]);
-  if (process.env.NODE_ENV !== "production") {
-    allowedOrigins.add(request.nextUrl.origin);
-  }
+  if (process.env.NODE_ENV !== "production") allowedOrigins.add(request.nextUrl.origin);
   if (sourceOrigin && !allowedOrigins.has(sourceOrigin)) {
     return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
   }
@@ -42,58 +37,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Envie JPG, PNG ou WebP de até 6 MB." }, { status: 400 });
   }
 
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const bucketName = process.env.R2_BUCKET_NAME;
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucketName) {
-    return NextResponse.json({ error: "Armazenamento de imagens indisponível." }, { status: 503 });
+  // Não duplicar segredos R2 no frontend. O backend já usa esse armazenamento
+  // para fotos reais dos veículos. O upload não grava dados da loja; apenas
+  // entrega uma URL, que será validada pelo PUT /api/account/store.
+  const backendUrl = resolveInternalBackendApiUrl("/api/account/store/media");
+  if (!backendUrl) {
+    return NextResponse.json({ error: "Serviço de imagens indisponível." }, { status: 503 });
   }
 
+  const forwarded = new FormData();
+  forwarded.set("kind", kind);
+  forwarded.set("photo", photo, photo.name);
   try {
-    const input = Buffer.from(await photo.arrayBuffer());
-    const meta = await sharp(input).metadata();
-    if (!meta.width || !meta.height || meta.width > 8000 || meta.height > 8000) {
-      return NextResponse.json({ error: "Dimensões de imagem inválidas." }, { status: 400 });
-    }
-
-    const converted = await sharp(input)
-      .rotate()
-      .resize(
-        kind === "cover"
-          ? { width: 1600, height: 900, fit: "inside", withoutEnlargement: true }
-          : { width: 512, height: 512, fit: "inside", withoutEnlargement: true }
-      )
-      .webp({ quality: 82 })
-      .toBuffer();
-
-    const userHash = crypto
-      .createHash("sha256")
-      .update(String(auth.ctx.session.id))
-      .digest("hex")
-      .slice(0, 20);
-    const key = "dealers/" + userHash + "/" + kind + "/" + crypto.randomUUID() + ".webp";
-    const client = new S3Client({
-      region: process.env.AWS_REGION || "auto",
-      endpoint: process.env.R2_ENDPOINT || "https://" + accountId + ".r2.cloudflarestorage.com",
-      forcePathStyle: true,
-      credentials: { accessKeyId, secretAccessKey },
+    const upstream = await fetch(backendUrl, {
+      method: "POST",
+      headers: { ...auth.ctx.backendHeaders },
+      body: forwarded,
+      cache: "no-store",
+      signal: AbortSignal.timeout(45_000),
     });
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: converted,
-        ContentType: "image/webp",
-        ContentLength: converted.length,
-        CacheControl: "public, max-age=31536000, immutable",
-      })
+    const payload = (await upstream.json().catch(() => null)) as
+      | { success?: boolean; url?: string; error?: string; message?: string }
+      | null;
+    if (!upstream.ok || !payload?.url) {
+      const error = payload?.error || payload?.message || "Não foi possível enviar a imagem.";
+      return applyBffCookies(
+        NextResponse.json({ error }, { status: upstream.ok ? 502 : upstream.status }),
+        auth.ctx
+      );
+    }
+    return applyBffCookies(
+      NextResponse.json({ success: true, url: payload.url }, { status: 201 }),
+      auth.ctx
     );
-
-    const url = "/api/vehicle-images?key=" + encodeURIComponent(key);
-    return applyBffCookies(NextResponse.json({ success: true, url }), auth.ctx);
   } catch (error) {
-    console.error("[store-media] falha de upload", error instanceof Error ? error.message : error);
-    return NextResponse.json({ error: "Não foi possível enviar a imagem." }, { status: 502 });
+    console.error("[store-media] falha de encaminhamento", error instanceof Error ? error.name : "unknown");
+    return NextResponse.json({ error: "Serviço de imagens temporariamente indisponível." }, { status: 502 });
   }
 }
