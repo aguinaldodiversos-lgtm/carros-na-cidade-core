@@ -41,9 +41,9 @@ describe("perfil público da loja — layout premium", () => {
     expect(screen.getByRole("region", { name: "Identidade da loja" }).className).toContain(
       "sm:p-5"
     );
-    expect(screen.getByRole("complementary", { name: "Informações de contato" }).className).toContain(
-      "sm:p-5"
-    );
+    expect(
+      screen.getByRole("complementary", { name: "Informações de contato" }).className
+    ).toContain("sm:p-5");
     expect(screen.getByRole("link", { name: /Ver estoque da loja/i })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Chamar no WhatsApp/i })).toBeTruthy();
     expect(screen.getByText("Rua Comercial, 100")).toBeTruthy();
