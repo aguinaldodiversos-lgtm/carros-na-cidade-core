@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
-import StoreReviewModeration from "@/components/account/StoreReviewModeration";
 
 import type { StoreProfile } from "@/lib/account/backend-account";
 import PurchaseIntentCityField, {
@@ -426,7 +425,6 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
           {submitting ? "Salvando..." : "Salvar dados da loja"}
         </button>
       </form>
-      {created ? <StoreReviewModeration /> : null}
     </>
   );
 }
