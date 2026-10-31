@@ -59,4 +59,3 @@ export async function submitDealerReview(slug, userId, input) {
     throw err;
   }
 }
-

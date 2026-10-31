@@ -7,7 +7,10 @@ import * as dashboardService from "./dashboard/admin-dashboard.service.js";
 import * as adsService from "./ads/admin-ads.service.js";
 import * as adBlockService from "./ads/admin-ad-block.service.js";
 import * as advertisersService from "./advertisers/admin-advertisers.service.js";
-import { listDealerReviewsForAdmin, hideDealerReviewByAdmin } from "./advertisers/admin-dealer-reviews.service.js";
+import {
+  listDealerReviewsForAdmin,
+  hideDealerReviewByAdmin,
+} from "./advertisers/admin-dealer-reviews.service.js";
 import * as adminUsersService from "./users/admin-users.service.js";
 import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";

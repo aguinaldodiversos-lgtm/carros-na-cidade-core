@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  adminApi,
-  type DealerReviewAdminRow,
-} from "@/lib/admin/api";
+import { adminApi, type DealerReviewAdminRow } from "@/lib/admin/api";
 import { useAdminFetch } from "@/lib/admin/useAdmin";
 import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
@@ -41,16 +38,37 @@ export default function AdminDealerReviews({ advertiserId }: { advertiserId: num
   const items = reviews.data?.data ?? [];
 
   return (
-    <section className="rounded-xl border border-cnc-line bg-white p-5 shadow-card" aria-label="Inspeção de avaliações da loja">
-      <h2 className="text-sm font-bold text-cnc-text">Avaliações dos clientes — inspeção administrativa</h2>
+    <section
+      className="rounded-xl border border-cnc-line bg-white p-5 shadow-card"
+      aria-label="Inspeção de avaliações da loja"
+    >
+      <h2 className="text-sm font-bold text-cnc-text">
+        Avaliações dos clientes — inspeção administrativa
+      </h2>
       <p className="mt-1 text-xs leading-relaxed text-cnc-muted">
         Consulte avaliações positivas e negativas antes de decidir. Somente o administrador pode
         ocultá-las; o lojista não possui essa permissão. Nenhuma avaliação é apagada do histórico.
       </p>
-      {reviews.loading ? <div className="mt-4"><AdminLoadingState /></div> : null}
-      {reviews.error ? <div className="mt-4"><AdminErrorState message={reviews.error} onRetry={reviews.reload} /></div> : null}
-      {error ? <p role="alert" className="mt-3 text-sm text-red-700">{error}</p> : null}
-      {success ? <p role="status" className="mt-3 text-sm text-emerald-700">{success}</p> : null}
+      {reviews.loading ? (
+        <div className="mt-4">
+          <AdminLoadingState />
+        </div>
+      ) : null}
+      {reviews.error ? (
+        <div className="mt-4">
+          <AdminErrorState message={reviews.error} onRetry={reviews.reload} />
+        </div>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p role="status" className="mt-3 text-sm text-emerald-700">
+          {success}
+        </p>
+      ) : null}
       {!reviews.loading && !reviews.error && items.length === 0 ? (
         <p className="mt-4 text-sm text-cnc-muted">Esta loja ainda não recebeu avaliações.</p>
       ) : null}
@@ -67,7 +85,9 @@ export default function AdminDealerReviews({ advertiserId }: { advertiserId: num
               <span className="text-amber-500" aria-label={review.rating + " de 5 estrelas"}>
                 {"★".repeat(Math.min(5, Math.max(1, review.rating)))}
               </span>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-cnc-text">{review.body}</p>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm text-cnc-text">
+                {review.body}
+              </p>
               <p className="mt-2 text-xs text-cnc-muted">
                 Publicada em {new Date(review.created_at).toLocaleDateString("pt-BR")}
               </p>
@@ -96,7 +116,11 @@ export default function AdminDealerReviews({ advertiserId }: { advertiserId: num
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => { setSelectedId(null); setReason(""); setError(""); }}
+                        onClick={() => {
+                          setSelectedId(null);
+                          setReason("");
+                          setError("");
+                        }}
                         className="rounded-lg border border-cnc-line bg-white px-3 py-2 text-xs font-bold text-cnc-text"
                       >
                         Cancelar
@@ -107,7 +131,12 @@ export default function AdminDealerReviews({ advertiserId }: { advertiserId: num
                   <button
                     type="button"
                     className="mt-3 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700"
-                    onClick={() => { setSelectedId(review.id); setReason(""); setError(""); setSuccess(""); }}
+                    onClick={() => {
+                      setSelectedId(review.id);
+                      setReason("");
+                      setError("");
+                      setSuccess("");
+                    }}
                   >
                     Analisar ocultação
                   </button>

@@ -24,10 +24,9 @@ describe("moderação administrativa de avaliações", () => {
     mocks.query.mockResolvedValue({ rows: [{ id: 12, status: "published" }] });
     const data = await listDealerReviewsForAdmin("64");
     expect(data).toEqual([{ id: 12, status: "published" }]);
-    expect(mocks.query).toHaveBeenCalledWith(
-      expect.stringContaining("WHERE advertiser_id = $1"),
-      [64]
-    );
+    expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("WHERE advertiser_id = $1"), [
+      64,
+    ]);
     expect(mocks.connect).not.toHaveBeenCalled();
   });
 
@@ -39,13 +38,17 @@ describe("moderação administrativa de avaliações", () => {
   });
 
   it("oculta em transação e grava justificativa de auditoria; não apaga", async () => {
-    mocks.query.mockResolvedValueOnce({})
+    mocks.query
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ rows: [{ id: 12, advertiser_id: 64, status: "published" }] })
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({});
     const result = await hideDealerReviewByAdmin(
-      "admin-1", "64", "12", "Análise concluída pela equipe responsável."
+      "admin-1",
+      "64",
+      "12",
+      "Análise concluída pela equipe responsável."
     );
     expect(result).toEqual({ id: 12, status: "hidden" });
     const sql = mocks.query.mock.calls.map(([s]) => s);
@@ -58,7 +61,8 @@ describe("moderação administrativa de avaliações", () => {
   });
 
   it("faz rollback se não conseguir registrar a auditoria", async () => {
-    mocks.query.mockResolvedValueOnce({})
+    mocks.query
+      .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ rows: [{ id: 12, status: "published" }] })
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce(new Error("auditoria indisponível"))
@@ -71,7 +75,10 @@ describe("moderação administrativa de avaliações", () => {
   });
 
   it("recusa avaliações ocultas e avaliações de outra loja", async () => {
-    mocks.query.mockResolvedValueOnce({}).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({});
+    mocks.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({});
     await expect(
       hideDealerReviewByAdmin("1", 64, 999, "Justificativa suficientemente detalhada.")
     ).rejects.toThrow(/não encontrada/);

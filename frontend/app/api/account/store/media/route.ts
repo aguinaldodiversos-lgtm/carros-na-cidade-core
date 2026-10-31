@@ -18,10 +18,7 @@ export async function POST(request: NextRequest) {
   // host interno, mesmo quando Origin é o domínio oficial do navegador.
   // A allowlist explícita preserva proteção contra CSRF (não confiar em Host/XFH).
   const sourceOrigin = request.headers.get("origin");
-  const allowedOrigins = new Set([
-    "https://www.carrosnacidade.com",
-    "https://carrosnacidade.com",
-  ]);
+  const allowedOrigins = new Set(["https://www.carrosnacidade.com", "https://carrosnacidade.com"]);
   if (process.env.NODE_ENV !== "production") {
     allowedOrigins.add(request.nextUrl.origin);
   }
