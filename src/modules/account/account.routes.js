@@ -36,7 +36,6 @@ const storeMediaUpload = multer({
   },
 }).single("photo");
 
-
 const router = express.Router();
 
 function asyncHandler(fn) {

@@ -41,12 +41,7 @@ export async function uploadStoreMedia({ userId, accountType, kind, file }) {
   try {
     const source = sharp(file.buffer, { limitInputPixels: 64_000_000 });
     const metadata = await source.metadata();
-    if (
-      !metadata.width ||
-      !metadata.height ||
-      metadata.width > 8000 ||
-      metadata.height > 8000
-    ) {
+    if (!metadata.width || !metadata.height || metadata.width > 8000 || metadata.height > 8000) {
       throw new AppError("Dimensões de imagem inválidas.", 400);
     }
     converted = await sharp(file.buffer, { limitInputPixels: 64_000_000 })

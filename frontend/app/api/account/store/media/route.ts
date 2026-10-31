@@ -56,9 +56,12 @@ export async function POST(request: NextRequest) {
       cache: "no-store",
       signal: AbortSignal.timeout(45_000),
     });
-    const payload = (await upstream.json().catch(() => null)) as
-      | { success?: boolean; url?: string; error?: string; message?: string }
-      | null;
+    const payload = (await upstream.json().catch(() => null)) as {
+      success?: boolean;
+      url?: string;
+      error?: string;
+      message?: string;
+    } | null;
     if (!upstream.ok || !payload?.url) {
       const error = payload?.error || payload?.message || "Não foi possível enviar a imagem.";
       return applyBffCookies(
@@ -71,7 +74,13 @@ export async function POST(request: NextRequest) {
       auth.ctx
     );
   } catch (error) {
-    console.error("[store-media] falha de encaminhamento", error instanceof Error ? error.name : "unknown");
-    return NextResponse.json({ error: "Serviço de imagens temporariamente indisponível." }, { status: 502 });
+    console.error(
+      "[store-media] falha de encaminhamento",
+      error instanceof Error ? error.name : "unknown"
+    );
+    return NextResponse.json(
+      { error: "Serviço de imagens temporariamente indisponível." },
+      { status: 502 }
+    );
   }
 }
