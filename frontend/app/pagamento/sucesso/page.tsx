@@ -1,182 +1,219 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-/**
- * Polling pós-checkout: o callback "success" do Mercado Pago volta antes do
- * webhook validar a aprovação no backend. Antes, esta página afirmava
- * "Pagamento aprovado" mesmo quando o webhook ainda não tinha rodado — UX
- * incoerente. Agora ela consulta /api/dashboard/me a cada 3s até confirmar
- * a conta possui um plano pago, ou até esgotar o budget (~30s).
- * Um plano já existente não comprova que a compra recém-iniciada foi aprovada:
- * a página informa o estado da conta sem alegar confirmação de transação.
- */
-
-type PollingState = "checking" | "plan_active" | "still_pending";
-
-const POLL_INTERVAL_MS = 3000;
-const MAX_POLL_ATTEMPTS = 10;
-
-type DashboardCurrentPlan = {
-  id?: string | null;
-  billing_model?: "free" | "one_time" | "monthly" | string | null;
-} | null;
-
-type DashboardPayload = {
-  ok?: boolean;
-  current_plan?: DashboardCurrentPlan;
-  plan?: DashboardCurrentPlan;
+type PaymentReturn = {
+  context: "boost" | "plan";
+  status: "pending" | "approved" | "rejected" | "canceled" | string;
+  boost_active: boolean;
+  product?: string;
 };
 
-function readCurrentPlan(payload: DashboardPayload | null): DashboardCurrentPlan {
-  if (!payload) return null;
-  return payload.current_plan ?? payload.plan ?? null;
+type ConfirmationState =
+  | { stage: "checking" }
+  | { stage: "approved"; payment: PaymentReturn }
+  | { stage: "pending" }
+  | { stage: "failed" }
+  | { stage: "unavailable" };
+
+const MAX_CHECKS = 12;
+const INTERVAL_MS = 2500;
+
+function PaymentIcon({ variant }: { variant: "success" | "pending" | "failed" }) {
+  const success = variant === "success";
+  return (
+    <span
+      className={
+        "mx-auto flex h-20 w-20 items-center justify-center rounded-full " +
+        (success
+          ? "bg-[#e6f7ef] text-[#09834b]"
+          : variant === "failed"
+            ? "bg-[#fff1f1] text-[#bf3737]"
+            : "bg-[#edf4ff] text-[#1463db]")
+      }
+      aria-hidden="true"
+    >
+      {success ? (
+        <svg className="h-11 w-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="m7.5 12.2 3 3L16.5 9" />
+        </svg>
+      ) : variant === "failed" ? (
+        <svg className="h-11 w-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v6m0 4h.01" />
+        </svg>
+      ) : (
+        <svg className="h-11 w-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l4 2" />
+        </svg>
+      )}
+    </span>
+  );
 }
 
-function isPaidPlan(plan: DashboardCurrentPlan): boolean {
-  if (!plan) return false;
-  const model = String(plan.billing_model || "").toLowerCase();
-  return model === "monthly" || model === "one_time";
+function ConfirmationContent({ state }: { state: ConfirmationState }) {
+  if (state.stage === "checking") {
+    return (
+      <>
+        <PaymentIcon variant="pending" />
+        <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-[#122344] sm:text-3xl">Conferindo seu pagamento</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#5e6c83]">
+          Você voltou do Mercado Pago. Estamos consultando a confirmação no sistema antes de exibir o resultado da compra.
+        </p>
+        <p role="status" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#1764dd]">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#1764dd]" />
+          Aguardando confirmação...
+        </p>
+      </>
+    );
+  }
+
+  if (state.stage === "approved") {
+    const isBoost = state.payment.context === "boost";
+    return (
+      <>
+        <PaymentIcon variant="success" />
+        <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-[#122344] sm:text-3xl">Pagamento confirmado!</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#53617a] sm:text-base">
+          {isBoost
+            ? state.payment.boost_active
+              ? "Seu Destaque de 7 dias está ativo! O anúncio já recebe a prioridade contratada; a exibição nas páginas pode levar alguns instantes para atualizar."
+              : "Recebemos a confirmação do seu pagamento. O Destaque contratado está em processamento e poderá aparecer no anúncio em instantes."
+            : "Recebemos a confirmação do pagamento. Os benefícios do plano contratado serão disponibilizados conforme a ativação da sua conta."}
+        </p>
+        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-[#d9eee3] bg-[#f4fcf7] px-4 py-3 text-left">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#2e8060]">Sua contratação</p>
+          <p className="mt-1 text-sm font-extrabold text-[#14583d]">{isBoost ? "Destaque de 7 dias" : "Plano contratado"}</p>
+          <p className="mt-1 text-xs leading-5 text-[#527463]">
+            {isBoost && state.payment.boost_active ? "Benefício ativo no anúncio." : "Pagamento aprovado. Acompanhe a ativação pelo painel."}
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  if (state.stage === "failed") {
+    return (
+      <>
+        <PaymentIcon variant="failed" />
+        <h1 className="mt-5 text-2xl font-extrabold text-[#122344] sm:text-3xl">Pagamento não confirmado</h1>
+        <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#53617a]">
+          O pagamento consta como não aprovado. Confira os detalhes no Mercado Pago antes de realizar outra tentativa.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <PaymentIcon variant="pending" />
+      <h1 className="mt-5 text-2xl font-extrabold text-[#122344] sm:text-3xl">
+        {state.stage === "pending" ? "Seu pagamento está em análise" : "Não foi possível confirmar o pagamento"}
+      </h1>
+      <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#53617a]">
+        {state.stage === "pending"
+          ? "A confirmação ainda não chegou ao sistema. Caso você já tenha pago, não faça um novo pagamento agora; acompanhe a liberação pelo painel da loja."
+          : "Não conseguimos identificar esta transação com segurança nesta sessão. Consulte o comprovante no Mercado Pago e acompanhe seu anúncio no painel. Evite pagar novamente antes de conferir."}
+      </p>
+    </>
+  );
 }
 
 export default function PagamentoSucessoPage() {
-  const [state, setState] = useState<PollingState>("checking");
-  const [planLabel, setPlanLabel] = useState<string | null>(null);
-  const cancelledRef = useRef(false);
+  const [state, setState] = useState<ConfirmationState>({ stage: "checking" });
 
   useEffect(() => {
-    cancelledRef.current = false;
-    let attempt = 0;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const params = new URLSearchParams(window.location.search);
+    // Mercado Pago Checkout Pro devolve external_reference (preferência)
+    // e payment_id/collection_id; nunca confiamos no parâmetro status.
+    const reference =
+      params.get("external_reference") ||
+      params.get("pedido") ||
+      params.get("payment_id") ||
+      params.get("collection_id") ||
+      "";
 
-    async function poll() {
-      if (cancelledRef.current) return;
-      attempt += 1;
+    if (!/^[a-zA-Z0-9_-]{8,128}$/.test(reference)) {
+      setState({ stage: "unavailable" });
+      return;
+    }
+
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let attempts = 0;
+
+    async function check() {
+      if (cancelled) return;
+      attempts += 1;
 
       try {
-        const response = await fetch("/api/dashboard/me", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        });
+        const response = await fetch(
+          "/api/payments/return-status?reference=" + encodeURIComponent(reference),
+          { method: "GET", credentials: "include", cache: "no-store" }
+        );
 
-        if (response.status === 401) {
-          // Sem sessão não existe comprovante de aprovação. Nunca exibir
-          // "Pagamento aprovado" apenas porque o visitante retornou do checkout.
-          if (!cancelledRef.current) setState("still_pending");
+        if (response.status === 401 || response.status === 403) {
+          if (!cancelled) setState({ stage: "unavailable" });
           return;
         }
 
         if (response.ok) {
-          const payload = (await response.json()) as DashboardPayload;
-          const plan = readCurrentPlan(payload);
-          if (isPaidPlan(plan)) {
-            if (!cancelledRef.current) {
-              setPlanLabel(plan?.id ? String(plan.id) : null);
-              setState("plan_active");
-            }
+          const payment = (await response.json()) as PaymentReturn;
+          if (payment.status === "approved") {
+            if (!cancelled) setState({ stage: "approved", payment });
+            return;
+          }
+          if (payment.status === "rejected" || payment.status === "canceled") {
+            if (!cancelled) setState({ stage: "failed" });
             return;
           }
         }
       } catch {
-        // Erro de rede: continua o polling até esgotar tentativas.
+        // Eventual atraso de webhook ou indisponibilidade temporária da rede.
       }
 
-      if (cancelledRef.current) return;
-
-      if (attempt >= MAX_POLL_ATTEMPTS) {
-        setState("still_pending");
+      if (cancelled) return;
+      if (attempts >= MAX_CHECKS) {
+        setState({ stage: "pending" });
         return;
       }
-
-      timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+      timeout = setTimeout(check, INTERVAL_MS);
     }
 
-    poll();
-
+    void check();
     return () => {
-      cancelledRef.current = true;
-      if (timeoutId) clearTimeout(timeoutId);
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
     };
   }, []);
 
   return (
-    <main className="mx-auto min-h-[70vh] w-full max-w-3xl px-6 py-20">
-      <section className="rounded-2xl border border-[#dfe4ef] bg-white p-8 text-center shadow-[0_2px_18px_rgba(10,20,40,0.06)]">
-        {state === "checking" ? (
-          <>
-            <h1 className="text-3xl font-extrabold text-[#1d2538]">Validando seu pagamento...</h1>
-            <p className="mt-2 text-sm text-[#53607b]">
-              Você retornou do checkout. Estamos verificando sua conta; a aprovação desta compra
-              depende da confirmação da transação no sistema.
-            </p>
-            <div
-              role="status"
-              aria-live="polite"
-              className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[#0e62d8]"
-            >
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#0e62d8]" />
-              Conferindo o status no backend
-            </div>
-          </>
-        ) : state === "plan_active" ? (
-          <>
-            <h1 className="text-3xl font-extrabold text-[#1d2538]">Plano ativo na sua conta</h1>
-            <p className="mt-2 text-sm text-[#53607b]">
-              {planLabel ? `Plano ativo: ${planLabel}. ` : "Identificamos um plano ativo. "}
-              Isso não confirma a aprovação desta compra. Consulte o comprovante no Mercado Pago.
-            </p>
-            <p className="mt-3 text-xs text-[#53607b]">
-              Se você começou a cadastrar um veículo antes de contratar, pode retomar o rascunho
-              salvo neste mesmo navegador e concluir a publicação.
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-3">
-              <Link
-                href="/anunciar/novo?step=5"
-                className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white"
-              >
-                Retomar meu anúncio
-              </Link>
-              <Link
-                href="/planos"
-                className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]"
-              >
-                Voltar para planos
-              </Link>
-              <Link
-                href="/anuncios"
-                className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]"
-              >
-                Ir para anuncios
-              </Link>
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 className="text-3xl font-extrabold text-[#1d2538]">Pagamento em validação</h1>
-            <p className="mt-2 text-sm text-[#53607b]">
-              Não foi possível confirmar esta transação pelo status da conta. Confira o pagamento no
-              Mercado Pago e acompanhe os benefícios no seu painel. Caso tenha pago, não inicie uma
-              segunda cobrança antes de verificar a primeira.
-            </p>
-            <div className="mt-5 flex justify-center gap-3">
-              <Link
-                href="/dashboard"
-                className="inline-flex h-11 items-center rounded-xl bg-[#0e62d8] px-5 text-sm font-bold text-white"
-              >
-                Abrir painel
-              </Link>
-              <Link
-                href="/planos"
-                className="inline-flex h-11 items-center rounded-xl border border-[#dfe4ef] px-5 text-sm font-bold text-[#2d3852]"
-              >
-                Voltar para planos
-              </Link>
-            </div>
-          </>
-        )}
+    <main className="mx-auto flex min-h-[70vh] w-full max-w-[840px] items-start justify-center px-4 py-10 sm:px-6 sm:py-16">
+      <section className="w-full rounded-3xl border border-[#e2e9f3] bg-white px-5 py-9 text-center shadow-[0_14px_48px_rgba(20,42,79,0.08)] sm:px-10 sm:py-12">
+        <ConfirmationContent state={state} />
+
+        <div className="mx-auto mt-8 flex max-w-md flex-col gap-3">
+          <Link
+            href="/dashboard-loja"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1462e7] px-5 py-3 text-sm font-extrabold text-white transition hover:bg-[#0c50c4]"
+          >
+            Voltar ao painel da loja
+            <span aria-hidden="true">→</span>
+          </Link>
+          <Link
+            href="/dashboard-loja/meus-anuncios"
+            className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-[#cbdcf8] bg-white px-5 py-3 text-sm font-bold text-[#1760d0] transition hover:bg-[#f4f8ff]"
+          >
+            Ver meus anúncios
+          </Link>
+        </div>
+
+        <p className="mx-auto mt-6 max-w-lg text-xs leading-5 text-[#8590a3]">
+          A confirmação exibida aqui é consultada no sistema do Carros na Cidade. O pagamento é processado pelo Mercado Pago.
+        </p>
       </section>
     </main>
   );
