@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import PersonalProfileForm from "@/components/account/PersonalProfileForm";
 import { fetchPersonalProfile } from "@/lib/account/backend-account";
 import { requirePfDashboardSession } from "@/lib/account/dashboard-session";
@@ -12,6 +13,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ContaPfPage() {
   const session = await requirePfDashboardSession();
+
+  // Conta CNPJ não pode abrir o formulário PF: o endpoint /personal retorna 403.
+  // Levar diretamente ao editor da loja, sem mascarar uma negação legítima como erro 500.
+  if (session.type === "CNPJ") redirect("/dashboard-loja/dados");
 
   try {
     const { profile } = await fetchPersonalProfile(session);

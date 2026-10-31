@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import AccountDashboardView from "@/components/account/AccountDashboardView";
 import { DashboardClientRecovery } from "@/components/dashboard/DashboardClientRecovery";
 import { loadDashboardPayload, requirePfDashboardSession } from "@/lib/account/dashboard-session";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await requirePfDashboardSession();
+  if (session.type === "CNPJ") redirect("/dashboard-loja");
   const payload = await loadDashboardPayload(session);
 
   if (!payload) {
