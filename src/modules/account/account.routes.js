@@ -17,6 +17,24 @@ import {
   updateStoreProfile,
 } from "./store-profile.service.js";
 import { getPersonalProfile, updatePersonalProfile } from "./personal-profile.service.js";
+import multer from "multer";
+import {
+  MAX_STORE_MEDIA_BYTES,
+  STORE_MEDIA_MIMES,
+  uploadStoreMedia,
+} from "./store-media.service.js";
+
+const storeMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_STORE_MEDIA_BYTES, files: 1, fields: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (!STORE_MEDIA_MIMES.has(file.mimetype)) {
+      callback(new AppError("Envie JPG, PNG ou WebP de até 6 MB.", 400));
+      return;
+    }
+    callback(null, true);
+  },
+}).single("photo");
 
 const router = express.Router();
 
@@ -153,6 +171,23 @@ router.put(
     const profile = await updatePersonalProfile(req.user.id, req.body);
     res.set("Cache-Control", "private, no-store");
     res.json({ success: true, profile });
+  })
+);
+
+// Envio de imagens da identidade pública (backend com R2 configurado).
+// Multipart restrito, autenticado e vinculado ao CNPJ; não edita anúncios.
+router.post(
+  "/store/media",
+  storeMediaUpload,
+  asyncHandler(async (req, res) => {
+    const uploaded = await uploadStoreMedia({
+      userId: req.user.id,
+      accountType: req.user.account_type,
+      kind: req.body?.kind,
+      file: req.file,
+    });
+    res.set("Cache-Control", "private, no-store");
+    res.status(201).json({ success: true, ...uploaded });
   })
 );
 
