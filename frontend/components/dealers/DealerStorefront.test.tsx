@@ -40,7 +40,9 @@ describe("perfil público da loja — layout premium", () => {
     expect(screen.queryByText(/Google Maps|Como chegar|CNPJ verificado/)).toBeNull();
     expect(screen.getByText(/ainda não recebeu avaliações públicas/i)).toBeTruthy();
     expect(screen.queryByText(/4,8|24 avaliações/)).toBeNull();
-    expect(screen.getByRole("link", { name: /Ver estoque da loja/i }).getAttribute("href")).toBe("#estoque");
+    expect(screen.getByRole("link", { name: /Ver estoque da loja/i }).getAttribute("href")).toBe(
+      "#estoque"
+    );
   });
 
   it("não exibe horários ou telefones inventados e mantém a navegação", () => {
@@ -54,6 +56,8 @@ describe("perfil público da loja — layout premium", () => {
     expect(screen.getByText(/a loja ainda não informou seus dados de contato/i)).toBeTruthy();
     expect(screen.queryByRole("link", { name: /chamar no whatsapp/i })).toBeNull();
     expect(screen.getByRole("link", { name: "Sobre a loja" }).getAttribute("href")).toBe("#sobre");
-    expect(screen.getByRole("link", { name: "Avaliações" }).getAttribute("href")).toBe("#avaliacoes");
+    expect(screen.getByRole("link", { name: "Avaliações" }).getAttribute("href")).toBe(
+      "#avaliacoes"
+    );
   });
 });

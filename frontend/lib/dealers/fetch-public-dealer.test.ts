@@ -129,12 +129,13 @@ describe("fetchPublicDealer — Lojas Públicas 2026-05-25", () => {
   it("expõe somente contatos públicos reais e horário informado, sem defaults fictícios", async () => {
     mockedFetch.mockResolvedValue({
       ok: true,
-      json: async () => dealerPayload({
-        address: "Rua Exemplo, 100",
-        phone: "1144149804",
-        whatsapp: "11999998888",
-        business_hours: "Segunda a sexta: 9h às 18h",
-      }),
+      json: async () =>
+        dealerPayload({
+          address: "Rua Exemplo, 100",
+          phone: "1144149804",
+          whatsapp: "11999998888",
+          business_hours: "Segunda a sexta: 9h às 18h",
+        }),
     } as unknown as Response);
 
     const out = await fetchPublicDealer("auto-center-7");
