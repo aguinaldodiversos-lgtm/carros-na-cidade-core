@@ -145,6 +145,7 @@ export async function findAdByIdentifier(identifier) {
       c.slug AS city_slug,
       adv.id           AS dealership_id,
       adv.slug         AS advertiser_slug,
+      adv.public_logo_url AS advertiser_logo_url,
       adv.name         AS seller_name,
       adv.company_name AS dealership_name,
       adv.phone        AS seller_phone,
