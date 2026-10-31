@@ -21,7 +21,9 @@ describe("retorno autenticado do Mercado Pago — somente leitura", () => {
 
   it("consulta a transação apenas pelo usuário autenticado e não escreve nada", async () => {
     db.query.mockResolvedValueOnce({
-      rows: [{ context: "boost", status: "approved", boost_option_id: "boost-7d", boost_active: true }],
+      rows: [
+        { context: "boost", status: "approved", boost_option_id: "boost-7d", boost_active: true },
+      ],
     });
     const result = await getMyPaymentReturnStatus({ userId: "lojista-122", reference: ID });
     expect(result).toEqual({

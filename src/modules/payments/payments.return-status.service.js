@@ -43,9 +43,10 @@ export async function getMyPaymentReturnStatus({ userId, reference }) {
   return {
     context: intent.context,
     status: intent.status,
-    boost_active: intent.context === "boost" && intent.status === "approved"
-      ? Boolean(intent.boost_active)
-      : false,
+    boost_active:
+      intent.context === "boost" && intent.status === "approved"
+        ? Boolean(intent.boost_active)
+        : false,
     plan_id: intent.context === "plan" ? intent.plan_id : null,
     product: intent.context === "boost" ? "Destaque de 7 dias" : "Plano contratado",
   };

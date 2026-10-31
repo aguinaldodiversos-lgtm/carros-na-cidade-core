@@ -35,17 +35,39 @@ function PaymentIcon({ variant }: { variant: "success" | "pending" | "failed" })
       aria-hidden="true"
     >
       {success ? (
-        <svg className="h-11 w-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          className="h-11 w-11"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <circle cx="12" cy="12" r="9" />
           <path d="m7.5 12.2 3 3L16.5 9" />
         </svg>
       ) : variant === "failed" ? (
-        <svg className="h-11 w-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+        <svg
+          className="h-11 w-11"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        >
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v6m0 4h.01" />
         </svg>
       ) : (
-        <svg className="h-11 w-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg
+          className="h-11 w-11"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
           <circle cx="12" cy="12" r="9" />
           <path d="M12 7v5l4 2" />
         </svg>
@@ -59,11 +81,17 @@ function ConfirmationContent({ state }: { state: ConfirmationState }) {
     return (
       <>
         <PaymentIcon variant="pending" />
-        <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-[#122344] sm:text-3xl">Conferindo seu pagamento</h1>
+        <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-[#122344] sm:text-3xl">
+          Conferindo seu pagamento
+        </h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#5e6c83]">
-          Você voltou do Mercado Pago. Estamos consultando a confirmação no sistema antes de exibir o resultado da compra.
+          Você voltou do Mercado Pago. Estamos consultando a confirmação no sistema antes de exibir
+          o resultado da compra.
         </p>
-        <p role="status" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#1764dd]">
+        <p
+          role="status"
+          className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#1764dd]"
+        >
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#1764dd]" />
           Aguardando confirmação...
         </p>
@@ -76,7 +104,9 @@ function ConfirmationContent({ state }: { state: ConfirmationState }) {
     return (
       <>
         <PaymentIcon variant="success" />
-        <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-[#122344] sm:text-3xl">Pagamento confirmado!</h1>
+        <h1 className="mt-5 text-2xl font-extrabold tracking-tight text-[#122344] sm:text-3xl">
+          Pagamento confirmado!
+        </h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#53617a] sm:text-base">
           {isBoost
             ? state.payment.boost_active
@@ -85,10 +115,16 @@ function ConfirmationContent({ state }: { state: ConfirmationState }) {
             : "Recebemos a confirmação do pagamento. Os benefícios do plano contratado serão disponibilizados conforme a ativação da sua conta."}
         </p>
         <div className="mx-auto mt-6 max-w-md rounded-2xl border border-[#d9eee3] bg-[#f4fcf7] px-4 py-3 text-left">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#2e8060]">Sua contratação</p>
-          <p className="mt-1 text-sm font-extrabold text-[#14583d]">{isBoost ? "Destaque de 7 dias" : "Plano contratado"}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#2e8060]">
+            Sua contratação
+          </p>
+          <p className="mt-1 text-sm font-extrabold text-[#14583d]">
+            {isBoost ? "Destaque de 7 dias" : "Plano contratado"}
+          </p>
           <p className="mt-1 text-xs leading-5 text-[#527463]">
-            {isBoost && state.payment.boost_active ? "Benefício ativo no anúncio." : "Pagamento aprovado. Acompanhe a ativação pelo painel."}
+            {isBoost && state.payment.boost_active
+              ? "Benefício ativo no anúncio."
+              : "Pagamento aprovado. Acompanhe a ativação pelo painel."}
           </p>
         </div>
       </>
@@ -99,9 +135,12 @@ function ConfirmationContent({ state }: { state: ConfirmationState }) {
     return (
       <>
         <PaymentIcon variant="failed" />
-        <h1 className="mt-5 text-2xl font-extrabold text-[#122344] sm:text-3xl">Pagamento não confirmado</h1>
+        <h1 className="mt-5 text-2xl font-extrabold text-[#122344] sm:text-3xl">
+          Pagamento não confirmado
+        </h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#53617a]">
-          O pagamento consta como não aprovado. Confira os detalhes no Mercado Pago antes de realizar outra tentativa.
+          O pagamento consta como não aprovado. Confira os detalhes no Mercado Pago antes de
+          realizar outra tentativa.
         </p>
       </>
     );
@@ -111,7 +150,9 @@ function ConfirmationContent({ state }: { state: ConfirmationState }) {
     <>
       <PaymentIcon variant="pending" />
       <h1 className="mt-5 text-2xl font-extrabold text-[#122344] sm:text-3xl">
-        {state.stage === "pending" ? "Seu pagamento está em análise" : "Não foi possível confirmar o pagamento"}
+        {state.stage === "pending"
+          ? "Seu pagamento está em análise"
+          : "Não foi possível confirmar o pagamento"}
       </h1>
       <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-[#53617a]">
         {state.stage === "pending"
@@ -212,7 +253,8 @@ export default function PagamentoSucessoPage() {
         </div>
 
         <p className="mx-auto mt-6 max-w-lg text-xs leading-5 text-[#8590a3]">
-          A confirmação exibida aqui é consultada no sistema do Carros na Cidade. O pagamento é processado pelo Mercado Pago.
+          A confirmação exibida aqui é consultada no sistema do Carros na Cidade. O pagamento é
+          processado pelo Mercado Pago.
         </p>
       </section>
     </main>

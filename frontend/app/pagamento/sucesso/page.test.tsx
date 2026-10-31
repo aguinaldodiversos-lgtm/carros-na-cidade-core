@@ -12,7 +12,11 @@ vi.mock("next/link", () => ({
     href: string;
     children: React.ReactNode;
     className?: string;
-  }) => <a href={href} {...props}>{children}</a>,
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
 }));
 
 const ID = "56dbb539-7df7-488a-937b-6aee8f56b6a9";
@@ -25,7 +29,11 @@ afterEach(() => {
 
 describe("tela de confirmação do pagamento", () => {
   it("mostra sucesso somente após resposta aprovada do backend com destaque ativo", async () => {
-    window.history.replaceState({}, "", "/pagamento/sucesso?external_reference=" + ID + "&status=approved");
+    window.history.replaceState(
+      {},
+      "",
+      "/pagamento/sucesso?external_reference=" + ID + "&status=approved"
+    );
     const spy = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -39,7 +47,9 @@ describe("tela de confirmação do pagamento", () => {
       expect(screen.getByRole("heading", { name: "Pagamento confirmado!" })).toBeTruthy();
     });
     expect(screen.getByText(/Destaque de 7 dias está ativo/i)).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Voltar ao painel da loja/i }).getAttribute("href")).toBe("/dashboard-loja");
+    expect(
+      screen.getByRole("link", { name: /Voltar ao painel da loja/i }).getAttribute("href")
+    ).toBe("/dashboard-loja");
     expect(screen.queryByText("Retomar meu anúncio")).toBeNull();
     expect(spy).toHaveBeenCalledWith(
       "/api/payments/return-status?reference=" + ID,
@@ -60,7 +70,11 @@ describe("tela de confirmação do pagamento", () => {
   });
 
   it("não chama aprovado quando o backend devolve rejeitado", async () => {
-    window.history.replaceState({}, "", "/pagamento/sucesso?external_reference=" + ID + "&status=approved");
+    window.history.replaceState(
+      {},
+      "",
+      "/pagamento/sucesso?external_reference=" + ID + "&status=approved"
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
