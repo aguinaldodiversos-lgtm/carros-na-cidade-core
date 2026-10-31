@@ -59,28 +59,3 @@ export async function submitDealerReview(slug, userId, input) {
     throw err;
   }
 }
-
-export async function listOwnerDealerReviews(userId) {
-  const result = await pool.query(
-    "SELECT r.id, r.reviewer_name AS author, r.rating, r.body, r.status, r.created_at " +
-      "FROM dealer_reviews r JOIN advertisers a ON a.id = r.advertiser_id " +
-      "WHERE a.user_id::text = $1 ORDER BY r.created_at DESC LIMIT 100",
-    [String(userId)]
-  );
-  return result.rows;
-}
-
-/** A remoção pública é lógica: preserva trilha de auditoria para o administrador. */
-export async function hideOwnedDealerReview(userId, reviewId) {
-  const id = Number(reviewId);
-  if (!Number.isSafeInteger(id) || id <= 0) throw new AppError("Avaliação inválida.", 400);
-  const updated = await pool.query(
-    "UPDATE dealer_reviews r SET status = 'hidden', hidden_at = NOW(), " +
-      "hidden_by_user_id = $1, updated_at = NOW() FROM advertisers a " +
-      "WHERE a.id = r.advertiser_id AND a.user_id::text = $1 AND r.id = $2 " +
-      "AND r.status = 'published' RETURNING r.id",
-    [String(userId), id]
-  );
-  if (!updated.rowCount) throw new AppError("Avaliação não encontrada ou já oculta.", 404);
-  return { ok: true };
-}

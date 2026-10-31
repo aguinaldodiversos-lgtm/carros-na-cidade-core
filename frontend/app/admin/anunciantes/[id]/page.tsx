@@ -9,6 +9,7 @@ import { AdminLoadingState } from "@/components/admin/AdminLoadingState";
 import { AdminErrorState } from "@/components/admin/AdminErrorState";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminActionDialog } from "@/components/admin/AdminActionDialog";
+import AdminDealerReviews from "@/components/admin/AdminDealerReviews";
 
 function fmtDate(d: string | undefined | null) {
   if (!d) return "—";
@@ -401,6 +402,8 @@ export default function AdminAnuncianteDetalhe() {
           </div>
         </div>
       </div>
+
+      <AdminDealerReviews advertiserId={d.id} />
 
       {/* Linked Ads */}
       <div className="rounded-xl border border-cnc-line bg-white shadow-card overflow-hidden">

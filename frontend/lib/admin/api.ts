@@ -159,6 +159,13 @@ export const adminApi = {
         body: payload,
       }),
     ads: (id: string | number) => adminFetch<ApiOne<AdRow[]>>(`advertisers/${id}/ads`),
+    reviews: (id: string | number) =>
+      adminFetch<ApiOne<DealerReviewAdminRow[]>>(`advertisers/${id}/reviews`),
+    hideReview: (advertiserId: string | number, reviewId: number, reason: string) =>
+      adminFetch<ApiOne<{ id: number; status: string }>>(
+        `advertisers/${advertiserId}/reviews/${reviewId}/hide`,
+        { method: "PATCH", body: { reason } }
+      ),
     // Concessão MANUAL de plano (cortesia / teste / brinde). Não gera cobrança.
     grantPlan: (id: string | number, payload: PlanGrantPayload) =>
       adminFetch<ApiOne<PlanGrantResult>>(`advertisers/${id}/plan-grant`, {
@@ -1060,6 +1067,17 @@ export type AdvertiserPlanGrant = {
   days_remaining: number | null;
   granted_by_admin_id: string | null;
   granted_by_name: string | null;
+};
+
+export type DealerReviewAdminRow = {
+  id: number;
+  author: string;
+  rating: number;
+  body: string;
+  status: "published" | "hidden";
+  created_at: string;
+  hidden_at?: string | null;
+  hidden_by_user_id?: string | null;
 };
 
 export type AdvDetail = AdvRow & {
