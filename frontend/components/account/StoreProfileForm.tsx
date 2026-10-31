@@ -53,6 +53,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
   const [whatsapp, setWhatsapp] = useState(initial?.whatsapp ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [businessHours, setBusinessHours] = useState(initial?.business_hours ?? "");
   const [coverUrl, setCoverUrl] = useState(initial?.cover_url ?? "");
   const [logoUrl, setLogoUrl] = useState(initial?.logo_url ?? "");
   const [uploading, setUploading] = useState<"cover" | "logo" | null>(null);
@@ -140,6 +141,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
           whatsapp: whatsappTrimmed,
           address: address.trim(),
           description: description.trim(),
+          business_hours: businessHours.trim(),
           cover_url: coverUrl,
           logo_url: logoUrl,
           ...(!created ? { city_id: city?.id } : {}),
@@ -165,6 +167,7 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
         setWhatsapp(data.store.whatsapp);
         setAddress(data.store.address);
         setDescription(data.store.description ?? "");
+        setBusinessHours(data.store.business_hours ?? "");
         setCoverUrl(data.store.cover_url ?? "");
         setLogoUrl(data.store.logo_url ?? "");
       }
@@ -315,6 +318,21 @@ export default function StoreProfileForm({ initial }: { initial: StoreProfile | 
               className="w-full rounded-[14px] border border-[#E5E9F2] bg-white p-4 text-base text-[#1D2440] outline-none focus:border-[#1F66E5]"
             />
             <span className="text-xs text-[#64748b]">{description.length}/600</span>
+          </label>
+          <label className="block">
+            <span className={LABEL_CLASS}>Horários de atendimento (opcional)</span>
+            <textarea
+              value={businessHours}
+              onChange={(event) => setBusinessHours(event.target.value)}
+              maxLength={200}
+              rows={2}
+              placeholder={"Ex.: Seg. a sex.: 9h às 18h" + "\\n" + "Sábado: 9h às 13h"}
+              className="w-full rounded-[14px] border border-[#E5E9F2] bg-white p-4 text-base text-[#1D2440] outline-none focus:border-[#1F66E5]"
+              aria-label="Horários de atendimento da loja"
+            />
+            <span className="mt-1 block text-xs text-[#64748b]">
+              Aparece apenas no perfil público. Não preencha horários que não pratica.
+            </span>
           </label>
           {created ? (
             <>

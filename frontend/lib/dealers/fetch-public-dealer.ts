@@ -27,6 +27,9 @@ export interface PublicDealer {
   coverUrl: string | null;
   logoUrl: string | null;
   whatsapp: string | null;
+  address: string | null;
+  phone: string | null;
+  businessHours: string | null;
   city: string | null;
   state: string | null;
   citySlug: string | null;
@@ -128,6 +131,9 @@ function parseDealer(raw: unknown): PublicDealer | null {
     coverUrl: toStringSafe(r.cover_url) || null,
     logoUrl: toStringSafe(r.logo_url) || null,
     whatsapp: toStringSafe(r.whatsapp) || null,
+    address: toStringSafe(r.address).slice(0, 300) || null,
+    phone: toStringSafe(r.phone).slice(0, 40) || null,
+    businessHours: toStringSafe(r.business_hours).slice(0, 200) || null,
     city: toStringSafe(r.city) || null,
     state: toStringSafe(r.state) || null,
     citySlug: toStringSafe(r.city_slug) || null,
