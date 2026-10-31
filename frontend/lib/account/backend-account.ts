@@ -445,6 +445,7 @@ export type StoreProfile = {
   description?: string;
   cover_url?: string;
   logo_url?: string;
+  business_hours?: string;
   city?: { id: number; name: string; state: string } | null;
   verified?: boolean;
   /** Comprador consegue contato? (COALESCE whatsapp/mobile_phone/phone não vazio) */
@@ -462,6 +463,7 @@ export type UpdateStoreProfilePayload = {
   description?: string;
   cover_url?: string;
   logo_url?: string;
+  business_hours?: string;
 };
 
 export async function fetchStoreProfile(session: SessionData) {
