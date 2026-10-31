@@ -16,6 +16,8 @@ export type SellerDealer = {
   name: string;
   logo: string;
   address: string;
+  /** Compatibilidade de tipos legados; valor não preenchido artificialmente. */
+  rating?: number;
   phone?: string;
   storeSlug: string;
 };
