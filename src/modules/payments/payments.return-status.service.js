@@ -10,7 +10,7 @@ import { query } from "../../infrastructure/database/db.js";
 export async function getMyPaymentReturnStatus({ userId, reference }) {
   const cleanReference = String(reference || "").trim();
 
-  // O Checkout Pro retorna external_reference (UUID local) na back_url.
+  // O Checkout Pro retorna external_reference ou payment_id na back_url.
   if (!/^[a-zA-Z0-9_-]{8,128}$/.test(cleanReference)) {
     return null;
   }
@@ -29,7 +29,7 @@ export async function getMyPaymentReturnStatus({ userId, reference }) {
     FROM payment_intents pi
     LEFT JOIN ads a
       ON a.id::text = pi.ad_id::text
-    WHERE pi.id = $1
+    WHERE (pi.id = $1 OR pi.payment_resource_id = $1 OR pi.checkout_resource_id = $1)
       AND pi.user_id = $2
       AND pi.context IN ('boost', 'plan')
     LIMIT 1
