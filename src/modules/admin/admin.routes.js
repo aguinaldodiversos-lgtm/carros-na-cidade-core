@@ -7,6 +7,7 @@ import * as dashboardService from "./dashboard/admin-dashboard.service.js";
 import * as adsService from "./ads/admin-ads.service.js";
 import * as adBlockService from "./ads/admin-ad-block.service.js";
 import * as advertisersService from "./advertisers/admin-advertisers.service.js";
+import { listDealerReviewsForAdmin, hideDealerReviewByAdmin } from "./advertisers/admin-dealer-reviews.service.js";
 import * as adminUsersService from "./users/admin-users.service.js";
 import * as paymentsService from "./payments/admin-payments.service.js";
 import * as metricsService from "./metrics/admin-metrics.service.js";
@@ -269,6 +270,30 @@ router.get(
   asyncHandler(async (req, res) => {
     const advertiser = await advertisersService.getAdvertiserById(req.params.id);
     res.json({ ok: true, data: advertiser });
+  })
+);
+
+// A moderação de avaliações pertence exclusivamente ao ADMIN.
+router.get(
+  "/advertisers/:id/reviews",
+  asyncHandler(async (req, res) => {
+    const reviews = await listDealerReviewsForAdmin(req.params.id);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ ok: true, data: reviews });
+  })
+);
+
+router.patch(
+  "/advertisers/:id/reviews/:reviewId/hide",
+  asyncHandler(async (req, res) => {
+    const result = await hideDealerReviewByAdmin(
+      req.user.id,
+      req.params.id,
+      req.params.reviewId,
+      req.body?.reason
+    );
+    res.set("Cache-Control", "private, no-store");
+    res.json({ ok: true, data: result });
   })
 );
 
