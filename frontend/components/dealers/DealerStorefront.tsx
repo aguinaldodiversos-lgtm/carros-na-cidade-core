@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AdCard } from "@/components/ads/AdCard";
 import type { PublicDealer, DealerReview } from "@/lib/dealers/fetch-public-dealer";
 import type { AdItem } from "@/lib/search/ads-search";
@@ -16,7 +16,7 @@ const CARD = "rounded-2xl border border-[#e5ebf4] bg-white shadow-[0_8px_26px_rg
 const ICON_CLASS = "h-[19px] w-[19px] shrink-0";
 
 function Icon({ name, className = ICON_CLASS }: { name: "pin" | "car" | "phone" | "clock" | "arrow" | "chat" | "check"; className?: string }) {
-  const paths: Record<typeof name, React.ReactNode> = {
+  const paths: Record<typeof name, ReactNode> = {
     pin: <><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
     car: <><path d="m5 11 1.7-5h10.6L19 11M5 11H4a2 2 0 0 0-2 2v5h20v-5a2 2 0 0 0-2-2h-1M5 11h14M5 18v2M19 18v2" /><circle cx="7" cy="15" r="1" /><circle cx="17" cy="15" r="1" /></>,
     phone: <path d="M21 16.4v3a2 2 0 0 1-2.2 2A18.5 18.5 0 0 1 2.6 5.2 2 2 0 0 1 4.6 3h3A2 2 0 0 1 9.5 4.7l.6 2.8a2 2 0 0 1-.6 1.9L8 10.7a14.5 14.5 0 0 0 5.3 5.3l1.3-1.5a2 2 0 0 1 1.9-.6l2.8.6A2 2 0 0 1 21 16.4Z" />,
