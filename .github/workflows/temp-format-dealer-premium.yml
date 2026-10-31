@@ -1,0 +1,32 @@
+name: Temporário - formatação da vitrine pública
+on:
+  push:
+    branches: [feat/public-dealer-premium-mobile-20261031]
+permissions:
+  contents: write
+jobs:
+  prettier:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/public-dealer-premium-mobile-20261031
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Formatar somente três arquivos da PR
+        run: |
+          npx prettier --write "frontend/components/dealers/DealerStorefront.tsx" "frontend/components/dealers/DealerStorefront.test.tsx" "frontend/lib/dealers/fetch-public-dealer.test.ts"
+      - name: Commitar na branch de revisão
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "frontend/components/dealers/DealerStorefront.tsx" "frontend/components/dealers/DealerStorefront.test.tsx" "frontend/lib/dealers/fetch-public-dealer.test.ts"
+          if ! git diff --cached --quiet; then
+            git commit -m "style(lojas): formatar página e testes"
+            git push origin HEAD:feat/public-dealer-premium-mobile-20261031
+          fi
