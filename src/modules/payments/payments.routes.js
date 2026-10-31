@@ -7,6 +7,7 @@ import {
   createPlanSubscription,
 } from "./payments.service.js";
 import { mercadoPagoWebhookController } from "./payments.webhook.controller.js";
+import { getMyPaymentReturnStatus } from "./payments.return-status.service.js";
 import {
   cancelUserSubscription,
   createSubscriptionCheckout,
@@ -52,6 +53,28 @@ export function resolvePublicUrls() {
     pendingUrl: `${origin}/pagamento/erro`,
   };
 }
+
+/** Estado do pagamento desta conta após o retorno do Mercado Pago.
+ * Nunca utiliza o status recebido na URL como confirmação de cobrança.
+ */
+router.get(
+  "/return-status",
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const reference = String(req.query?.reference || "");
+    const result = await getMyPaymentReturnStatus({
+      userId: req.user.id,
+      reference,
+    });
+
+    res.set("Cache-Control", "private, no-store");
+    if (!result) {
+      res.status(404).json({ error: "Pagamento não encontrado nesta conta." });
+      return;
+    }
+    res.json(result);
+  })
+);
 
 router.post(
   "/create",
