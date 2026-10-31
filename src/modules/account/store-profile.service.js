@@ -100,6 +100,7 @@ export async function getStoreProfile(userId) {
        adv.public_description,
        adv.public_cover_url,
        adv.public_logo_url,
+       adv.public_business_hours,
        adv.city_id,
        adv.verified,
        cities.name AS city_name,
@@ -131,6 +132,7 @@ export async function getStoreProfile(userId) {
     description: adv.public_description || "",
     cover_url: adv.public_cover_url || "",
     logo_url: adv.public_logo_url || "",
+    business_hours: adv.public_business_hours || "",
     city: adv.city_id
       ? { id: Number(adv.city_id), name: adv.city_name || "", state: adv.city_state || "" }
       : null,
@@ -237,6 +239,14 @@ export async function updateStoreProfile(userId, input) {
   setIfColumnExists("email", email || null);
   setIfColumnExists("whatsapp", whatsapp || null);
   setIfColumnExists("address", address || null);
+
+  if (input && Object.prototype.hasOwnProperty.call(input, "business_hours")) {
+    const hours = String(input.business_hours ?? "").trim();
+    if (hours.length > 200 || /[<>]/.test(hours)) {
+      throw new AppError("Horário de atendimento deve ter até 200 caracteres.", 400);
+    }
+    setIfColumnExists("public_business_hours", hours || null);
+  }
 
   if (input && Object.prototype.hasOwnProperty.call(input, "description")) {
     const description = String(input.description ?? "").trim();
