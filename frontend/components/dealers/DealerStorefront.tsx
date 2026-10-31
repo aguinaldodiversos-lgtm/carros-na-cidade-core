@@ -362,7 +362,7 @@ export default function DealerStorefront({ dealer, ads, reviews }: Props) {
       </nav>
 
       <div className="relative">
-        <div className="relative aspect-[16/8] w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#10254b] to-[#1d60c9] sm:aspect-[16/5] lg:aspect-[5/1]">
+        <div className="relative aspect-[16/8] w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#10254b] to-[#1d60c9] sm:aspect-[16/5] lg:aspect-[4/1]">
           {dealer.coverUrl ? (
             <Image
               src={dealer.coverUrl}
@@ -380,17 +380,17 @@ export default function DealerStorefront({ dealer, ads, reviews }: Props) {
           )}
         </div>
 
-        <div className="relative z-[1] -mt-6 grid gap-3 px-1 sm:-mt-12 sm:gap-4 sm:px-3 lg:grid-cols-[minmax(0,1.95fr)_minmax(290px,1fr)]">
-          <section aria-label="Identidade da loja" className={CARD + " min-w-0 p-4 sm:p-6"}>
-            <div className="flex items-start gap-4 sm:gap-5">
-              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dde5f3] bg-[#121821] text-base font-extrabold text-white shadow-sm sm:h-32 sm:w-32">
+        <div className="relative z-[1] -mt-5 grid gap-3 px-1 sm:-mt-6 sm:gap-4 sm:px-3 lg:grid-cols-[minmax(0,1.95fr)_minmax(290px,1fr)]">
+          <section aria-label="Identidade da loja" className={CARD + " min-w-0 p-4 sm:p-5"}>
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dde5f3] bg-[#121821] text-base font-extrabold text-white shadow-sm sm:h-24 sm:w-24">
                 {dealer.logoUrl ? (
                   <Image
                     src={dealer.logoUrl}
                     alt={"Logotipo da " + dealer.name}
                     fill
                     unoptimized
-                    sizes="(max-width: 640px) 80px, 128px"
+                    sizes="(max-width: 640px) 64px, 96px"
                     className="object-contain"
                   />
                 ) : (
@@ -414,28 +414,12 @@ export default function DealerStorefront({ dealer, ads, reviews }: Props) {
                     {dealer.totalActiveAds === 1 ? "anúncio ativo" : "anúncios ativos"}
                   </span>
                 </div>
-                <p className="mt-3 hidden text-sm leading-relaxed text-[#526079] sm:block">
-                  Consulte os veículos anunciados pela {dealer.name} e negocie diretamente com a
-                  loja, sem intermediação do portal.
-                </p>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-[#395477] sm:mt-5">
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#e4eaf4] bg-[#f7f9ff] px-3 py-2">
-                <Icon name="check" className="h-4 w-4 text-[#145de0]" />
-                Contato direto
-              </span>
-              {dealer.address && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#e4eaf4] bg-[#f7f9ff] px-3 py-2">
-                  <Icon name="pin" className="h-4 w-4 text-[#145de0]" />
-                  Endereço comercial informado
-                </span>
-              )}
-            </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <a
                 href="#estoque"
-                className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#1262e8] px-3 py-3 text-center text-sm font-extrabold text-white shadow-sm transition hover:bg-[#064cbe]"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#1262e8] px-3 py-2.5 text-center text-sm font-extrabold text-white shadow-sm transition hover:bg-[#064cbe]"
               >
                 <Icon name="car" />
                 Ver estoque da loja
@@ -446,7 +430,7 @@ export default function DealerStorefront({ dealer, ads, reviews }: Props) {
                   href={whatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#089853] px-3 py-3 text-center text-sm font-extrabold text-white shadow-sm transition hover:bg-[#087a45]"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#089853] px-3 py-2.5 text-center text-sm font-extrabold text-white shadow-sm transition hover:bg-[#087a45]"
                 >
                   <Icon name="chat" />
                   Chamar no WhatsApp
@@ -455,12 +439,12 @@ export default function DealerStorefront({ dealer, ads, reviews }: Props) {
             </div>
           </section>
 
-          <aside aria-label="Informações de contato" className={CARD + " min-w-0 p-4 sm:p-6"}>
+          <aside aria-label="Informações de contato" className={CARD + " min-w-0 p-4 sm:p-5"}>
             <h2 className="text-base font-extrabold text-[#152548] sm:text-lg">
               Informações de contato
             </h2>
             {hasContactInfo ? (
-              <div className="mt-4 space-y-4">
+              <div className="mt-3 space-y-3">
                 {dealer.address && (
                   <div className={contactRow}>
                     <Icon name="pin" className="mt-0.5 h-5 w-5 text-[#1764e6]" />

@@ -32,6 +32,23 @@ const baseDealer: PublicDealer = {
 afterEach(cleanup);
 
 describe("perfil público da loja — layout premium", () => {
+  it("mantém fachada visível e cards compactos sem perder ações ou contatos", () => {
+    render(<DealerStorefront dealer={baseDealer} ads={[]} reviews={[]} />);
+    const facade = screen.getByRole("img", { name: /Fachada da loja/i });
+    expect(facade.parentElement?.className).toContain("lg:aspect-[4/1]");
+    const logo = screen.getByRole("img", { name: /Logotipo da/i });
+    expect(logo.parentElement?.className).toContain("sm:h-24");
+    expect(screen.getByRole("region", { name: "Identidade da loja" }).className).toContain(
+      "sm:p-5"
+    );
+    expect(
+      screen.getByRole("complementary", { name: "Informações de contato" }).className
+    ).toContain("sm:p-5");
+    expect(screen.getByRole("link", { name: /Ver estoque da loja/i })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Chamar no WhatsApp/i })).toBeTruthy();
+    expect(screen.getByText("Rua Comercial, 100")).toBeTruthy();
+  });
+
   it("renderiza apenas contatos reais, sem mapa nem avaliações fictícias", () => {
     render(<DealerStorefront dealer={baseDealer} ads={[]} reviews={[]} />);
     expect(screen.getByText("Rua Comercial, 100")).toBeTruthy();
