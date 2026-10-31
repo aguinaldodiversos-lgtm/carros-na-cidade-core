@@ -295,6 +295,46 @@ describe("adaptAdDetailToVehicle — selos de procedência x opcionais", () => {
  * as cópias locais antigas (que retornavam "R$ 0" e "São Paulo (SP)"
  * sintético).
  */
+describe("logo comercial no detalhe", () => {
+  it("usa somente o logotipo real cadastrado pela loja", () => {
+    const v = adaptAdDetailToVehicle(makeAd({
+      account_type: "CNPJ",
+      seller_kind: "dealer",
+      advertiser_slug: "ittmotors-122",
+      advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
+    }));
+    expect(v.seller.type).toBe("dealer");
+    if (v.seller.type === "dealer") {
+      expect(v.seller.logo).toBe("/api/vehicle-images?key=dealers%2Flogo.webp");
+      expect(v.seller.storeSlug).toBe("ittmotors-122");
+    }
+  });
+
+  it("não utiliza logo do portal ou avaliação falsa se a loja não cadastrou logo", () => {
+    const v = adaptAdDetailToVehicle(makeAd({
+      account_type: "CNPJ",
+      seller_kind: "dealer",
+      advertiser_logo_url: null,
+    }));
+    expect(v.seller.type).toBe("dealer");
+    if (v.seller.type === "dealer") {
+      expect(v.seller.logo).toBe("");
+      expect("rating" in v.seller).toBe(false);
+    }
+  });
+
+  it("preserva tipo particular e não expõe logotipo comercial recebido por engano", () => {
+    const v = adaptAdDetailToVehicle(makeAd({
+      account_type: "CPF",
+      seller_kind: "private",
+      seller_name: "João da Silva",
+      advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
+    }));
+    expect(v.seller.type).toBe("private");
+    expect("logo" in v.seller).toBe(false);
+  });
+});
+
 describe("adaptAdDetailToVehicle — contrato público P2-E", () => {
   it("nunca renderiza 'R$ 0' quando price=0", () => {
     const v = adaptAdDetailToVehicle(makeAd({ price: 0 }));
