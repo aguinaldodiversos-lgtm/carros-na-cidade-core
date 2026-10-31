@@ -98,6 +98,25 @@ describe("fetchAdDetail — regressão 2026-05-24", () => {
     expect(result?.seller_kind).toBe("dealer");
   });
 
+  it("propaga apenas logotipo público informado pelo backend", async () => {
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          id: 42,
+          slug: "honda-civic-2020",
+          title: "Honda Civic",
+          price: 89900,
+          advertiser_slug: "ittmotors-122",
+          advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
+        },
+      }),
+    } as unknown as Response);
+
+    const result = await fetchAdDetail("honda-civic-2020");
+    expect(result?.advertiser_logo_url).toBe("/api/vehicle-images?key=dealers%2Flogo.webp");
+  });
+
   it("advertiser_slug aceita aliases legados (advertiserSlug / dealership_slug)", async () => {
     mockedFetch.mockResolvedValueOnce({
       ok: true,
