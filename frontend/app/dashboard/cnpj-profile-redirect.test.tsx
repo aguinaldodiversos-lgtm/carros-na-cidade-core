@@ -46,18 +46,14 @@ beforeEach(() => {
 describe("rotas /dashboard com sessão CNPJ", () => {
   it("redireciona Dados pessoais ao editor correto da loja ANTES de consultar /personal", async () => {
     setAccount("CNPJ");
-    await expect(ContaPfPage()).rejects.toThrow(
-      "NEXT_REDIRECT:/dashboard-loja/dados"
-    );
+    await expect(ContaPfPage()).rejects.toThrow("NEXT_REDIRECT:/dashboard-loja/dados");
     expect(mocks.redirect).toHaveBeenCalledWith("/dashboard-loja/dados");
     expect(mocks.fetchPersonal).not.toHaveBeenCalled();
   });
 
   it("redireciona a página principal do painel PF ao painel de lojista", async () => {
     setAccount("CNPJ");
-    await expect(DashboardPage()).rejects.toThrow(
-      "NEXT_REDIRECT:/dashboard-loja"
-    );
+    await expect(DashboardPage()).rejects.toThrow("NEXT_REDIRECT:/dashboard-loja");
     expect(mocks.loadDashboard).not.toHaveBeenCalled();
   });
 
