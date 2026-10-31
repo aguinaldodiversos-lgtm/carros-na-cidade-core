@@ -59,9 +59,7 @@ describe("card de acesso ao perfil público da loja", () => {
   });
 
   it("não apresenta um link falso quando falta slug válido", () => {
-    render(
-      <DealerStoreLinkCard seller={{ ...seller, storeSlug: "", logo: "" }} city="" />
-    );
+    render(<DealerStoreLinkCard seller={{ ...seller, storeSlug: "", logo: "" }} city="" />);
     expect(screen.queryByRole("link", { name: /Ver página da loja/i })).toBeNull();
     expect(screen.getByText(/Perfil público da loja indisponível/i)).toBeTruthy();
   });

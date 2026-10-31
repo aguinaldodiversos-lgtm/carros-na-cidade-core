@@ -178,7 +178,13 @@ describe("adaptAdDetailToVehicle — Fase A: câmbio/carroceria (fonte confiáve
 
   it("carroceria 'sedan' isolada (Mobi) vira 'Não informado' — nunca chuta Sedã", () => {
     const v = adaptAdDetailToVehicle(
-      makeAd({ brand: "Fiat", model: "Mobi", title: "Fiat Mobi Like 1.0 Fire Flex 5p", body_type: "sedan", version: "Like 1.0 Fire Flex 5p" })
+      makeAd({
+        brand: "Fiat",
+        model: "Mobi",
+        title: "Fiat Mobi Like 1.0 Fire Flex 5p",
+        body_type: "sedan",
+        version: "Like 1.0 Fire Flex 5p",
+      })
     );
     expect(v.bodyType).toBe("Não informado");
   });
@@ -211,9 +217,9 @@ describe("adaptAdDetailToVehicle — combustível duplicado no H1/fullName", () 
     expect(
       adaptAdDetailToVehicle(makeAd({ title: "Ford Ranger XLT 3.2 Diesel Diesel" })).fullName
     ).toBe("Ford Ranger XLT 3.2 Diesel");
-    expect(
-      adaptAdDetailToVehicle(makeAd({ title: "VW Gol 1.6 Gasolina Gasolina" })).fullName
-    ).toBe("VW Gol 1.6 Gasolina");
+    expect(adaptAdDetailToVehicle(makeAd({ title: "VW Gol 1.6 Gasolina Gasolina" })).fullName).toBe(
+      "VW Gol 1.6 Gasolina"
+    );
   });
 
   it("NÃO remove o combustível quando ele aparece uma única vez", () => {
@@ -297,12 +303,14 @@ describe("adaptAdDetailToVehicle — selos de procedência x opcionais", () => {
  */
 describe("logo comercial no detalhe", () => {
   it("usa somente o logotipo real cadastrado pela loja", () => {
-    const v = adaptAdDetailToVehicle(makeAd({
-      account_type: "CNPJ",
-      seller_kind: "dealer",
-      advertiser_slug: "ittmotors-122",
-      advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
-    }));
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        account_type: "CNPJ",
+        seller_kind: "dealer",
+        advertiser_slug: "ittmotors-122",
+        advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
+      })
+    );
     expect(v.seller.type).toBe("dealer");
     if (v.seller.type === "dealer") {
       expect(v.seller.logo).toBe("/api/vehicle-images?key=dealers%2Flogo.webp");
@@ -311,11 +319,13 @@ describe("logo comercial no detalhe", () => {
   });
 
   it("não utiliza logo do portal ou avaliação falsa se a loja não cadastrou logo", () => {
-    const v = adaptAdDetailToVehicle(makeAd({
-      account_type: "CNPJ",
-      seller_kind: "dealer",
-      advertiser_logo_url: null,
-    }));
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        account_type: "CNPJ",
+        seller_kind: "dealer",
+        advertiser_logo_url: null,
+      })
+    );
     expect(v.seller.type).toBe("dealer");
     if (v.seller.type === "dealer") {
       expect(v.seller.logo).toBe("");
@@ -324,12 +334,14 @@ describe("logo comercial no detalhe", () => {
   });
 
   it("preserva tipo particular e não expõe logotipo comercial recebido por engano", () => {
-    const v = adaptAdDetailToVehicle(makeAd({
-      account_type: "CPF",
-      seller_kind: "private",
-      seller_name: "João da Silva",
-      advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
-    }));
+    const v = adaptAdDetailToVehicle(
+      makeAd({
+        account_type: "CPF",
+        seller_kind: "private",
+        seller_name: "João da Silva",
+        advertiser_logo_url: "/api/vehicle-images?key=dealers%2Flogo.webp",
+      })
+    );
     expect(v.seller.type).toBe("private");
     expect("logo" in v.seller).toBe(false);
   });
@@ -368,4 +380,3 @@ describe("adaptAdDetailToVehicle — contrato público P2-E", () => {
     expect(v.city).toBe("Curitiba (PR)");
   });
 });
-

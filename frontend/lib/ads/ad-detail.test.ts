@@ -11,9 +11,7 @@ vi.mock("@/lib/net/ssr-resilient-fetch", () => ({
 
 vi.mock("@/lib/vehicle/detail-utils", () => ({
   collectVehicleImageCandidates: (...args: unknown[]) =>
-    args
-      .filter((v): v is string => typeof v === "string" && v.length > 0)
-      .map((v) => String(v)),
+    args.filter((v): v is string => typeof v === "string" && v.length > 0).map((v) => String(v)),
 }));
 
 import { fetchAdDetail } from "./ad-detail";

@@ -90,7 +90,14 @@ export default function DealerStoreLinkCard({ seller, city }: DealerStoreLinkCar
           </p>
           {city ? (
             <p className="mt-1 flex items-center gap-1 text-[12.5px] text-cnc-muted">
-              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-primary" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 shrink-0 text-primary"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                aria-hidden="true"
+              >
                 <path d="M12 22s7-7.5 7-12a7 7 0 1 0-14 0c0 4.5 7 12 7 12Z" />
                 <circle cx="12" cy="10" r="2.5" />
               </svg>
