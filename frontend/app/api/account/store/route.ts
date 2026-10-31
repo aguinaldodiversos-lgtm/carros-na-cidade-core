@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       description: String(raw?.description ?? ""),
       cover_url: String(raw?.cover_url ?? ""),
       logo_url: String(raw?.logo_url ?? ""),
+      business_hours: String(raw?.business_hours ?? ""),
       city_id: Number(raw?.city_id),
     };
     const created = await createStoreProfile(auth.ctx.session, payload);
@@ -70,6 +71,7 @@ export async function PUT(request: NextRequest) {
       description: String(raw?.description ?? ""),
       cover_url: String(raw?.cover_url ?? ""),
       logo_url: String(raw?.logo_url ?? ""),
+      business_hours: String(raw?.business_hours ?? ""),
     };
 
     const updated = await updateStoreProfile(auth.ctx.session, payload);
