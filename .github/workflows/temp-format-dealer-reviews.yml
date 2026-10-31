@@ -1,0 +1,32 @@
+name: Temporário - formatar moderação de avaliações
+on:
+  push:
+    branches: [fix/dealer-media-admin-review-control-20261030]
+permissions:
+  contents: write
+jobs:
+  prettier:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/dealer-media-admin-review-control-20261030
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Aplicar prettier somente aos 5 arquivos
+        run: |
+          npx prettier --write "frontend/app/api/account/store/media/route.ts" "frontend/components/admin/AdminDealerReviews.tsx" "src/modules/admin/admin.routes.js" "src/modules/public/dealer-reviews.service.js" "tests/admin/admin-dealer-reviews.service.test.js"
+      - name: Commitar formatação na branch de correção
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "frontend/app/api/account/store/media/route.ts" "frontend/components/admin/AdminDealerReviews.tsx" "src/modules/admin/admin.routes.js" "src/modules/public/dealer-reviews.service.js" "tests/admin/admin-dealer-reviews.service.test.js"
+          if ! git diff --cached --quiet; then
+            git commit -m "style(lojas): formatar arquivos da correção"
+            git push origin HEAD:fix/dealer-media-admin-review-control-20261030
+          fi
