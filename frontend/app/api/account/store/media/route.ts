@@ -14,9 +14,22 @@ export async function POST(request: NextRequest) {
   const auth = await authenticateBffRequest(request);
   if (!auth.ok) return auth.response;
 
+  // Em produção o Render/Cloudflare pode entregar request.nextUrl.origin como
+  // host interno, mesmo quando Origin é o domínio oficial do navegador.
+  // A allowlist explícita preserva proteção contra CSRF (não confiar em Host/XFH).
   const sourceOrigin = request.headers.get("origin");
-  if (sourceOrigin && sourceOrigin !== request.nextUrl.origin) {
+  const allowedOrigins = new Set([
+    "https://www.carrosnacidade.com",
+    "https://carrosnacidade.com",
+  ]);
+  if (process.env.NODE_ENV !== "production") {
+    allowedOrigins.add(request.nextUrl.origin);
+  }
+  if (sourceOrigin && !allowedOrigins.has(sourceOrigin)) {
     return NextResponse.json({ error: "Origem não autorizada." }, { status: 403 });
+  }
+  if (auth.ctx.session.type !== "CNPJ") {
+    return NextResponse.json({ error: "Envio disponível apenas para lojistas." }, { status: 403 });
   }
 
   const form = await request.formData().catch(() => null);
