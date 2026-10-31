@@ -21,6 +21,7 @@ import {
 import type { VehicleDetail } from "@/lib/vehicle/public-vehicle";
 import { buildCanonicalCityHref } from "@/lib/seo/canonical-city-path";
 
+import DealerStoreLinkCard from "./DealerStoreLinkCard";
 import VehicleGalleryCarousel from "./VehicleGalleryCarousel";
 import VehicleMessageForm from "./VehicleMessageForm";
 
@@ -334,30 +335,28 @@ export default function VehicleDetailView({
 
             {/* Aviso legal */}
             <section className="rounded-2xl border border-cnc-line bg-white p-4 shadow-card">
-  <h2 className="text-[15px] font-extrabold text-cnc-text-strong">
-    Aviso Legal
-  </h2>
+              <h2 className="text-[15px] font-extrabold text-cnc-text-strong">Aviso Legal</h2>
 
-  <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
-    O Carros na Cidade é um portal de anúncios automotivos. Não somos
-    proprietários dos veículos anunciados, não recebemos o pagamento da compra
-    e não intermediamos a negociação entre comprador e vendedor.
-  </p>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
+                O Carros na Cidade é um portal de anúncios automotivos. Não somos proprietários dos
+                veículos anunciados, não recebemos o pagamento da compra e não intermediamos a
+                negociação entre comprador e vendedor.
+              </p>
 
-  <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
-    As informações deste anúncio são fornecidas pelo anunciante e devem ser
-    verificadas pelo comprador antes da conclusão do negócio. A publicação do
-    anúncio não representa vistoria, certificação, garantia de procedência ou
-    recomendação de compra pelo Carros na Cidade.
-  </p>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-cnc-muted">
+                As informações deste anúncio são fornecidas pelo anunciante e devem ser verificadas
+                pelo comprador antes da conclusão do negócio. A publicação do anúncio não representa
+                vistoria, certificação, garantia de procedência ou recomendação de compra pelo
+                Carros na Cidade.
+              </p>
 
-  <Link
-    href="/termos-de-uso"
-    className="mt-3 inline-flex text-[12.5px] font-semibold text-[#0e62d8] hover:underline"
-  >
-    Ver Termos de Uso
-  </Link>
-</section>
+              <Link
+                href="/termos-de-uso"
+                className="mt-3 inline-flex text-[12.5px] font-semibold text-[#0e62d8] hover:underline"
+              >
+                Ver Termos de Uso
+              </Link>
+            </section>
 
             {/* Denunciar */}
             <button
@@ -535,55 +534,36 @@ function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
 
 function SellerCard({ vehicle }: { vehicle: VehicleDetail }) {
   const seller = vehicle.seller;
-  const isDealer = seller.type === "dealer";
-  // PF: `seller.name` já é APENAS o primeiro nome (truncado na fonte, LGPD).
-  // Loja: nome comercial completo.
-  const name = seller.name || (isDealer ? "Loja parceira" : "Anunciante");
+  const city = vehicle.city === "Localização não informada" ? "" : vehicle.city;
+
+  // O cartão CTA aparece somente para conta CNPJ; PF mantém o bloco
+  // informativo, sem URL de loja nem nome completo exposto.
+  if (seller.type === "dealer") {
+    return <DealerStoreLinkCard seller={seller} city={city} />;
+  }
+
+  const name = seller.name || "Anunciante";
   const initials =
     name
       .split(" ")
       .filter(Boolean)
       .slice(0, 2)
-      .map((p) => p.charAt(0).toUpperCase())
+      .map((part) => part.charAt(0).toUpperCase())
       .join("") || "C";
-  const city = vehicle.city === "Localização não informada" ? "" : vehicle.city;
-  const href = isDealer && seller.storeSlug ? `/lojas/${seller.storeSlug}` : null;
-  const Wrapper: React.ElementType = href ? Link : "div";
-  const wrapperProps = href ? { href } : {};
 
   return (
     <section className="rounded-2xl border border-cnc-line bg-white p-4 shadow-card">
       <h2 className="text-[15px] font-extrabold text-cnc-text-strong">Vendedor</h2>
-      <Wrapper
-        {...wrapperProps}
-        className="mt-3 flex items-center gap-3 rounded-xl transition hover:bg-cnc-bg"
-      >
+      <div className="mt-3 flex items-center gap-3">
         <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-[14px] font-extrabold text-primary">
-          {isDealer && seller.logo ? (
-            <Image
-              src={seller.logo}
-              alt={name}
-              width={48}
-              height={48}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            initials
-          )}
+          {initials}
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-extrabold text-cnc-text-strong">{name}</p>
           {city ? <p className="mt-0.5 truncate text-[12.5px] text-cnc-muted">{city}</p> : null}
-          <p className="mt-0.5 text-[11.5px] text-cnc-muted-soft">
-            {isDealer ? "Loja / Revenda" : "Anunciante particular"}
-          </p>
+          <p className="mt-0.5 text-[11.5px] text-cnc-muted-soft">Anunciante particular</p>
         </div>
-        {href ? (
-          <span aria-hidden="true" className="shrink-0 text-cnc-muted-soft">
-            <ChevronRightIcon />
-          </span>
-        ) : null}
-      </Wrapper>
+      </div>
     </section>
   );
 }

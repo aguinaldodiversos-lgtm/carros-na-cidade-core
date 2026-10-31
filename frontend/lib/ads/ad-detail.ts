@@ -47,6 +47,8 @@ export interface PublicAdDetail {
    * card da loja para `/lojas/[advertiser_slug]`. Ausência → não linkar.
    */
   advertiser_slug?: string | null;
+  /** Logotipo comercial público cadastrado pela loja (não é o logo do portal). */
+  advertiser_logo_url?: string | null;
   /**
    * Backend marca true quando o anúncio entrou em pending_review por
    * sinal de preço abaixo da FIPE e foi aprovado pela moderação.
@@ -199,6 +201,7 @@ function normalizeAdDetail(raw: unknown, requestedIdentifier: string): PublicAdD
     advertiser_slug: toNullableText(
       item.advertiser_slug ?? item.advertiserSlug ?? item.dealership_slug
     ),
+    advertiser_logo_url: toNullableText(item.advertiser_logo_url),
     reviewed_after_below_fipe: item.reviewed_after_below_fipe === true,
     dealership_name: toNullableText(
       item.dealership_name ?? item.dealershipName ?? item.store_name ?? item.dealer_name

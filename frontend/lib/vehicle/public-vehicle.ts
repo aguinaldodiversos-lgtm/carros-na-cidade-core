@@ -8,7 +8,6 @@ import {
   type TrustBadge,
 } from "@/lib/ads/vehicle-options";
 import { buildPublicTerritoryLabel, formatPricePublic } from "@/lib/public-contracts";
-import { SITE_LOGO_SRC } from "@/lib/site/brand-assets";
 import { normalizeVehicleGalleryImages } from "@/lib/vehicle/detail-utils";
 import { resolveSellerKind } from "@/lib/vehicle/seller-kind";
 
@@ -17,7 +16,8 @@ export type SellerDealer = {
   name: string;
   logo: string;
   address: string;
-  rating: number;
+  /** Compatibilidade de tipos legados; valor não preenchido artificialmente. */
+  rating?: number;
   phone?: string;
   storeSlug: string;
 };
@@ -588,9 +588,8 @@ function buildSellerInfo(ad: PublicAdDetail): SellerInfo {
     return {
       type: "dealer",
       name: sellerName,
-      logo: SITE_LOGO_SRC,
+      logo: sanitizeText(ad.advertiser_logo_url),
       address: cityDisplay,
-      rating: 4.8,
       phone: sellerPhone,
       storeSlug: canonicalStoreSlug,
     };
