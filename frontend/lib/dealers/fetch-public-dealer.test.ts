@@ -126,6 +126,35 @@ describe("fetchPublicDealer — Lojas Públicas 2026-05-25", () => {
     expect(out?.dealer.name).toBe("Loja parceira");
   });
 
+  it("expõe somente contatos públicos reais e horário informado, sem defaults fictícios", async () => {
+    mockedFetch.mockResolvedValue({
+      ok: true,
+      json: async () => dealerPayload({
+        address: "Rua Exemplo, 100",
+        phone: "1144149804",
+        whatsapp: "11999998888",
+        business_hours: "Segunda a sexta: 9h às 18h",
+      }),
+    } as unknown as Response);
+
+    const out = await fetchPublicDealer("auto-center-7");
+    expect(out?.dealer.address).toBe("Rua Exemplo, 100");
+    expect(out?.dealer.phone).toBe("1144149804");
+    expect(out?.dealer.whatsapp).toBe("11999998888");
+    expect(out?.dealer.businessHours).toBe("Segunda a sexta: 9h às 18h");
+  });
+
+  it("não inventa endereço, telefone ou horário quando não cadastrados", async () => {
+    mockedFetch.mockResolvedValue({
+      ok: true,
+      json: async () => dealerPayload(),
+    } as unknown as Response);
+    const out = await fetchPublicDealer("auto-center-7");
+    expect(out?.dealer.address).toBeNull();
+    expect(out?.dealer.phone).toBeNull();
+    expect(out?.dealer.businessHours).toBeNull();
+  });
+
   it("verified=true propaga para o payload", async () => {
     mockedFetch.mockResolvedValue({
       ok: true,
